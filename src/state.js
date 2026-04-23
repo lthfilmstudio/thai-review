@@ -2,6 +2,33 @@
    settings 跟 progress 寫進 localStorage，重新開啟能還原。 */
 
 export const STORAGE_KEY = 'thai-review-v1';
+export const LESSONS_CACHE_KEY = 'thai-review-lessons-v1';
+
+/* 儲存整份 lessons 資料到 localStorage。8500 張卡約 1.3MB，在限額內。 */
+export function saveLessonsCache(url, lessons) {
+  try {
+    localStorage.setItem(LESSONS_CACHE_KEY, JSON.stringify({ url, ts: Date.now(), lessons }));
+  } catch (e) {
+    console.warn('lessons cache save failed:', e.message);
+  }
+}
+
+/* 讀 cache；URL 不符就忽略。 */
+export function loadLessonsCache(url) {
+  try {
+    const raw = localStorage.getItem(LESSONS_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    if (c.url !== url) return null;
+    return { lessons: c.lessons, ts: c.ts };
+  } catch (e) {
+    return null;
+  }
+}
+
+export function clearLessonsCache() {
+  try { localStorage.removeItem(LESSONS_CACHE_KEY); } catch {}
+}
 
 /* 預設資料來源：Nalin 的泰文課 Sheet（整份文件發佈）。
    使用者未在設定填自訂 URL 時，就用這個。 */

@@ -4,6 +4,7 @@ import {
   state, loadState, saveState,
   DEMO_LESSONS, DEFAULT_SHEET_URL,
   filteredCards, setGrade, shuffleCurrentLesson,
+  saveLessonsCache, loadLessonsCache, clearLessonsCache,
 } from './state.js';
 import { loadLessons } from './data.js';
 import { speakCard, warmupVoices } from './tts.js';
@@ -13,17 +14,38 @@ import {
   openDrawer, closeDrawer, openModal, closeModal, applyTheme,
 } from './ui.js';
 
-async function fetchLessonsOrDemo() {
-  const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
+async function fetchFromNetwork(url) {
   try {
     const lessons = await loadLessons(url);
     if (lessons && lessons.length) return lessons;
   } catch (e) {
-    console.warn('資料載入失敗，使用 demo 資料：', e.message);
-    // 使用者有填自訂 URL 才跳錯誤提示；預設 URL 失敗靜默 fallback 到 demo
+    console.warn('資料載入失敗：', e.message);
     if (state.settings.sheetInput) alert('資料載入失敗：' + e.message);
   }
-  return DEMO_LESSONS;
+  return null;
+}
+
+/* cache-first：有 cache 先回、同時背景 revalidate；
+   沒 cache 才等網路；網路也炸才走 DEMO。 */
+async function loadLessonsCacheFirst(onFreshData) {
+  const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
+  const cached = loadLessonsCache(url);
+
+  // 背景 revalidate 永遠會跑
+  const revalidate = (async () => {
+    const fresh = await fetchFromNetwork(url);
+    if (fresh) {
+      saveLessonsCache(url, fresh);
+      onFreshData?.(fresh);
+    }
+    return fresh;
+  })();
+
+  if (cached) return cached.lessons;
+
+  // 沒 cache，等網路
+  const fresh = await revalidate;
+  return fresh || DEMO_LESSONS;
 }
 
 function rerender() {
@@ -99,13 +121,28 @@ function showLoading(msg) {
   }
 }
 
+function onFreshLessons(fresh) {
+  // 課程結構沒變（數量跟 id 都相同）就靜默替換卡片資料，
+  // 保留使用者當前位置；變了才重設到第一堂。
+  const sameStructure = fresh.length === state.lessons.length
+    && fresh.every((l, i) => l.id === state.lessons[i]?.id);
+  state.lessons = fresh;
+  if (!sameStructure) {
+    state.currentLessonId = fresh[0]?.id || null;
+    state.cardIndex = 0;
+    state.flipped = false;
+  }
+  rerender();
+}
+
 async function init() {
   loadState();
   applyTheme();
 
-  showLoading('正在從 Google Sheets 抓課程…');
+  const hasCache = !!loadLessonsCache(state.settings.sheetInput || DEFAULT_SHEET_URL);
+  if (!hasCache) showLoading('正在從 Google Sheets 抓課程…');
 
-  state.lessons = await fetchLessonsOrDemo();
+  state.lessons = await loadLessonsCacheFirst(onFreshLessons);
   if (!state.currentLessonId ||
       (state.currentLessonId !== '__ALL__' && !state.lessons.find(l => l.id === state.currentLessonId))) {
     state.currentLessonId = state.lessons[0]?.id || null;
@@ -158,7 +195,10 @@ async function init() {
     state.settings.sheetInput = newInput;
     saveState();
     if (inputChanged) {
-      state.lessons = await fetchLessonsOrDemo();
+      // URL 變了 → 清 cache 強制重抓
+      clearLessonsCache();
+      showLoading('正在從 Google Sheets 抓課程…');
+      state.lessons = await loadLessonsCacheFirst(onFreshLessons);
       state.currentLessonId = state.lessons[0]?.id || null;
       state.cardIndex = 0;
       state.flipped = false;
