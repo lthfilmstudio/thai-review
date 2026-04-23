@@ -77,9 +77,22 @@ function wireSegClick(sel, onPick) {
   });
 }
 
+function showLoading(msg) {
+  const el = document.getElementById('content');
+  if (el) {
+    el.innerHTML = `<div class="empty">
+      <div class="empty-icon">⋯</div>
+      <div class="empty-title">${msg}</div>
+      <div class="empty-sub">首次載入 28 堂課要幾秒到十幾秒，請稍候。之後 Service Worker 會 cache，就會快很多。</div>
+    </div>`;
+  }
+}
+
 async function init() {
   loadState();
   applyTheme();
+
+  showLoading('正在從 Google Sheets 抓課程…');
 
   state.lessons = await fetchLessonsOrDemo();
   if (!state.currentLessonId ||

@@ -123,16 +123,17 @@ async function loadFromPublishedSheet(pubUrl) {
   const html = await res.text();
   const tabs = parsePubTabs(html);
   if (!tabs.length) throw new Error('找不到 tab，請確認 Sheet 已「發佈整個文件」');
-  const lessons = [];
-  for (const tab of tabs) {
+  // 並行抓所有 tab（28 個 × 300ms 依序 ≈ 10s，並行 <1s）
+  const results = await Promise.allSettled(tabs.map(async tab => {
     const csvUrl = `${base}/pub?gid=${tab.gid}&single=true&output=csv`;
-    try {
-      const cards = await fetchCsvCards(csvUrl);
-      if (cards.length) lessons.push({ id: 'gid-' + tab.gid, title: tab.name, cards });
-    } catch (e) {
-      console.warn('tab skipped:', tab.name, e);
-    }
-  }
+    const cards = await fetchCsvCards(csvUrl);
+    return { id: 'gid-' + tab.gid, title: tab.name, cards };
+  }));
+  const lessons = [];
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value.cards.length) lessons.push(r.value);
+    else if (r.status === 'rejected') console.warn('tab skipped:', tabs[i].name, r.reason);
+  });
   if (!lessons.length) throw new Error('所有 tab 都讀取失敗');
   return lessons;
 }
