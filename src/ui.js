@@ -93,10 +93,14 @@ export function renderSidebar(selectLesson) {
 
     // 章節數量夠多（>1）才展開收合功能；只有 1 章就直接平鋪
     const needChapterGroup = byChapter.size > 1;
+    // 預設展開最後一章、其餘收起（使用者有手動點過就改用 explicit 狀態）
+    const chapterKeys = [...byChapter.keys()];
+    const lastChapter = chapterKeys[chapterKeys.length - 1];
 
     for (const [ch, items] of byChapter) {
       const collapseKey = `${topKey}-${ch}`;
-      const collapsed = !!state.collapsed[collapseKey];
+      const explicit = state.collapsed[collapseKey];
+      const collapsed = explicit !== undefined ? !!explicit : (ch !== lastChapter);
 
       if (needChapterGroup) {
         const label = `${GROUP_LABEL[topKey]} ${ch}`;
