@@ -2,10 +2,30 @@
 .progress-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 12px;
   flex-shrink: 0;
 }
+
+.nav-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--surface-hover);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-btn:hover {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.nav-btn:active { transform: scale(0.94); }
 
 .progress-track {
   flex: 1;

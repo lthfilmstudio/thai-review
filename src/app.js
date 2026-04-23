@@ -213,6 +213,12 @@ async function init() {
     }
   });
 
+  // 字卡頁的上一張 / 下一張按鈕（事件委派，每次 re-render 都有效）
+  document.getElementById('content').addEventListener('click', e => {
+    if (e.target.closest('#cardPrev')) { e.stopPropagation(); prevCard(); }
+    else if (e.target.closest('#cardNext')) { e.stopPropagation(); nextCard(); }
+  });
+
   // 滑動手勢（content 區內左右滑切卡）
   let tx = 0, ty = 0;
   const contentEl = document.getElementById('content');

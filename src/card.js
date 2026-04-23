@@ -13,8 +13,14 @@ export function renderCardMode(el, cards, onGrade) {
 
   el.innerHTML = `
     <div class="progress-row">
+      <button class="nav-btn" id="cardPrev" aria-label="上一張" title="上一張 (←)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
       <div class="progress-track"><div class="progress-bar" style="width:${pct}%"></div></div>
       <div class="progress-count">${i + 1} / ${cards.length}</div>
+      <button class="nav-btn" id="cardNext" aria-label="下一張" title="下一張 (→)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
     </div>
     <div class="card-stage${state.flipped ? ' flipped' : ''}" id="cardStage">
       <div class="card-inner">
