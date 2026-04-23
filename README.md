@@ -41,16 +41,19 @@ npx serve .
 
 ### CSV 欄位格式
 
-| 欄名 | 必要 | 說明 |
+欄位名中英文皆可（大小寫無差），第一個命中的 header 就用：
+
+| 語意 | 必要 | 可用欄名（擇一） |
 |---|---|---|
-| `thai` | ✅ | 泰文原文 |
-| `karaoke` | ✅ | 拼音（含聲調，如 `sà-wàt-dee kráp`） |
-| `zh` | ✅ | 繁體中文翻譯 |
-| `type` | - | `word` 或 `sentence`（預設 `word`） |
-| `note` | - | 備註（口語、男/女用...） |
-| `lesson` | - | 課程名（方式 C 必填） |
-| `audio_url` | - | 音檔 URL（Stage 1 選用） |
-| `start_ms` / `end_ms` / `audio_file` | - | Stage 3 接老師原音用 |
+| 泰文原文 | ✅ | `泰文` / `thai` / `th` |
+| 拼音（含聲調） | ✅ | `泰式Karaoke拼音` / `拼音` / `karaoke` / `pronunciation` |
+| 中文翻譯 | ✅ | `中文` / `中文翻譯` / `翻譯` / `zh` / `chinese` |
+| 類型（word/sentence） | - | `類型` / `type` |
+| 備註 | - | `備註` / `note` |
+| 音檔 URL | - | `音檔` / `audio_url` |
+| 課程名（方式 C 必填） | - | `課程` / `課` / `堂` / `lesson` |
+
+Stage 3 用的 `start_ms` / `end_ms` / `audio_file` 會再擴充。
 
 ## 部署到 GitHub Pages
 

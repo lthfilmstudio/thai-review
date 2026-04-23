@@ -29,15 +29,38 @@ export function parseCsv(text) {
   return rows;
 }
 
+/* 欄位別名：第一個命中的 header 就用。中文在先因為使用者的 Sheet 大多是中文 header。 */
+const COL_ALIASES = {
+  thai:      ['泰文', 'thai', 'th'],
+  karaoke:   ['泰式karaoke拼音', 'karaoke拼音', '拼音', 'karaoke', 'pronunciation'],
+  zh:        ['中文', '中文翻譯', '翻譯', 'zh', 'chinese', 'cn'],
+  type:      ['類型', 'type', '分類'],
+  note:      ['備註', 'note', '說明'],
+  audio_url: ['音檔', 'audio_url', 'audio', '音檔網址'],
+  lesson:    ['課程', '課', '堂', 'lesson'],
+};
+
+function findCol(header, key) {
+  const aliases = COL_ALIASES[key] || [key];
+  for (const a of aliases) {
+    const i = header.indexOf(a.toLowerCase());
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+
 function rowsToCards(rows) {
   if (!rows.length) return [];
   const header = rows[0].map(h => h.trim().toLowerCase());
-  const col = name => header.indexOf(name);
-  const iT = col('thai'), iK = col('karaoke'), iZ = col('zh');
-  const iType = col('type'), iNote = col('note'), iAudio = col('audio_url');
-  const iLesson = col('lesson');
+  const iT = findCol(header, 'thai');
+  const iK = findCol(header, 'karaoke');
+  const iZ = findCol(header, 'zh');
+  const iType = findCol(header, 'type');
+  const iNote = findCol(header, 'note');
+  const iAudio = findCol(header, 'audio_url');
+  const iLesson = findCol(header, 'lesson');
   if (iT < 0 || iK < 0 || iZ < 0) {
-    throw new Error('CSV 缺少必要欄位：thai, karaoke, zh');
+    throw new Error(`CSV 缺少必要欄位（泰文/拼音/中文）。目前 header：${rows[0].join(' | ')}`);
   }
   const cards = [];
   for (let r = 1; r < rows.length; r++) {
@@ -116,20 +139,27 @@ async function loadFromPublishedSheet(pubUrl) {
 
 function parsePubTabs(html) {
   const tabs = [];
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  // 常見結構：<li id="sheet-button-XXX"><a>Name</a></li>，href 帶 gid
-  const nodes = doc.querySelectorAll('li[id^="sheet-button-"] a, #sheet-menu li a, ul.sheets-list li a');
-  for (const a of nodes) {
-    const href = a.getAttribute('href') || '';
-    const m = href.match(/gid=(\d+)/);
-    if (m) tabs.push({ gid: m[1], name: (a.textContent || '').trim() });
+  // Google 把 tab 清單塞在 JS：
+  // items.push({name: "3-1", pageUrl: "...gid=XXX", gid: "1979220085", initialSheet: ...})
+  const jsRe = /items\.push\(\{\s*name:\s*"((?:\\.|[^"\\])*)"[^}]*?\bgid:\s*"(\d+)"/g;
+  let mm;
+  while ((mm = jsRe.exec(html))) {
+    const name = mm[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    tabs.push({ gid: mm[2], name });
   }
   if (tabs.length) return dedupeTabs(tabs);
-  // 後援：直接 regex 找 li
-  const re = /<li[^>]*id="sheet-button-(\d+)"[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>/g;
-  let mm;
-  while ((mm = re.exec(html))) tabs.push({ gid: mm[1], name: mm[2].trim() });
+
+  // 後援：DOM 結構（如果 Google 改版）
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const nodes = doc.querySelectorAll('li[id^="sheet-button-"] a, #sheet-menu li a, ul.sheets-list li a');
+    for (const a of nodes) {
+      const href = a.getAttribute('href') || '';
+      const m = href.match(/gid=(\d+)/);
+      if (m) tabs.push({ gid: m[1], name: (a.textContent || '').trim() });
+    }
+  } catch (e) {}
   return dedupeTabs(tabs);
 }
 
