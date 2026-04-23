@@ -13,6 +13,7 @@ import { stopListen } from './listen.js';
 import {
   renderSidebar, renderTopbarTitle, renderStats, renderContent,
   openDrawer, closeDrawer, openModal, closeModal, applyTheme,
+  openSearch, closeSearch, renderSearchResults,
 } from './ui.js';
 
 async function fetchFromNetwork(url) {
@@ -104,7 +105,10 @@ function onFreshManifest(fresh) {
 
 /* 確保單堂課的 cards 已載入；未載入就抓並 cache。 */
 async function ensureLessonLoaded(lessonId, { silentUI = false } = {}) {
-  if (lessonId === '__ALL__') return ensureAllLoaded();
+  // 全部混合、收藏、搜尋都需要所有課都載入過才有完整結果
+  if (lessonId === '__ALL__' || lessonId === '__FAV__' || lessonId === '__SEARCH__') {
+    return ensureAllLoaded();
+  }
   const lesson = state.lessons.find(l => l.id === lessonId);
   if (!lesson || lesson._loaded || !lesson.gid || !state.baseUrl) return;
 
@@ -151,6 +155,18 @@ function rerender() {
   renderTopbarTitle();
   renderContent(rerender);
   renderStats();
+}
+
+function onSearchPick(match) {
+  // 跳到該卡：切到對應課程、cardIndex、並切回字卡模式
+  state.currentLessonId = match.lessonId;
+  state.cardIndex = match.index;
+  state.flipped = false;
+  if (state.mode === 'listen') state.mode = 'card';
+  stopListen();
+  saveState();
+  closeSearch();
+  rerender();
 }
 
 async function selectLesson(id) {
@@ -271,6 +287,20 @@ async function init() {
   document.getElementById('btnMenu').addEventListener('click', openDrawer);
   document.getElementById('drawerMask').addEventListener('click', closeDrawer);
   document.getElementById('btnSettings').addEventListener('click', openModal);
+  document.getElementById('btnSearch').addEventListener('click', async () => {
+    openSearch();
+    // 搜尋要跨全部課程，先補抓
+    await ensureAllLoaded();
+    // 重畫側邊看有沒有載入新的
+    renderSidebar(selectLesson);
+  });
+  document.getElementById('btnCloseSearch').addEventListener('click', closeSearch);
+  document.getElementById('searchMask').addEventListener('click', e => {
+    if (e.target.id === 'searchMask') closeSearch();
+  });
+  document.getElementById('inpSearch').addEventListener('input', e => {
+    renderSearchResults(e.target.value, onSearchPick);
+  });
   document.getElementById('btnShuffle').addEventListener('click', () => {
     stopListen();
     shuffleCurrentLesson();
@@ -325,9 +355,22 @@ async function init() {
 
   // 鍵盤快捷鍵
   document.addEventListener('keydown', e => {
+    // Esc 關搜尋（搜尋 modal 內也要能關）
+    if (e.key === 'Escape' && document.getElementById('searchMask').classList.contains('open')) {
+      closeSearch();
+      return;
+    }
     if (document.getElementById('modalMask').classList.contains('open')) return;
+    if (document.getElementById('searchMask').classList.contains('open')) return;
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea') return;
+
+    // / 開搜尋
+    if (e.key === '/') {
+      e.preventDefault();
+      document.getElementById('btnSearch').click();
+      return;
+    }
 
     if (state.mode === 'listen') {
       if (e.key === 'ArrowLeft') { stopListen(); prevCard(); }

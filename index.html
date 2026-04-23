@@ -32,6 +32,9 @@
     <button class="top-btn" id="btnMenu" aria-label="選單" title="課程選單">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
+    <button class="top-btn" id="btnSearch" aria-label="搜尋" title="搜尋 (/)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+    </button>
   </div>
   <div class="top-center">
     <div class="mode-tabs" id="modeTabs">
@@ -78,6 +81,7 @@
       <div><span class="kbd">1</span> <span class="kbd">2</span> <span class="kbd">3</span> 評估</div>
       <div><span class="kbd">P</span> 播放</div>
       <div><span class="kbd">S</span> 隨機</div>
+      <div><span class="kbd">/</span> 搜尋</div>
     </div>
   </aside>
 </div>
@@ -156,6 +160,18 @@
       <button class="btn ghost" id="btnResetProgress">重置進度</button>
       <button class="btn primary" id="btnSaveSettings">儲存</button>
     </div>
+  </div>
+</div>
+
+<!-- Search modal -->
+<div class="modal-mask" id="searchMask">
+  <div class="modal search-modal">
+    <div class="modal-head">
+      <input class="search-input" id="inpSearch" placeholder="搜尋 — 中文 / 泰文 / 拼音" autocomplete="off">
+      <button class="modal-close" id="btnCloseSearch" aria-label="關閉">✕</button>
+    </div>
+    <div class="search-meta" id="searchMeta"></div>
+    <div class="search-results" id="searchResults"></div>
   </div>
 </div>
 

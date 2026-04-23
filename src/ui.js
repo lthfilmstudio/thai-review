@@ -1,6 +1,6 @@
 /* UI render 總管：sidebar、drawer、topbar、stats、content dispatcher、modal、主題。 */
 
-import { state, currentLesson, filteredCards, gradeOf } from './state.js';
+import { state, currentLesson, filteredCards, gradeOf, favoriteCount } from './state.js';
 import { renderCardMode } from './card.js';
 import { renderListenMode, stopListen } from './listen.js';
 
@@ -37,12 +37,17 @@ export function renderSidebar(selectLesson) {
     dlist.appendChild(makeDrawer(l, active));
   }
 
-  // 「全部混合」分隔
+  // 「全部混合」+「⭐ 收藏」分隔
   if (state.lessons.length > 1) {
     const hr = document.createElement('div'); hr.className = 'side-divider'; list.appendChild(hr);
-    list.appendChild(makeSide({ id: '__ALL__', title: '全部混合' }, state.currentLessonId === '__ALL__'));
     const hr2 = document.createElement('div'); hr2.className = 'side-divider'; dlist.appendChild(hr2);
+
+    list.appendChild(makeSide({ id: '__ALL__', title: '全部混合' }, state.currentLessonId === '__ALL__'));
     dlist.appendChild(makeDrawer({ id: '__ALL__', title: '全部混合' }, state.currentLessonId === '__ALL__'));
+
+    const favTitle = '⭐ 收藏' + (favoriteCount() ? ` (${favoriteCount()})` : '');
+    list.appendChild(makeSide({ id: '__FAV__', title: favTitle }, state.currentLessonId === '__FAV__'));
+    dlist.appendChild(makeDrawer({ id: '__FAV__', title: favTitle }, state.currentLessonId === '__FAV__'));
   }
 }
 
@@ -109,6 +114,62 @@ export function openModal() {
 }
 export function closeModal() {
   document.getElementById('modalMask').classList.remove('open');
+}
+
+export function openSearch() {
+  const inp = document.getElementById('inpSearch');
+  inp.value = '';
+  document.getElementById('searchMeta').textContent = '輸入中文、泰文或拼音關鍵字';
+  document.getElementById('searchResults').innerHTML = '';
+  document.getElementById('searchMask').classList.add('open');
+  setTimeout(() => inp.focus(), 50);
+}
+
+export function closeSearch() {
+  document.getElementById('searchMask').classList.remove('open');
+}
+
+export function renderSearchResults(query, onPick) {
+  const meta = document.getElementById('searchMeta');
+  const list = document.getElementById('searchResults');
+  const q = (query || '').trim().toLowerCase();
+  list.innerHTML = '';
+
+  if (!q) {
+    meta.textContent = '輸入中文、泰文或拼音關鍵字';
+    return;
+  }
+
+  const matches = [];
+  for (const l of state.lessons) {
+    for (let i = 0; i < l.cards.length; i++) {
+      const c = l.cards[i];
+      if (
+        (c.thai || '').toLowerCase().includes(q) ||
+        (c.zh || '').toLowerCase().includes(q) ||
+        (c.karaoke || '').toLowerCase().includes(q)
+      ) {
+        matches.push({ card: c, lessonId: l.id, lessonTitle: l.title, index: i });
+        if (matches.length >= 100) break;  // 上限
+      }
+    }
+    if (matches.length >= 100) break;
+  }
+
+  meta.textContent = matches.length ? `找到 ${matches.length} 張${matches.length >= 100 ? '（只顯示前 100 張）' : ''}` : '沒有符合的卡';
+
+  for (const m of matches) {
+    const btn = document.createElement('button');
+    btn.className = 'search-item';
+    btn.innerHTML = `
+      <div class="si-tag">${escapeHtml(m.lessonTitle)}</div>
+      <div class="si-thai">${escapeHtml(m.card.thai)}</div>
+      <div class="si-karaoke">${escapeHtml(m.card.karaoke)}</div>
+      <div class="si-zh">${escapeHtml(m.card.zh)}</div>
+    `;
+    btn.addEventListener('click', () => onPick(m));
+    list.appendChild(btn);
+  }
 }
 
 function syncSegActive(sel, predicate) {

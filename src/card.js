@@ -2,7 +2,7 @@
    （prefers-reduced-motion 時在 CSS 改 cross-fade）。
    reverse=true：中文在正面、泰文在背面。 */
 
-import { state, gradeOf, setGrade } from './state.js';
+import { state, gradeOf, setGrade, isFavorite, toggleFavorite } from './state.js';
 import { speakCard } from './tts.js';
 import { escapeHtml } from './ui.js';
 
@@ -10,6 +10,8 @@ const SVG_PLAY = '<svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 2 
 const SVG_CHEV_L = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
 const SVG_CHEV_R = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
 const SVG_EXT = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>';
+const SVG_STAR_OUTLINE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+const SVG_STAR_FILLED = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
 
 function youglishUrl(thai) {
   // YouGlish 後端（Tomcat）擋 encoded slash，而泰文資料常有 "ค่ะ / ครับ" 這種男女變體；
@@ -88,6 +90,9 @@ export function renderCardMode(el, cards, onGrade, opts = {}) {
             <a class="yg-btn" id="ygLink" href="${youglishUrl(card.thai)}" target="_blank" rel="noopener noreferrer" aria-label="在 YouGlish 聽真人發音">
               ${SVG_EXT}<span>聽真人</span>
             </a>
+            <button class="fav-btn${isFavorite(card) ? ' on' : ''}" id="favBtn" aria-label="收藏">
+              ${isFavorite(card) ? SVG_STAR_FILLED : SVG_STAR_OUTLINE}
+            </button>
           </div>
         </div>
       </div>
@@ -101,9 +106,17 @@ export function renderCardMode(el, cards, onGrade, opts = {}) {
 
   const stage = document.getElementById('cardStage');
   stage.addEventListener('click', e => {
-    if (e.target.closest('.play-btn') || e.target.closest('.pill') || e.target.closest('.yg-btn')) return;
+    if (e.target.closest('.play-btn') || e.target.closest('.pill') || e.target.closest('.yg-btn') || e.target.closest('.fav-btn')) return;
     state.flipped = !state.flipped;
     stage.classList.toggle('flipped', state.flipped);
+  });
+
+  const favBtn = document.getElementById('favBtn');
+  favBtn?.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleFavorite(card);
+    favBtn.classList.toggle('on');
+    favBtn.innerHTML = isFavorite(card) ? SVG_STAR_FILLED : SVG_STAR_OUTLINE;
   });
   document.getElementById('playFront').addEventListener('click', e => {
     e.stopPropagation();

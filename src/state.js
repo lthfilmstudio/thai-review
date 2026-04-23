@@ -103,7 +103,9 @@ export const state = {
   mode: 'card',              // 'card'（泰→中）| 'reverse'（中→泰）| 'listen'
   cardIndex: 0,
   flipped: false,
-  progress: {},              // { "lessonId:idx": "good"|"ok"|"bad" }
+  progress: {},              // { "lessonId:thai": "good"|"ok"|"bad" }
+  favorites: {},             // { "thai": 1 }
+  searchQuery: '',           // 搜尋虛擬課程用（不存 localStorage）
   settings: {
     sheetInput: '',          // sheet URL / ID / csv URL
     rate: 1,
@@ -127,6 +129,7 @@ export function loadState() {
     const s = JSON.parse(raw);
     Object.assign(state.settings, s.settings || {});
     state.progress = s.progress || {};
+    state.favorites = s.favorites || {};
     state.currentLessonId = s.currentLessonId || null;
     state.mode = s.mode || 'card';
   } catch (e) {
@@ -138,9 +141,26 @@ export function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     settings: state.settings,
     progress: state.progress,
+    favorites: state.favorites,
     currentLessonId: state.currentLessonId,
     mode: state.mode,
   }));
+}
+
+export function isFavorite(card) {
+  return !!state.favorites[card?.thai];
+}
+
+export function toggleFavorite(card) {
+  if (!card) return;
+  const key = card.thai;
+  if (state.favorites[key]) delete state.favorites[key];
+  else state.favorites[key] = 1;
+  saveState();
+}
+
+export function favoriteCount() {
+  return Object.keys(state.favorites).length;
 }
 
 export function currentLesson() {
@@ -150,6 +170,31 @@ export function currentLesson() {
       for (const c of l.cards) all.cards.push({ ...c, _lessonId: l.id });
     }
     return all;
+  }
+  if (state.currentLessonId === '__FAV__') {
+    const fav = { id: '__FAV__', title: '⭐ 收藏', cards: [] };
+    for (const l of state.lessons) {
+      for (const c of l.cards) {
+        if (state.favorites[c.thai]) fav.cards.push({ ...c, _lessonId: l.id });
+      }
+    }
+    return fav;
+  }
+  if (state.currentLessonId === '__SEARCH__') {
+    const q = (state.searchQuery || '').trim().toLowerCase();
+    const res = { id: '__SEARCH__', title: '🔍 ' + (q || '搜尋'), cards: [] };
+    if (q) {
+      for (const l of state.lessons) {
+        for (const c of l.cards) {
+          if (
+            (c.thai || '').toLowerCase().includes(q) ||
+            (c.zh || '').toLowerCase().includes(q) ||
+            (c.karaoke || '').toLowerCase().includes(q)
+          ) res.cards.push({ ...c, _lessonId: l.id });
+        }
+      }
+    }
+    return res;
   }
   return state.lessons.find(l => l.id === state.currentLessonId) || state.lessons[0];
 }
