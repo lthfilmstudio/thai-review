@@ -38,6 +38,8 @@ const COL_ALIASES = {
   note:      ['備註', 'note', '說明'],
   audio_url: ['音檔', 'audio_url', 'audio', '音檔網址'],
   lesson:    ['課程', '課', '堂', 'lesson'],
+  start_ms:  ['start_ms', 'start', '開始毫秒', '起始毫秒'],
+  end_ms:    ['end_ms', 'end', '結束毫秒'],
 };
 
 function findCol(header, key) {
@@ -59,9 +61,15 @@ function rowsToCards(rows) {
   const iNote = findCol(header, 'note');
   const iAudio = findCol(header, 'audio_url');
   const iLesson = findCol(header, 'lesson');
+  const iStart = findCol(header, 'start_ms');
+  const iEnd = findCol(header, 'end_ms');
   if (iT < 0 || iK < 0 || iZ < 0) {
     throw new Error(`CSV 缺少必要欄位（泰文/拼音/中文）。目前 header：${rows[0].join(' | ')}`);
   }
+  const toMs = v => {
+    const n = Number((v || '').toString().trim());
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
   const cards = [];
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
@@ -74,6 +82,8 @@ function rowsToCards(rows) {
       note: iNote >= 0 ? (row[iNote] || '').trim() : '',
       audio_url: iAudio >= 0 ? (row[iAudio] || '').trim() : '',
       lesson: iLesson >= 0 ? (row[iLesson] || '').trim() : '',
+      start_ms: iStart >= 0 ? toMs(row[iStart]) : null,
+      end_ms: iEnd >= 0 ? toMs(row[iEnd]) : null,
     });
   }
   return cards;
