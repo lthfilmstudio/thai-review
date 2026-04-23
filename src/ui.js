@@ -64,10 +64,11 @@ export function renderSidebar(selectLesson) {
 
   // 分組渲染課程
   const grouped = groupLessons(state.lessons);
-  const hasMultipleGroups = grouped.length > 1;
+  // 只要有任何有前綴的組（非「其他」）就顯示 header；全是「其他」就不顯示（單組扁平列表）
+  const hasPrefixedGroup = grouped.some(([k]) => k !== '其他');
 
   for (const [key, lessons] of grouped) {
-    if (hasMultipleGroups) {
+    if (hasPrefixedGroup) {
       list.appendChild(makeGroupHeader(GROUP_LABEL[key], lessons.length));
       dlist.appendChild(makeGroupHeader(GROUP_LABEL[key], lessons.length));
     }
