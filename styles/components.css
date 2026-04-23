@@ -576,56 +576,58 @@
   max-width: 280px;
 }
 
-/* ===== 手機字體 × 1.5（≤640px）===== */
+/* ===== 手機字體 × ~1.125（≤640px）=====
+   ≈ 原始 size × 1.5 × 0.75，各 size 用 * 0.75 縮回來。
+   觸控元件保留至少 36px 不再縮。 */
 @media (max-width: 640px) {
   /* 字卡正反面 */
-  .thai-main { font-size: clamp(42px, 9vw, 64px); }
-  .thai-main.thai-back { font-size: clamp(32px, 7vw, 50px); }
-  .thai-main.thai-listen { font-size: clamp(36px, 8vw, 56px); }
-  .thai-sub-text { font-size: clamp(21px, 4.5vw, 30px); }
-  .karaoke { font-size: clamp(19px, 3.5vw, 24px); }
-  .zh { font-size: clamp(21px, 3.8vw, 26px); }
-  .zh-note { font-size: clamp(15px, 2.8vw, 18px); }
-  .card-tag { font-size: 13px; }
-  .flip-hint { font-size: 12px; }
-  .card { padding: 28px 20px; gap: 18px; }
+  .thai-main { font-size: clamp(32px, 6.75vw, 48px); }
+  .thai-main.thai-back { font-size: clamp(24px, 5.25vw, 38px); }
+  .thai-main.thai-listen { font-size: clamp(27px, 6vw, 42px); }
+  .thai-sub-text { font-size: clamp(16px, 3.4vw, 22px); }
+  .karaoke { font-size: clamp(14px, 2.6vw, 18px); }
+  .zh { font-size: clamp(16px, 2.85vw, 20px); }
+  .zh-note { font-size: clamp(11px, 2.1vw, 14px); }
+  .card-tag { font-size: 10px; }
+  .flip-hint { font-size: 9px; }
+  .card { padding: 26px 18px; gap: 16px; }
 
-  /* 評估 pill 加大好按 */
-  .pill { padding: 14px; font-size: 15px; }
+  /* 評估 pill */
+  .pill { padding: 11px; font-size: 12px; }
 
   /* 底部模式切換 */
-  .mp-btn { padding: 12px 8px; font-size: 15px; }
+  .mp-btn { padding: 9px 8px; font-size: 12px; }
 
   /* 被動聽力 */
-  .listen-card { padding: 24px 18px; }
-  .listen-info { font-size: 15px; margin-bottom: 16px; }
-  .listen-kara { font-size: 20px; }
-  .listen-zh { font-size: 20px; }
-  .phase-label { font-size: 15px; }
-  .l-btn { width: 36px; height: 36px; font-size: 14px; }
-  .l-main { width: 48px; height: 48px; font-size: 18px; }
-  .setting-label { font-size: 15px; }
+  .listen-card { padding: 22px 16px; }
+  .listen-info { font-size: 12px; margin-bottom: 14px; }
+  .listen-kara { font-size: 15px; }
+  .listen-zh { font-size: 15px; }
+  .phase-label { font-size: 12px; }
+  .l-btn { width: 32px; height: 32px; font-size: 11px; }
+  .l-main { width: 40px; height: 40px; font-size: 14px; }
+  .setting-label { font-size: 12px; }
 
   /* Progress / nav */
-  .progress-count { font-size: 14px; min-width: 70px; }
-  .nav-btn { width: 38px; height: 38px; }
+  .progress-count { font-size: 11px; min-width: 60px; }
+  .nav-btn { width: 32px; height: 32px; }
 
-  /* Drawer（課程選單）項目加大 */
-  .drawer-item { padding: 14px 14px; font-size: 17px; }
-  .drawer-title { font-size: 13px; }
+  /* Drawer（課程選單）項目 */
+  .drawer-item { padding: 12px 12px; font-size: 13px; }
+  .drawer-title { font-size: 10px; }
 
   /* 設定 modal */
-  .modal { padding: 22px; }
-  .modal-title { font-size: 18px; }
-  .field-label { font-size: 14px; }
-  .field-hint { font-size: 13px; line-height: 1.6; }
-  .field input, .field select, .field textarea { font-size: 16px; padding: 11px 13px; }
-  .seg-btn { padding: 8px 14px; font-size: 14px; }
-  .btn { padding: 12px 16px; font-size: 15px; }
+  .modal { padding: 18px; }
+  .modal-title { font-size: 14px; }
+  .field-label { font-size: 11px; }
+  .field-hint { font-size: 10px; line-height: 1.55; }
+  .field input, .field select, .field textarea { font-size: 13px; padding: 9px 11px; }
+  .seg-btn { padding: 6px 11px; font-size: 11px; }
+  .btn { padding: 10px 13px; font-size: 12px; }
 
   /* Topbar */
-  .top-title { font-size: 16px; }
-  .top-btn { width: 42px; height: 42px; }
+  .top-title { font-size: 13px; }
+  .top-btn { width: 36px; height: 36px; }
 }
 
 /* Silent loop audio hidden */
