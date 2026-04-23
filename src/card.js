@@ -38,7 +38,7 @@ export function renderCardMode(el, cards, onGrade) {
         <div class="card back">
           <div class="card-tag">${card.type === 'sentence' ? 'EXAMPLE' : 'VOCAB'}</div>
           <div class="thai-stack">
-            <div class="thai-main" style="font-size:clamp(22px,4.5vw,36px)">${escapeHtml(card.thai)}</div>
+            <div class="thai-main thai-back">${escapeHtml(card.thai)}</div>
             <div class="thai-sub-text">${escapeHtml(card.thai)}</div>
           </div>
           <div class="karaoke">${escapeHtml(card.karaoke)}</div>

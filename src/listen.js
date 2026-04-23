@@ -23,7 +23,7 @@ export function renderListenMode(el, cards, advanceCb) {
       <div class="listen-card">
         <div class="listen-info">第 ${i + 1} / ${cards.length} · 重複 ${Math.min(curRep + 1, rep)}/${rep}</div>
         <div class="listen-body">
-          <div class="thai-main" style="font-size:clamp(24px,5vw,40px)">${escapeHtml(card.thai)}</div>
+          <div class="thai-main thai-listen">${escapeHtml(card.thai)}</div>
           <div class="thai-sub-text">${escapeHtml(card.thai)}</div>
         </div>
         <div class="listen-kara">${escapeHtml(card.karaoke)}</div>
