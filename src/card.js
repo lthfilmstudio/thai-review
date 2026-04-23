@@ -9,6 +9,11 @@ import { escapeHtml } from './ui.js';
 const SVG_PLAY = '<svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 2 L9 6 L3 10 Z" fill="currentColor"/></svg>';
 const SVG_CHEV_L = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
 const SVG_CHEV_R = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
+const SVG_EXT = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>';
+
+function youglishUrl(thai) {
+  return 'https://youglish.com/pronounce/' + encodeURIComponent(thai) + '/thai';
+}
 
 function frontBody(card, reverse) {
   if (reverse) {
@@ -75,7 +80,12 @@ export function renderCardMode(el, cards, onGrade, opts = {}) {
         <div class="card back">
           <div class="card-tag">${tag}</div>
           ${backBody(card, reverse)}
-          <button class="play-btn" id="playBack" aria-label="再聽一次">${SVG_PLAY}</button>
+          <div class="back-actions">
+            <button class="play-btn" id="playBack" aria-label="再聽一次">${SVG_PLAY}</button>
+            <a class="yg-btn" id="ygLink" href="${youglishUrl(card.thai)}" target="_blank" rel="noopener noreferrer" aria-label="在 YouGlish 聽真人發音">
+              ${SVG_EXT}<span>聽真人</span>
+            </a>
+          </div>
         </div>
       </div>
     </div>
@@ -88,7 +98,7 @@ export function renderCardMode(el, cards, onGrade, opts = {}) {
 
   const stage = document.getElementById('cardStage');
   stage.addEventListener('click', e => {
-    if (e.target.closest('.play-btn') || e.target.closest('.pill')) return;
+    if (e.target.closest('.play-btn') || e.target.closest('.pill') || e.target.closest('.yg-btn')) return;
     state.flipped = !state.flipped;
     stage.classList.toggle('flipped', state.flipped);
   });
