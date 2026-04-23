@@ -2,9 +2,11 @@
    settings 跟 progress 寫進 localStorage，重新開啟能還原。 */
 
 export const STORAGE_KEY = 'thai-review-v1';
-export const LESSONS_CACHE_KEY = 'thai-review-lessons-v1';
+export const LESSONS_CACHE_KEY = 'thai-review-lessons-v1';      // 舊版（full cache）
+export const MANIFEST_CACHE_KEY = 'thai-review-manifest-v1';    // 新版（只 tab 列表）
+export const LESSON_CACHE_PREFIX = 'thai-review-lesson-';       // 新版（單堂 cards）
 
-/* 儲存整份 lessons 資料到 localStorage。8500 張卡約 1.3MB，在限額內。 */
+/* ===== 舊版：整份 lessons cache（保留相容，其他非 publish-to-web 模式還在用） ===== */
 export function saveLessonsCache(url, lessons) {
   try {
     localStorage.setItem(LESSONS_CACHE_KEY, JSON.stringify({ url, ts: Date.now(), lessons }));
@@ -13,7 +15,6 @@ export function saveLessonsCache(url, lessons) {
   }
 }
 
-/* 讀 cache；URL 不符就忽略。 */
 export function loadLessonsCache(url) {
   try {
     const raw = localStorage.getItem(LESSONS_CACHE_KEY);
@@ -21,13 +22,58 @@ export function loadLessonsCache(url) {
     const c = JSON.parse(raw);
     if (c.url !== url) return null;
     return { lessons: c.lessons, ts: c.ts };
-  } catch (e) {
+  } catch {
     return null;
   }
 }
 
 export function clearLessonsCache() {
-  try { localStorage.removeItem(LESSONS_CACHE_KEY); } catch {}
+  try {
+    localStorage.removeItem(LESSONS_CACHE_KEY);
+    localStorage.removeItem(MANIFEST_CACHE_KEY);
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith(LESSON_CACHE_PREFIX)) localStorage.removeItem(k);
+    });
+  } catch {}
+}
+
+/* ===== 新版 lazy：manifest（tab 列表） + 單堂 cards ===== */
+export function saveManifest(url, manifest) {
+  try {
+    localStorage.setItem(MANIFEST_CACHE_KEY, JSON.stringify({ url, ts: Date.now(), ...manifest }));
+  } catch (e) {
+    console.warn('manifest save failed:', e.message);
+  }
+}
+
+export function loadManifest(url) {
+  try {
+    const raw = localStorage.getItem(MANIFEST_CACHE_KEY);
+    if (!raw) return null;
+    const m = JSON.parse(raw);
+    if (m.url !== url) return null;
+    return m;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLessonCards(gid, cards) {
+  try {
+    localStorage.setItem(LESSON_CACHE_PREFIX + gid, JSON.stringify({ ts: Date.now(), cards }));
+  } catch (e) {
+    console.warn('lesson cards save failed:', gid, e.message);
+  }
+}
+
+export function loadLessonCards(gid) {
+  try {
+    const raw = localStorage.getItem(LESSON_CACHE_PREFIX + gid);
+    if (!raw) return null;
+    return JSON.parse(raw).cards;
+  } catch {
+    return null;
+  }
 }
 
 /* 預設資料來源：Nalin 的泰文課 Sheet（整份文件發佈）。

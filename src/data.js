@@ -112,6 +112,30 @@ async function loadMultipleCsvs(urls) {
   return lessons;
 }
 
+/* 只抓 tab 列表（不抓 CSV），給 lazy 載入用。 */
+export async function loadTabsOnly(input) {
+  input = (input || '').trim();
+  if (!input) return null;
+  const lines = input.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length !== 1) return null;
+  const one = lines[0];
+  if (!/\/d\/e\//.test(one) || /output=csv/i.test(one)) return null;
+
+  const base = one.replace(/[?#].*$/, '').replace(/\/pub(html)?$/, '');
+  const res = await fetch(base + '/pubhtml');
+  if (!res.ok) throw new Error('pubhtml HTTP ' + res.status);
+  const html = await res.text();
+  const tabs = parsePubTabs(html);
+  if (!tabs.length) throw new Error('找不到 tab，請確認 Sheet 已「發佈整個文件」');
+  return { baseUrl: base, tabs };
+}
+
+/* 抓單一 tab 的 cards。 */
+export async function fetchLessonCards(baseUrl, gid) {
+  const csvUrl = `${baseUrl}/pub?gid=${gid}&single=true&output=csv`;
+  return await fetchCsvCards(csvUrl);
+}
+
 /* 方案 2：publish-to-web 整份 Sheet。抓 pubhtml 解析 tab 列表，
    每個 tab 再抓成 CSV。需使用者在 Google Sheets 選「發佈整個文件」。 */
 async function loadFromPublishedSheet(pubUrl) {
