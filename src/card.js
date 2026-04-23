@@ -1,52 +1,81 @@
-/* 字卡 / 例句模式 render。翻面走 .card-inner 整層旋轉
-   （prefers-reduced-motion 時在 CSS 改 cross-fade）。 */
+/* 字卡模式 render。翻面走 .card-inner 整層旋轉
+   （prefers-reduced-motion 時在 CSS 改 cross-fade）。
+   reverse=true：中文在正面、泰文在背面。 */
 
 import { state, gradeOf, setGrade } from './state.js';
 import { speakCard } from './tts.js';
 import { escapeHtml } from './ui.js';
 
-export function renderCardMode(el, cards, onGrade) {
+const SVG_PLAY = '<svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 2 L9 6 L3 10 Z" fill="currentColor"/></svg>';
+const SVG_CHEV_L = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
+const SVG_CHEV_R = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
+
+function frontBody(card, reverse) {
+  if (reverse) {
+    return `
+      <div class="thai-stack">
+        <div class="zh" style="font-size:clamp(22px,4.2vw,30px)">${escapeHtml(card.zh)}</div>
+        ${card.note ? `<div class="zh-note">（${escapeHtml(card.note)}）</div>` : ''}
+      </div>
+    `;
+  }
+  return `
+    <div class="thai-stack">
+      <div class="thai-main">${escapeHtml(card.thai)}</div>
+      <div class="thai-sub-text">${escapeHtml(card.thai)}</div>
+    </div>
+  `;
+}
+
+function backBody(card, reverse) {
+  if (reverse) {
+    // 反向的「答案面」＝ 泰文 + 拼音（中文已在正面，不再重複）
+    return `
+      <div class="thai-stack">
+        <div class="thai-main">${escapeHtml(card.thai)}</div>
+        <div class="thai-sub-text">${escapeHtml(card.thai)}</div>
+      </div>
+      <div class="karaoke">${escapeHtml(card.karaoke)}</div>
+    `;
+  }
+  return `
+    <div class="thai-stack">
+      <div class="thai-main thai-back">${escapeHtml(card.thai)}</div>
+      <div class="thai-sub-text">${escapeHtml(card.thai)}</div>
+    </div>
+    <div class="karaoke">${escapeHtml(card.karaoke)}</div>
+    <div class="divider"></div>
+    <div class="zh">${escapeHtml(card.zh)}${card.note ? `<br><span class="zh-note">（${escapeHtml(card.note)}）</span>` : ''}</div>
+  `;
+}
+
+export function renderCardMode(el, cards, onGrade, opts = {}) {
+  const reverse = !!opts.reverse;
   const i = state.cardIndex;
   const card = cards[i];
   const pct = Math.round(((i + 1) / cards.length) * 100);
   const grade = gradeOf(i);
+  const tag = card.type === 'sentence' ? 'EXAMPLE' : 'VOCAB';
 
   el.innerHTML = `
     <div class="progress-row">
-      <button class="nav-btn" id="cardPrev" aria-label="上一張" title="上一張 (←)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </button>
+      <button class="nav-btn" id="cardPrev" aria-label="上一張" title="上一張 (←)">${SVG_CHEV_L}</button>
       <div class="progress-track"><div class="progress-bar" style="width:${pct}%"></div></div>
       <div class="progress-count">${i + 1} / ${cards.length}</div>
-      <button class="nav-btn" id="cardNext" aria-label="下一張" title="下一張 (→)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
+      <button class="nav-btn" id="cardNext" aria-label="下一張" title="下一張 (→)">${SVG_CHEV_R}</button>
     </div>
     <div class="card-stage${state.flipped ? ' flipped' : ''}" id="cardStage">
       <div class="card-inner">
         <div class="card front">
-          <div class="card-tag">${card.type === 'sentence' ? 'EXAMPLE' : 'VOCAB'}</div>
-          <div class="thai-stack">
-            <div class="thai-main">${escapeHtml(card.thai)}</div>
-            <div class="thai-sub-text">${escapeHtml(card.thai)}</div>
-          </div>
-          <button class="play-btn" id="playFront" aria-label="播放">
-            <svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 2 L9 6 L3 10 Z" fill="currentColor"/></svg>
-          </button>
+          <div class="card-tag">${tag}</div>
+          ${frontBody(card, reverse)}
+          <button class="play-btn" id="playFront" aria-label="播放">${SVG_PLAY}</button>
           <div class="flip-hint">TAP CARD TO FLIP</div>
         </div>
         <div class="card back">
-          <div class="card-tag">${card.type === 'sentence' ? 'EXAMPLE' : 'VOCAB'}</div>
-          <div class="thai-stack">
-            <div class="thai-main thai-back">${escapeHtml(card.thai)}</div>
-            <div class="thai-sub-text">${escapeHtml(card.thai)}</div>
-          </div>
-          <div class="karaoke">${escapeHtml(card.karaoke)}</div>
-          <div class="divider"></div>
-          <div class="zh">${escapeHtml(card.zh)}${card.note ? `<br><span class="zh-note">（${escapeHtml(card.note)}）</span>` : ''}</div>
-          <button class="play-btn" id="playBack" aria-label="再聽一次">
-            <svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 2 L9 6 L3 10 Z" fill="currentColor"/></svg>
-          </button>
+          <div class="card-tag">${tag}</div>
+          ${backBody(card, reverse)}
+          <button class="play-btn" id="playBack" aria-label="再聽一次">${SVG_PLAY}</button>
         </div>
       </div>
     </div>

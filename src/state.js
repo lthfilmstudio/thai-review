@@ -27,7 +27,7 @@ export const DEMO_LESSONS = [
 export const state = {
   lessons: [],
   currentLessonId: null,
-  mode: 'card',              // 'card' | 'listen'
+  mode: 'card',              // 'card'（泰→中）| 'reverse'（中→泰）| 'listen'
   cardIndex: 0,
   flipped: false,
   progress: {},              // { "lessonId:idx": "good"|"ok"|"bad" }

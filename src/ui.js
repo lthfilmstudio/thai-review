@@ -84,7 +84,8 @@ export function renderContent(onGrade) {
       renderStats();
     });
   } else {
-    renderCardMode(el, cards, onGrade);
+    // card（正向）或 reverse（中文在正面）
+    renderCardMode(el, cards, onGrade, { reverse: state.mode === 'reverse' });
     renderStats();
   }
 }
