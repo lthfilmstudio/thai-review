@@ -172,6 +172,31 @@
   margin: 6px 4px;
 }
 
+/* 分組標題（sidebar / drawer 共用） */
+.group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--gold);
+  font-weight: 500;
+  padding: 10px 10px 4px;
+  text-transform: uppercase;
+}
+
+.group-header .group-count {
+  font-size: 10px;
+  color: var(--text-mute);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+@media (max-width: 640px) {
+  .group-header { font-size: 13px; padding: 12px 12px 6px; }
+  .group-header .group-count { font-size: 12px; }
+}
+
 /* ===== Stats (desktop right column) ===== */
 .stats {
   background: var(--surface-soft);

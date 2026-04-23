@@ -10,31 +10,72 @@ export function escapeHtml(s) {
   }[c]));
 }
 
+/* 解析 tab 名前綴分組：「初 1」→ group=初、displayTitle=1；沒前綴就歸「其他」 */
+const GROUP_ORDER = ['初', '中', '高'];
+const GROUP_LABEL = { '初': '初級', '中': '中級', '高': '高級', '其他': '其他' };
+
+function parseGroup(title) {
+  const m = (title || '').match(/^(初|中|高)\s+(.*)$/);
+  if (m) return { group: m[1], display: m[2] };
+  return { group: '其他', display: title };
+}
+
+function groupLessons(lessons) {
+  const groups = new Map();
+  for (const l of lessons) {
+    const { group, display } = parseGroup(l.title);
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push({ ...l, displayTitle: display });
+  }
+  // 依 GROUP_ORDER 排，其他放最後
+  const ordered = [];
+  for (const g of GROUP_ORDER) if (groups.has(g)) ordered.push([g, groups.get(g)]);
+  if (groups.has('其他')) ordered.push(['其他', groups.get('其他')]);
+  return ordered;
+}
+
 export function renderSidebar(selectLesson) {
   const list = document.getElementById('sideList');
   const dlist = document.getElementById('drawerList');
   list.innerHTML = '';
   dlist.innerHTML = '';
 
-  const makeSide = (l, isActive) => {
+  const makeSide = (l, isActive, display) => {
     const btn = document.createElement('button');
     btn.className = 'side-item' + (isActive ? ' active' : '');
-    btn.innerHTML = `<span class="dot"></span><span>${escapeHtml(l.title)}</span>`;
+    btn.innerHTML = `<span class="dot"></span><span>${escapeHtml(display ?? l.title)}</span>`;
     btn.addEventListener('click', () => selectLesson(l.id));
     return btn;
   };
-  const makeDrawer = (l, isActive) => {
+  const makeDrawer = (l, isActive, display) => {
     const btn = document.createElement('button');
     btn.className = 'drawer-item' + (isActive ? ' active' : '');
-    btn.textContent = l.title;
+    btn.textContent = display ?? l.title;
     btn.addEventListener('click', () => { selectLesson(l.id); closeDrawer(); });
     return btn;
   };
 
-  for (const l of state.lessons) {
-    const active = l.id === state.currentLessonId;
-    list.appendChild(makeSide(l, active));
-    dlist.appendChild(makeDrawer(l, active));
+  const makeGroupHeader = (label, count) => {
+    const h = document.createElement('div');
+    h.className = 'group-header';
+    h.innerHTML = `<span>${escapeHtml(label)}</span><span class="group-count">${count}</span>`;
+    return h;
+  };
+
+  // 分組渲染課程
+  const grouped = groupLessons(state.lessons);
+  const hasMultipleGroups = grouped.length > 1;
+
+  for (const [key, lessons] of grouped) {
+    if (hasMultipleGroups) {
+      list.appendChild(makeGroupHeader(GROUP_LABEL[key], lessons.length));
+      dlist.appendChild(makeGroupHeader(GROUP_LABEL[key], lessons.length));
+    }
+    for (const l of lessons) {
+      const active = l.id === state.currentLessonId;
+      list.appendChild(makeSide(l, active, l.displayTitle));
+      dlist.appendChild(makeDrawer(l, active, l.displayTitle));
+    }
   }
 
   // 「全部混合」+「⭐ 收藏」分隔
@@ -53,7 +94,14 @@ export function renderSidebar(selectLesson) {
 
 export function renderTopbarTitle() {
   const lesson = currentLesson();
-  document.getElementById('topTitle').textContent = lesson ? lesson.title : '清心安神';
+  if (!lesson) {
+    document.getElementById('topTitle').textContent = '清心安神';
+    return;
+  }
+  // 虛擬課程（全部混合/收藏/搜尋）保留原名，真實課程剝掉「初 」「中 」前綴
+  const isVirtual = ['__ALL__', '__FAV__', '__SEARCH__'].includes(lesson.id);
+  const { display } = parseGroup(lesson.title);
+  document.getElementById('topTitle').textContent = isVirtual ? lesson.title : display;
 }
 
 export function renderStats() {
@@ -161,8 +209,10 @@ export function renderSearchResults(query, onPick) {
   for (const m of matches) {
     const btn = document.createElement('button');
     btn.className = 'search-item';
+    const { group, display } = parseGroup(m.lessonTitle);
+    const tag = group === '其他' ? display : `${GROUP_LABEL[group]} · ${display}`;
     btn.innerHTML = `
-      <div class="si-tag">${escapeHtml(m.lessonTitle)}</div>
+      <div class="si-tag">${escapeHtml(tag)}</div>
       <div class="si-thai">${escapeHtml(m.card.thai)}</div>
       <div class="si-karaoke">${escapeHtml(m.card.karaoke)}</div>
       <div class="si-zh">${escapeHtml(m.card.zh)}</div>
