@@ -1,7 +1,7 @@
 {
-  "name": "泰文複習",
-  "short_name": "泰文",
-  "description": "泰文單字與例句複習 PWA — 字卡、例句、被動聽力三模式。",
+  "name": "清心安神",
+  "short_name": "清心安神",
+  "description": "泰文單字複習 PWA — 字卡、反向、自動播放。",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

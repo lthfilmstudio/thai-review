@@ -193,7 +193,7 @@ function updateMediaSessionMetadata(card) {
   if (!('mediaSession' in navigator) || !window.MediaMetadata) return;
   try {
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: card.thai || '泰文複習',
+      title: card.thai || '清心安神',
       artist: card.karaoke || '',
       album: card.zh || '',
       artwork: [

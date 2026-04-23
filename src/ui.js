@@ -48,7 +48,7 @@ export function renderSidebar(selectLesson) {
 
 export function renderTopbarTitle() {
   const lesson = currentLesson();
-  document.getElementById('topTitle').textContent = lesson ? lesson.title : '泰文複習';
+  document.getElementById('topTitle').textContent = lesson ? lesson.title : '清心安神';
 }
 
 export function renderStats() {
