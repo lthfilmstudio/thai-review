@@ -353,6 +353,22 @@ async function init() {
     }
   });
 
+  // 重新同步 Sheet（清 cache 重抓）
+  document.getElementById('btnClearCache').addEventListener('click', async () => {
+    if (!confirm('重新從 Google Sheet 抓最新資料？（進度跟收藏不會動）')) return;
+    clearLessonsCache();
+    showLoading('重新抓 Sheet…');
+    state.lessons = await loadLessonsSmart(onFreshManifest);
+    if (!state.lessons.find(l => l.id === state.currentLessonId) &&
+        state.currentLessonId !== '__ALL__' && state.currentLessonId !== '__FAV__') {
+      state.currentLessonId = state.lessons[0]?.id || null;
+      state.cardIndex = 0;
+    }
+    await ensureLessonLoaded(state.currentLessonId);
+    closeModal();
+    rerender();
+  });
+
   // 鍵盤快捷鍵
   document.addEventListener('keydown', e => {
     // Esc 關搜尋（搜尋 modal 內也要能關）
