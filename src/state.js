@@ -105,6 +105,7 @@ export const state = {
   flipped: false,
   progress: {},              // { "lessonId:thai": "good"|"ok"|"bad" }
   favorites: {},             // { "thai": 1 }
+  collapsed: {},             // { "初-2": true } → 初級 2 章節收合中
   searchQuery: '',           // 搜尋虛擬課程用（不存 localStorage）
   settings: {
     sheetInput: '',          // sheet URL / ID / csv URL
@@ -130,6 +131,7 @@ export function loadState() {
     Object.assign(state.settings, s.settings || {});
     state.progress = s.progress || {};
     state.favorites = s.favorites || {};
+    state.collapsed = s.collapsed || {};
     state.currentLessonId = s.currentLessonId || null;
     state.mode = s.mode || 'card';
   } catch (e) {
@@ -142,6 +144,7 @@ export function saveState() {
     settings: state.settings,
     progress: state.progress,
     favorites: state.favorites,
+    collapsed: state.collapsed,
     currentLessonId: state.currentLessonId,
     mode: state.mode,
   }));

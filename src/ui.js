@@ -1,6 +1,6 @@
 /* UI render 總管：sidebar、drawer、topbar、stats、content dispatcher、modal、主題。 */
 
-import { state, currentLesson, filteredCards, gradeOf, favoriteCount } from './state.js';
+import { state, currentLesson, filteredCards, gradeOf, favoriteCount, saveState } from './state.js';
 import { renderCardMode } from './card.js';
 import { renderListenMode, stopListen } from './listen.js';
 
@@ -62,20 +62,59 @@ export function renderSidebar(selectLesson) {
     return h;
   };
 
-  // 分組渲染課程
+  const chevronSvg = collapsed => `<svg class="chev${collapsed ? '' : ' open'}" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>`;
+
+  const makeChapterHeader = (label, count, collapsed, onToggle) => {
+    const btn = document.createElement('button');
+    btn.className = 'chapter-header' + (collapsed ? ' collapsed' : '');
+    btn.innerHTML = `${chevronSvg(collapsed)}<span class="ch-label">${escapeHtml(label)}</span><span class="ch-count">${count}</span>`;
+    btn.addEventListener('click', onToggle);
+    return btn;
+  };
+
+  // 分組渲染課程：先依前綴（初/中/高）分，再依章節號（1/2/3...）分子群
   const grouped = groupLessons(state.lessons);
-  // 只要有任何有前綴的組（非「其他」）就顯示 header；全是「其他」就不顯示（單組扁平列表）
   const hasPrefixedGroup = grouped.some(([k]) => k !== '其他');
 
-  for (const [key, lessons] of grouped) {
+  for (const [topKey, lessons] of grouped) {
     if (hasPrefixedGroup) {
-      list.appendChild(makeGroupHeader(GROUP_LABEL[key], lessons.length));
-      dlist.appendChild(makeGroupHeader(GROUP_LABEL[key], lessons.length));
+      list.appendChild(makeGroupHeader(GROUP_LABEL[topKey], lessons.length));
+      dlist.appendChild(makeGroupHeader(GROUP_LABEL[topKey], lessons.length));
     }
+
+    // 子群：按章節號分組（「2-3」→ 章節 2、「3-總複習」→ 章節 3、「1」→ 章節 1）
+    const byChapter = new Map();
     for (const l of lessons) {
-      const active = l.id === state.currentLessonId;
-      list.appendChild(makeSide(l, active, l.displayTitle));
-      dlist.appendChild(makeDrawer(l, active, l.displayTitle));
+      const m = (l.displayTitle || '').match(/^(\d+)/);
+      const ch = m ? m[1] : '?';
+      if (!byChapter.has(ch)) byChapter.set(ch, []);
+      byChapter.get(ch).push(l);
+    }
+
+    // 章節數量夠多（>1）才展開收合功能；只有 1 章就直接平鋪
+    const needChapterGroup = byChapter.size > 1;
+
+    for (const [ch, items] of byChapter) {
+      const collapseKey = `${topKey}-${ch}`;
+      const collapsed = !!state.collapsed[collapseKey];
+
+      if (needChapterGroup) {
+        const label = `${GROUP_LABEL[topKey]} ${ch}`;
+        const toggle = () => {
+          state.collapsed[collapseKey] = !state.collapsed[collapseKey];
+          saveState();
+          renderSidebar(selectLesson);
+        };
+        list.appendChild(makeChapterHeader(label, items.length, collapsed, toggle));
+        dlist.appendChild(makeChapterHeader(label, items.length, collapsed, toggle));
+        if (collapsed) continue;
+      }
+
+      for (const l of items) {
+        const active = l.id === state.currentLessonId;
+        list.appendChild(makeSide(l, active, l.displayTitle));
+        dlist.appendChild(makeDrawer(l, active, l.displayTitle));
+      }
     }
   }
 
