@@ -1,0 +1,110 @@
+/* ===== Theme variables ===== */
+:root {
+  /* dark (default) */
+  --bg: #0F1814;
+  --panel: #1A2B24;
+  --card: #243830;
+  --card-hi: #2D4A3E;
+  --text: #F5F0E8;
+  --text-soft: rgba(245, 240, 232, 0.65);
+  --text-mute: rgba(245, 240, 232, 0.4);
+  --gold: #C4A574;
+  --gold-soft: rgba(196, 165, 116, 0.15);
+  --danger: #E8948F;
+  --danger-soft: rgba(184, 84, 80, 0.15);
+  --hair: rgba(245, 240, 232, 0.08);
+  --surface-hover: rgba(245, 240, 232, 0.06);
+  --surface-soft: rgba(245, 240, 232, 0.04);
+  --surface-deep: rgba(0, 0, 0, 0.2);
+  --scrollbar: rgba(245, 240, 232, 0.1);
+}
+
+/* Auto light mode (applies only when data-theme is not set or is 'auto') */
+@media (prefers-color-scheme: light) {
+  html:not([data-theme='dark']):not([data-theme='light']) {
+    --bg: #F5F0E8;
+    --panel: #EAE2D2;
+    --card: #E4DAC4;
+    --card-hi: #D8C9A8;
+    --text: #1A2B24;
+    --text-soft: rgba(26, 43, 36, 0.7);
+    --text-mute: rgba(26, 43, 36, 0.4);
+    --gold: #8B6F3F;
+    --gold-soft: rgba(139, 111, 63, 0.15);
+    --danger: #A8524D;
+    --danger-soft: rgba(168, 82, 77, 0.15);
+    --hair: rgba(26, 43, 36, 0.1);
+    --surface-hover: rgba(26, 43, 36, 0.06);
+    --surface-soft: rgba(26, 43, 36, 0.03);
+    --surface-deep: rgba(26, 43, 36, 0.08);
+    --scrollbar: rgba(26, 43, 36, 0.15);
+  }
+}
+
+/* Manual light override */
+html[data-theme='light'] {
+  --bg: #F5F0E8;
+  --panel: #EAE2D2;
+  --card: #E4DAC4;
+  --card-hi: #D8C9A8;
+  --text: #1A2B24;
+  --text-soft: rgba(26, 43, 36, 0.7);
+  --text-mute: rgba(26, 43, 36, 0.4);
+  --gold: #8B6F3F;
+  --gold-soft: rgba(139, 111, 63, 0.15);
+  --danger: #A8524D;
+  --danger-soft: rgba(168, 82, 77, 0.15);
+  --hair: rgba(26, 43, 36, 0.1);
+  --surface-hover: rgba(26, 43, 36, 0.06);
+  --surface-soft: rgba(26, 43, 36, 0.03);
+  --surface-deep: rgba(26, 43, 36, 0.08);
+  --scrollbar: rgba(26, 43, 36, 0.15);
+}
+
+/* ===== Reset ===== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: 'Inter', 'Sarabun', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  background: var(--surface-soft);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.thai { font-family: 'Sarabun', sans-serif; }
+.thai-sub { font-family: 'Noto Sans Thai', sans-serif; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }

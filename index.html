@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1814" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F5F0E8" media="(prefers-color-scheme: light)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="泰文複習">
+<title>泰文複習</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500&family=Noto+Sans+Thai:wght@400;500&family=Inter:wght@400;500&family=Noto+Sans+TC:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/layout.css">
+<link rel="stylesheet" href="styles/components.css">
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <button class="top-btn" id="btnMenu" aria-label="選單">☰</button>
+  <div class="top-center">
+    <div class="mode-tabs" id="modeTabs">
+      <button class="mode-tab active" data-mode="card">字卡</button>
+      <button class="mode-tab" data-mode="example">例句</button>
+      <button class="mode-tab" data-mode="listen">被動聽力</button>
+    </div>
+    <div class="top-title" id="topTitle">泰文複習</div>
+  </div>
+  <button class="top-btn" id="btnSettings" aria-label="設定">⚙</button>
+</div>
+
+<!-- Mobile mode picker -->
+<div class="mode-picker-mobile" id="modePicker">
+  <button class="mp-btn active" data-mode="card">字卡</button>
+  <button class="mp-btn" data-mode="example">例句</button>
+  <button class="mp-btn" data-mode="listen">被動聽力</button>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <aside class="sidebar" id="sidebar">
+    <div class="side-label">課程</div>
+    <div id="sideList"></div>
+  </aside>
+
+  <section class="content" id="content"></section>
+
+  <aside class="stats">
+    <div class="stats-title">本堂統計</div>
+    <div class="stat-box gold"><div class="stat-label">會了</div><div class="stat-val" id="statGood">0</div></div>
+    <div class="stat-box"><div class="stat-label">普通</div><div class="stat-val" id="statOk">0</div></div>
+    <div class="stat-box red"><div class="stat-label">不熟</div><div class="stat-val" id="statBad">0</div></div>
+    <div class="shortcuts">
+      <div><span class="kbd">←</span> <span class="kbd">→</span> 切卡</div>
+      <div><span class="kbd">Space</span> 翻面</div>
+      <div><span class="kbd">1</span> <span class="kbd">2</span> <span class="kbd">3</span> 評估</div>
+      <div><span class="kbd">P</span> 播放</div>
+    </div>
+  </aside>
+</div>
+
+<!-- Drawer (mobile) -->
+<div class="drawer-mask" id="drawerMask"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-title">模式</div>
+  <button class="drawer-item active" data-drawer-mode="card">字卡</button>
+  <button class="drawer-item" data-drawer-mode="example">例句</button>
+  <button class="drawer-item" data-drawer-mode="listen">被動聽力</button>
+  <div class="side-divider"></div>
+  <div class="drawer-title">課程</div>
+  <div id="drawerList"></div>
+</aside>
+
+<!-- Settings modal -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">設定</div>
+      <button class="modal-close" id="btnCloseModal" aria-label="關閉">✕</button>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Google Sheet 網址或 ID</label>
+      <textarea id="inpSheet" rows="2" placeholder="貼 Sheet 編輯網址 或 Sheet ID"></textarea>
+      <div class="field-hint">
+        支援兩種來源：
+        <br>1. 整份 Sheet（推薦）：設為「任何擁有連結的人可檢視」，貼編輯網址，自動列出每個 tab 當一堂課。
+        <br>2. 單一 CSV：貼「發佈到網路」的 CSV 網址，所有卡片按 <code>lesson</code> 欄分組。
+        <br>欄位需有 <code>thai, karaoke, zh</code>；可選 <code>type(word/sentence), note, audio_url, lesson</code>。
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">語速（TTS 倍率）</label>
+      <div class="seg" id="segRate">
+        <button class="seg-btn" data-rate="0.6">0.6×</button>
+        <button class="seg-btn" data-rate="0.8">0.8×</button>
+        <button class="seg-btn active" data-rate="1">1×</button>
+        <button class="seg-btn" data-rate="1.2">1.2×</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">被動聽力重複次數</label>
+      <div class="seg" id="segRepeat">
+        <button class="seg-btn" data-repeat="1">1×</button>
+        <button class="seg-btn" data-repeat="2">2×</button>
+        <button class="seg-btn active" data-repeat="3">3×</button>
+        <button class="seg-btn" data-repeat="4">4×</button>
+        <button class="seg-btn" data-repeat="5">5×</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">跟讀間隔（秒）</label>
+      <div class="seg" id="segGap">
+        <button class="seg-btn" data-gap="auto">自動</button>
+        <button class="seg-btn" data-gap="1">1s</button>
+        <button class="seg-btn active" data-gap="2">2s</button>
+        <button class="seg-btn" data-gap="3">3s</button>
+        <button class="seg-btn" data-gap="4">4s</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">主題</label>
+      <div class="seg" id="segTheme">
+        <button class="seg-btn" data-theme="auto">自動</button>
+        <button class="seg-btn active" data-theme="dark">深色</button>
+        <button class="seg-btn" data-theme="light">淺色</button>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn ghost" id="btnResetProgress">重置進度</button>
+      <button class="btn primary" id="btnSaveSettings">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Silent loop audio for Media Session (keeps session alive on lock-screen) -->
+<audio id="silentLoop" loop preload="auto" playsinline crossorigin="anonymous"
+       src="data:audio/wav;base64,UklGRhwAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="></audio>
+
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

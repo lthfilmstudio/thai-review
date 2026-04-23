@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+._*
+
+# 編輯器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Playwright 測試產物
+.playwright-mcp/
+test-results/
+playwright-report/
+
+# 暫存
+*.log
+tmp/

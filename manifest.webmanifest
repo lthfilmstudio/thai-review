@@ -1,0 +1,33 @@
+{
+  "name": "泰文複習",
+  "short_name": "泰文",
+  "description": "泰文單字與例句複習 PWA — 字卡、例句、被動聽力三模式。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0F1814",
+  "theme_color": "#0F1814",
+  "lang": "zh-Hant",
+  "categories": ["education"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
