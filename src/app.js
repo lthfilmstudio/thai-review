@@ -1,6 +1,10 @@
 /* 入口：init → 載入狀態 → 抓資料 → 綁事件。 */
 
-import { state, loadState, saveState, DEMO_LESSONS, DEFAULT_SHEET_URL, filteredCards, setGrade } from './state.js';
+import {
+  state, loadState, saveState,
+  DEMO_LESSONS, DEFAULT_SHEET_URL,
+  filteredCards, setGrade, shuffleCurrentLesson,
+} from './state.js';
 import { loadLessons } from './data.js';
 import { speakCard, warmupVoices } from './tts.js';
 import { stopListen } from './listen.js';
@@ -77,6 +81,13 @@ function wireSegClick(sel, onPick) {
   });
 }
 
+function flashShuffle() {
+  const btn = document.getElementById('btnShuffle');
+  if (!btn) return;
+  btn.classList.add('flash');
+  setTimeout(() => btn.classList.remove('flash'), 400);
+}
+
 function showLoading(msg) {
   const el = document.getElementById('content');
   if (el) {
@@ -118,6 +129,12 @@ async function init() {
   document.getElementById('btnMenu').addEventListener('click', openDrawer);
   document.getElementById('drawerMask').addEventListener('click', closeDrawer);
   document.getElementById('btnSettings').addEventListener('click', openModal);
+  document.getElementById('btnShuffle').addEventListener('click', () => {
+    stopListen();
+    shuffleCurrentLesson();
+    rerender();
+    flashShuffle();
+  });
   document.getElementById('btnCloseModal').addEventListener('click', closeModal);
   document.getElementById('modalMask').addEventListener('click', e => {
     if (e.target.id === 'modalMask') closeModal();
@@ -188,6 +205,11 @@ async function init() {
     else if (e.key === 'p' || e.key === 'P') {
       const cards = filteredCards();
       if (cards[state.cardIndex]) speakCard(cards[state.cardIndex]);
+    }
+    else if (e.key === 's' || e.key === 'S') {
+      shuffleCurrentLesson();
+      rerender();
+      flashShuffle();
     }
   });
 

@@ -86,14 +86,37 @@ export function filteredCards() {
   return lesson ? lesson.cards : [];
 }
 
-const progKey = idx => (state.currentLessonId || 'x') + ':' + idx;
-
-export function gradeOf(idx) {
-  return state.progress[progKey(idx)];
+/* 以 card.thai 當 key，這樣打亂順序或換課不會弄丟評分。 */
+function progKey(cardOrIdx) {
+  const lessonId = state.currentLessonId || 'x';
+  if (typeof cardOrIdx === 'number') {
+    const cards = currentLesson()?.cards || [];
+    const c = cards[cardOrIdx];
+    return c ? lessonId + ':' + c.thai : lessonId + ':idx:' + cardOrIdx;
+  }
+  return lessonId + ':' + cardOrIdx.thai;
 }
 
-export function setGrade(idx, g) {
-  if (g) state.progress[progKey(idx)] = g;
-  else delete state.progress[progKey(idx)];
+export function gradeOf(idxOrCard) {
+  return state.progress[progKey(idxOrCard)];
+}
+
+export function setGrade(idxOrCard, g) {
+  const k = progKey(idxOrCard);
+  if (g) state.progress[k] = g;
+  else delete state.progress[k];
   saveState();
+}
+
+/* Fisher-Yates 就地打亂當前課程的 cards 陣列 */
+export function shuffleCurrentLesson() {
+  const lesson = currentLesson();
+  if (!lesson || !lesson.cards.length) return;
+  const arr = lesson.cards;
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  state.cardIndex = 0;
+  state.flipped = false;
 }

@@ -22,6 +22,11 @@
 }
 
 .top-btn:hover { background: var(--surface-hover); filter: brightness(1.3); }
+.top-btn.flash {
+  background: var(--gold);
+  color: var(--panel);
+  transition: background 0.1s, color 0.1s;
+}
 
 .top-center {
   display: flex;
