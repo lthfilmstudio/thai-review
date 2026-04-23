@@ -12,7 +12,10 @@ const SVG_CHEV_R = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" 
 const SVG_EXT = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>';
 
 function youglishUrl(thai) {
-  return 'https://youglish.com/pronounce/' + encodeURIComponent(thai) + '/thai';
+  // YouGlish 後端（Tomcat）擋 encoded slash，而泰文資料常有 "ค่ะ / ครับ" 這種男女變體；
+  // 取 / 前第一段當搜尋詞最乾淨（是完整片語，搜得到真人影片）。
+  const term = (thai || '').split('/')[0].trim();
+  return 'https://youglish.com/pronounce/' + encodeURIComponent(term) + '/thai';
 }
 
 function frontBody(card, reverse) {
