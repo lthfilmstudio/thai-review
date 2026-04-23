@@ -72,7 +72,7 @@ export function renderContent(onGrade) {
     el.innerHTML = `<div class="empty">
       <div class="empty-icon">✦</div>
       <div class="empty-title">沒有卡片</div>
-      <div class="empty-sub">這堂課沒有${state.mode === 'example' ? '例句' : '內容'}。試試切到其他課程或模式。</div>
+      <div class="empty-sub">這堂課沒有內容。試試切到其他課程。</div>
     </div>`;
     return;
   }

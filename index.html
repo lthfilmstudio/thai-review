@@ -32,7 +32,6 @@
   <div class="top-center">
     <div class="mode-tabs" id="modeTabs">
       <button class="mode-tab active" data-mode="card">字卡</button>
-      <button class="mode-tab" data-mode="example">例句</button>
       <button class="mode-tab" data-mode="listen">被動聽力</button>
     </div>
     <div class="top-title" id="topTitle">泰文複習</div>
@@ -43,7 +42,6 @@
 <!-- Mobile mode picker -->
 <div class="mode-picker-mobile" id="modePicker">
   <button class="mp-btn active" data-mode="card">字卡</button>
-  <button class="mp-btn" data-mode="example">例句</button>
   <button class="mp-btn" data-mode="listen">被動聽力</button>
 </div>
 
@@ -75,7 +73,6 @@
 <aside class="drawer" id="drawer">
   <div class="drawer-title">模式</div>
   <button class="drawer-item active" data-drawer-mode="card">字卡</button>
-  <button class="drawer-item" data-drawer-mode="example">例句</button>
   <button class="drawer-item" data-drawer-mode="listen">被動聽力</button>
   <div class="side-divider"></div>
   <div class="drawer-title">課程</div>
@@ -91,13 +88,11 @@
     </div>
 
     <div class="field">
-      <label class="field-label">Google Sheet 網址或 ID</label>
-      <textarea id="inpSheet" rows="2" placeholder="貼 Sheet 編輯網址 或 Sheet ID"></textarea>
+      <label class="field-label">Google Sheet 網址（選填）</label>
+      <textarea id="inpSheet" rows="2" placeholder="留空則使用預設 Sheet"></textarea>
       <div class="field-hint">
-        支援兩種來源：
-        <br>1. 整份 Sheet（推薦）：設為「任何擁有連結的人可檢視」，貼編輯網址，自動列出每個 tab 當一堂課。
-        <br>2. 單一 CSV：貼「發佈到網路」的 CSV 網址，所有卡片按 <code>lesson</code> 欄分組。
-        <br>欄位需有 <code>thai, karaoke, zh</code>；可選 <code>type(word/sentence), note, audio_url, lesson</code>。
+        留空 → 用內建預設（Nalin 的課本 Sheet）。<br>
+        要換：貼「發佈到網路 → 整個文件」的 URL，自動列每個 tab 當一堂課；或單一 CSV URL（output=csv）；或多行 CSV URL 一行一堂。
       </div>
     </div>
 

@@ -1,6 +1,6 @@
 /* 入口：init → 載入狀態 → 抓資料 → 綁事件。 */
 
-import { state, loadState, saveState, DEMO_LESSONS, filteredCards, setGrade } from './state.js';
+import { state, loadState, saveState, DEMO_LESSONS, DEFAULT_SHEET_URL, filteredCards, setGrade } from './state.js';
 import { loadLessons } from './data.js';
 import { speakCard, warmupVoices } from './tts.js';
 import { stopListen } from './listen.js';
@@ -10,14 +10,14 @@ import {
 } from './ui.js';
 
 async function fetchLessonsOrDemo() {
-  if (state.settings.sheetInput) {
-    try {
-      const lessons = await loadLessons(state.settings.sheetInput);
-      if (lessons && lessons.length) return lessons;
-    } catch (e) {
-      console.warn('資料載入失敗，使用 demo 資料：', e.message);
-      alert('資料載入失敗：' + e.message);
-    }
+  const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
+  try {
+    const lessons = await loadLessons(url);
+    if (lessons && lessons.length) return lessons;
+  } catch (e) {
+    console.warn('資料載入失敗，使用 demo 資料：', e.message);
+    // 使用者有填自訂 URL 才跳錯誤提示；預設 URL 失敗靜默 fallback 到 demo
+    if (state.settings.sheetInput) alert('資料載入失敗：' + e.message);
   }
   return DEMO_LESSONS;
 }

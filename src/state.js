@@ -3,6 +3,10 @@
 
 export const STORAGE_KEY = 'thai-review-v1';
 
+/* 預設資料來源：Nalin 的泰文課 Sheet（整份文件發佈）。
+   使用者未在設定填自訂 URL 時，就用這個。 */
+export const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQzG3dKsEvQSsMxu4d1cwTMyvzUaq7kPK2Nwlg2qVZvzEmVhO4IS6D9lPirt4-cRbfokXbQNgvBWo9C/pubhtml';
+
 export const DEMO_LESSONS = [
   { id: 'demo-12', title: '第 12 堂（示範）', cards: [
     { thai: 'สวัสดีครับ', karaoke: 'sà-wàt-dee kráp', zh: '你好（男生用）', type: 'word', note: '男性使用' },
@@ -23,7 +27,7 @@ export const DEMO_LESSONS = [
 export const state = {
   lessons: [],
   currentLessonId: null,
-  mode: 'card',              // 'card' | 'example' | 'listen'
+  mode: 'card',              // 'card' | 'listen'
   cardIndex: 0,
   flipped: false,
   progress: {},              // { "lessonId:idx": "good"|"ok"|"bad" }
@@ -79,9 +83,7 @@ export function currentLesson() {
 
 export function filteredCards() {
   const lesson = currentLesson();
-  if (!lesson) return [];
-  if (state.mode === 'example') return lesson.cards.filter(c => c.type === 'sentence');
-  return lesson.cards;
+  return lesson ? lesson.cards : [];
 }
 
 const progKey = idx => (state.currentLessonId || 'x') + ':' + idx;

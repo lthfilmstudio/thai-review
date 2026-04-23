@@ -1,6 +1,6 @@
 # 泰文複習 — Stage 1 PWA
 
-純 HTML/CSS/JS（零 npm 依賴）的泰文學習 PWA。三大模式：字卡、例句、被動聽力。支援離線、鎖屏背景播放、響應式（手機 / iPad / 桌面）。
+純 HTML/CSS/JS（零 npm 依賴）的泰文學習 PWA。兩大模式：字卡、被動聽力。支援離線、鎖屏背景播放、響應式（手機 / iPad / 桌面）。
 
 資料源是 Google Sheets，用 publish-to-web 取 CSV；每個 worksheet 當一堂課。
 
@@ -81,9 +81,6 @@ git push -u origin main
 - 三顆評估按鈕：不熟 / 普通 / 會了（存 localStorage）
 - 手機：左右滑切卡
 - 桌面鍵盤：`←` `→` 切卡、`Space` 翻面、`1` `2` `3` 評估、`P` 播放
-
-### 例句模式
-- 同字卡但只出 `type=sentence`
 
 ### 被動聽力模式
 - 自動循環：老師語音 → 金色進度條 → 跟讀空白（灰色進度條）→ 重複 N 次 → 下一張
