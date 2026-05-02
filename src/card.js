@@ -2,11 +2,9 @@
    （prefers-reduced-motion 時在 CSS 改 cross-fade）。
    reverse=true：中文在正面、泰文在背面。 */
 
-import { state, gradeOf, setGrade, isFavorite, toggleFavorite } from './state.js';
-import { speakCard } from './tts.js';
+import { state, isFavorite, toggleFavorite } from './state.js';
 import { escapeHtml } from './ui.js';
 
-const SVG_PLAY = '<svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 2 L9 6 L3 10 Z" fill="currentColor"/></svg>';
 const SVG_CHEV_L = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
 const SVG_CHEV_R = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
 const SVG_EXT = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>';
@@ -59,54 +57,48 @@ function backBody(card, reverse) {
   `;
 }
 
-export function renderCardMode(el, cards, onGrade, opts = {}) {
+export function renderCardMode(el, cards, _onGrade, opts = {}) {
   const reverse = !!opts.reverse;
   const i = state.cardIndex;
   const card = cards[i];
   const pct = Math.round(((i + 1) / cards.length) * 100);
-  const grade = gradeOf(i);
   const tag = card.type === 'sentence' ? 'EXAMPLE' : 'VOCAB';
 
   el.innerHTML = `
     <div class="progress-row">
-      <button class="nav-btn" id="cardPrev" aria-label="上一張" title="上一張 (←)">${SVG_CHEV_L}</button>
       <div class="progress-track"><div class="progress-bar" style="width:${pct}%"></div></div>
       <div class="progress-count">${i + 1} / ${cards.length}</div>
-      <button class="nav-btn" id="cardNext" aria-label="下一張" title="下一張 (→)">${SVG_CHEV_R}</button>
     </div>
     <div class="card-stage${state.flipped ? ' flipped' : ''}" id="cardStage">
       <div class="card-inner">
         <div class="card front">
           <div class="card-tag">${tag}</div>
           ${frontBody(card, reverse)}
-          <button class="play-btn" id="playFront" aria-label="播放">${SVG_PLAY}</button>
           <div class="flip-hint">TAP CARD TO FLIP</div>
         </div>
         <div class="card back">
           <div class="card-tag">${tag}</div>
           ${backBody(card, reverse)}
           <div class="back-actions">
-            <button class="play-btn" id="playBack" aria-label="再聽一次">${SVG_PLAY}</button>
-            <a class="yg-btn" id="ygLink" href="${youglishUrl(card.thai)}" target="_blank" rel="noopener noreferrer" aria-label="在 YouGlish 聽真人發音">
+            <a class="yg-btn" href="${youglishUrl(card.thai)}" target="_blank" rel="noopener noreferrer" aria-label="在 YouGlish 聽真人發音">
               ${SVG_EXT}<span>聽真人</span>
             </a>
-            <button class="fav-btn${isFavorite(card) ? ' on' : ''}" id="favBtn" aria-label="收藏">
-              ${isFavorite(card) ? SVG_STAR_FILLED : SVG_STAR_OUTLINE}
-            </button>
           </div>
         </div>
       </div>
     </div>
-    <div class="grade-row">
-      <button class="pill red${grade === 'bad' ? ' active' : ''}" data-grade="bad">不熟</button>
-      <button class="pill neutral${grade === 'ok' ? ' active' : ''}" data-grade="ok">普通</button>
-      <button class="pill gold${grade === 'good' ? ' active' : ''}" data-grade="good">會了</button>
+    <div class="card-nav-row">
+      <button class="nav-side-btn" id="cardPrev" aria-label="上一張">${SVG_CHEV_L}<span>上一張</span></button>
+      <button class="fav-btn${isFavorite(card) ? ' on' : ''}" id="favBtn" aria-label="收藏">
+        ${isFavorite(card) ? SVG_STAR_FILLED : SVG_STAR_OUTLINE}
+      </button>
+      <button class="nav-side-btn" id="cardNext" aria-label="下一張"><span>下一張</span>${SVG_CHEV_R}</button>
     </div>
   `;
 
   const stage = document.getElementById('cardStage');
   stage.addEventListener('click', e => {
-    if (e.target.closest('.play-btn') || e.target.closest('.pill') || e.target.closest('.yg-btn') || e.target.closest('.fav-btn')) return;
+    if (e.target.closest('.yg-btn')) return;
     state.flipped = !state.flipped;
     stage.classList.toggle('flipped', state.flipped);
   });
@@ -117,20 +109,5 @@ export function renderCardMode(el, cards, onGrade, opts = {}) {
     toggleFavorite(card);
     favBtn.classList.toggle('on');
     favBtn.innerHTML = isFavorite(card) ? SVG_STAR_FILLED : SVG_STAR_OUTLINE;
-  });
-  document.getElementById('playFront').addEventListener('click', e => {
-    e.stopPropagation();
-    speakCard(card);
-  });
-  document.getElementById('playBack').addEventListener('click', e => {
-    e.stopPropagation();
-    speakCard(card);
-  });
-  el.querySelectorAll('.pill').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      setGrade(state.cardIndex, btn.dataset.grade);
-      onGrade?.();
-    });
   });
 }

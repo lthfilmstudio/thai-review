@@ -288,6 +288,37 @@
   transform: scale(0.94);
 }
 
+/* ===== 底部導覽列（上一張 / 收藏 / 下一張） ===== */
+.card-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 4px 4px;
+  flex-shrink: 0;
+}
+
+.nav-side-btn {
+  flex: 1;
+  padding: 12px 8px;
+  border-radius: 10px;
+  background: var(--surface-hover);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.12s;
+}
+
+.nav-side-btn:hover {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.nav-side-btn:active { transform: scale(0.97); }
+
 /* ===== Grade pills ===== */
 .grade-row {
   display: flex;
