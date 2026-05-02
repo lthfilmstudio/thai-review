@@ -127,11 +127,11 @@ export function renderSidebar(selectLesson) {
     const hr = document.createElement('div'); hr.className = 'side-divider'; list.appendChild(hr);
     const hr2 = document.createElement('div'); hr2.className = 'side-divider'; dlist.appendChild(hr2);
 
-    list.appendChild(makeSide({ id: '__ALL__', title: '全部混合' }, state.currentLessonId === '__ALL__'));
-    dlist.appendChild(makeDrawer({ id: '__ALL__', title: '全部混合' }, state.currentLessonId === '__ALL__'));
-
     const favTitle = '★ 收藏' + (favoriteCount() ? ` (${favoriteCount()})` : '');
     dlist.appendChild(makeDrawer({ id: '__FAV__', title: favTitle }, state.currentLessonId === '__FAV__'));
+
+    list.appendChild(makeSide({ id: '__ALL__', title: '全部混合' }, state.currentLessonId === '__ALL__'));
+    dlist.appendChild(makeDrawer({ id: '__ALL__', title: '全部混合' }, state.currentLessonId === '__ALL__'));
   }
 }
 
