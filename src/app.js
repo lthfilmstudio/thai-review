@@ -199,6 +199,7 @@ function nextCard() {
   if (!cards.length) return;
   state.cardIndex = (state.cardIndex + 1) % cards.length;
   state.flipped = false;
+  saveState();
   renderContent(rerender);
 }
 
@@ -207,6 +208,7 @@ function prevCard() {
   if (!cards.length) return;
   state.cardIndex = (state.cardIndex - 1 + cards.length) % cards.length;
   state.flipped = false;
+  saveState();
   renderContent(rerender);
 }
 
@@ -268,6 +270,10 @@ async function init() {
 
   // lazy 模式：確保當前課程的卡片已載入
   await ensureLessonLoaded(state.currentLessonId, { silentUI: false });
+
+  // 防止舊 cardIndex 在課程更新後越界
+  const _initCards = filteredCards();
+  if (_initCards.length && state.cardIndex >= _initCards.length) state.cardIndex = 0;
 
   rerender();
 

@@ -134,6 +134,7 @@ export function loadState() {
     state.collapsed = s.collapsed || {};
     state.currentLessonId = s.currentLessonId || null;
     state.mode = s.mode || 'card';
+    state.cardIndex = typeof s.cardIndex === 'number' ? s.cardIndex : 0;
   } catch (e) {
     // 忽略損毀的 localStorage
   }
@@ -147,6 +148,7 @@ export function saveState() {
     collapsed: state.collapsed,
     currentLessonId: state.currentLessonId,
     mode: state.mode,
+    cardIndex: state.cardIndex,
   }));
 }
 
