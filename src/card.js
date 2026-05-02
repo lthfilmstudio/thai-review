@@ -3,7 +3,10 @@
    reverse=true：中文在正面、泰文在背面。 */
 
 import { state, isFavorite, toggleFavorite } from './state.js';
+import { speakCard } from './tts.js';
 import { escapeHtml } from './ui.js';
+
+const SVG_PLAY = '<svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 2 L9 6 L3 10 Z" fill="currentColor"/></svg>';
 
 const SVG_CHEV_L = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
 const SVG_CHEV_R = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
@@ -80,6 +83,7 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
           <div class="card-tag">${tag}</div>
           ${backBody(card, reverse)}
           <div class="back-actions">
+            <button class="play-btn" id="playBack" aria-label="播放">${SVG_PLAY}</button>
             <a class="yg-btn" href="${youglishUrl(card.thai)}" target="_blank" rel="noopener noreferrer" aria-label="在 YouGlish 聽真人發音">
               ${SVG_EXT}<span>聽真人</span>
             </a>
@@ -98,9 +102,14 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
 
   const stage = document.getElementById('cardStage');
   stage.addEventListener('click', e => {
-    if (e.target.closest('.yg-btn')) return;
+    if (e.target.closest('.play-btn') || e.target.closest('.yg-btn')) return;
     state.flipped = !state.flipped;
     stage.classList.toggle('flipped', state.flipped);
+  });
+
+  document.getElementById('playBack')?.addEventListener('click', e => {
+    e.stopPropagation();
+    speakCard(card);
   });
 
   const favBtn = document.getElementById('favBtn');

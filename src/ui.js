@@ -1,6 +1,6 @@
 /* UI render 總管：sidebar、drawer、topbar、stats、content dispatcher、modal、主題。 */
 
-import { state, currentLesson, filteredCards, gradeOf, favoriteCount, saveState } from './state.js';
+import { state, currentLesson, filteredCards, favoriteCount, saveState } from './state.js';
 import { renderCardMode } from './card.js';
 import { renderListenMode, stopListen } from './listen.js';
 
@@ -149,17 +149,11 @@ export function renderTopbarTitle() {
 }
 
 export function renderStats() {
-  const cards = filteredCards();
-  let g = 0, o = 0, b = 0;
-  cards.forEach((_, i) => {
-    const grade = gradeOf(i);
-    if (grade === 'good') g++;
-    else if (grade === 'ok') o++;
-    else if (grade === 'bad') b++;
-  });
-  document.getElementById('statGood').textContent = g;
-  document.getElementById('statOk').textContent = o;
-  document.getElementById('statBad').textContent = b;
+  const count = favoriteCount();
+  const el = document.getElementById('favPanelCount');
+  if (el) el.textContent = count ? `${count} 張` : '0 張';
+  const btn = document.getElementById('btnFavPanel');
+  if (btn) btn.classList.toggle('active', state.currentLessonId === '__FAV__');
 }
 
 export function renderContent(onGrade) {

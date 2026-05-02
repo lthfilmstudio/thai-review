@@ -276,6 +276,48 @@
 .stat-box.gold .stat-val { color: var(--gold); }
 .stat-box.red .stat-val { color: var(--danger); }
 
+.fav-panel-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 10px;
+  border-radius: 10px;
+  background: var(--surface-hover);
+  color: var(--text-soft);
+  text-align: left;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+
+.fav-panel-btn:hover,
+.fav-panel-btn.active {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.fav-panel-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fav-panel-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.fav-panel-btn:hover .fav-panel-label,
+.fav-panel-btn.active .fav-panel-label {
+  color: var(--gold);
+}
+
+.fav-panel-count {
+  font-size: 11px;
+  color: var(--text-mute);
+}
+
 .shortcuts {
   margin-top: auto;
   font-size: 15px;

@@ -290,6 +290,7 @@ async function init() {
   );
 
   // Topbar 按鈕
+  document.getElementById('btnFavPanel')?.addEventListener('click', () => selectLesson('__FAV__'));
   document.getElementById('btnMenu').addEventListener('click', openDrawer);
   document.getElementById('drawerMask').addEventListener('click', closeDrawer);
   document.getElementById('btnSettings').addEventListener('click', openModal);

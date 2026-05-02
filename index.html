@@ -71,14 +71,16 @@
   <section class="content" id="content"></section>
 
   <aside class="stats">
-    <div class="stats-title">本堂統計</div>
-    <div class="stat-box gold"><div class="stat-label">會了</div><div class="stat-val" id="statGood">0</div></div>
-    <div class="stat-box"><div class="stat-label">普通</div><div class="stat-val" id="statOk">0</div></div>
-    <div class="stat-box red"><div class="stat-label">不熟</div><div class="stat-val" id="statBad">0</div></div>
+    <button class="fav-panel-btn" id="btnFavPanel" aria-label="切換到收藏課程">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <div class="fav-panel-info">
+        <div class="fav-panel-label">收藏</div>
+        <div class="fav-panel-count" id="favPanelCount">0 張</div>
+      </div>
+    </button>
     <div class="shortcuts">
       <div><span class="kbd">←</span> <span class="kbd">→</span> 切卡</div>
       <div><span class="kbd">Space</span> 翻面</div>
-      <div><span class="kbd">1</span> <span class="kbd">2</span> <span class="kbd">3</span> 評估</div>
       <div><span class="kbd">P</span> 播放</div>
       <div><span class="kbd">S</span> 隨機</div>
       <div><span class="kbd">/</span> 搜尋</div>
