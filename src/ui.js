@@ -91,8 +91,8 @@ export function renderSidebar(selectLesson) {
       byChapter.get(ch).push(l);
     }
 
-    // 章節數量夠多（>1）才展開收合功能；只有 1 章就直接平鋪
-    const needChapterGroup = byChapter.size > 1;
+    // 有初/中/高前綴分組時一律顯示章節 header（即使只有 1 章），保持視覺一致；純「其他」群才平鋪
+    const needChapterGroup = hasPrefixedGroup || byChapter.size > 1;
     // 預設展開最後一章、其餘收起（使用者有手動點過就改用 explicit 狀態）
     const chapterKeys = [...byChapter.keys()];
     const lastChapter = chapterKeys[chapterKeys.length - 1];
