@@ -16,9 +16,9 @@ import {
   openSearch, closeSearch, renderSearchResults,
 } from './ui.js';
 
-async function fetchFromNetwork(url) {
+async function fetchFromNetwork(url, { force = false } = {}) {
   try {
-    const lessons = await loadLessons(url);
+    const lessons = await loadLessons(url, { force });
     if (lessons && lessons.length) return lessons;
   } catch (e) {
     console.warn('資料載入失敗：', e.message);
@@ -28,12 +28,12 @@ async function fetchFromNetwork(url) {
 }
 
 /* 舊版 eager cache（給單一 CSV / 多 CSV 模式用，沒 tab 概念無法 lazy）。 */
-async function loadLessonsCacheFirstEager(onFreshData) {
+async function loadLessonsCacheFirstEager(onFreshData, { force = false } = {}) {
   const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
-  const cached = loadLessonsCache(url);
+  const cached = force ? null : loadLessonsCache(url);
 
   const revalidate = (async () => {
-    const fresh = await fetchFromNetwork(url);
+    const fresh = await fetchFromNetwork(url, { force });
     if (fresh) {
       saveLessonsCache(url, fresh);
       onFreshData?.(fresh);
@@ -63,11 +63,11 @@ function buildLessonsFromManifest(manifest) {
   });
 }
 
-async function loadLessonsLazy(url, onFreshManifest) {
-  let manifest = loadManifest(url);
+async function loadLessonsLazy(url, onFreshManifest, { force = false } = {}) {
+  let manifest = force ? null : loadManifest(url);
 
   if (!manifest) {
-    const m = await loadTabsOnly(url);
+    const m = await loadTabsOnly(url, { force });
     if (!m) throw new Error('no-manifest');
     manifest = { url, ts: Date.now(), ...m };
     saveManifest(url, m);
@@ -104,17 +104,17 @@ function onFreshManifest(fresh) {
 }
 
 /* 確保單堂課的 cards 已載入；未載入就抓並 cache。 */
-async function ensureLessonLoaded(lessonId, { silentUI = false } = {}) {
+async function ensureLessonLoaded(lessonId, { silentUI = false, force = false } = {}) {
   // 全部混合、收藏、搜尋都需要所有課都載入過才有完整結果
   if (lessonId === '__ALL__' || lessonId === '__FAV__' || lessonId === '__SEARCH__') {
-    return ensureAllLoaded();
+    return ensureAllLoaded({ force });
   }
   const lesson = state.lessons.find(l => l.id === lessonId);
-  if (!lesson || lesson._loaded || !lesson.gid || !state.baseUrl) return;
+  if (!lesson || (!force && lesson._loaded) || !lesson.gid || !state.baseUrl) return;
 
   if (!silentUI) showLoading(`載入「${lesson.title}」…`);
   try {
-    lesson.cards = await fetchLessonCards(state.baseUrl, lesson.gid);
+    lesson.cards = await fetchLessonCards(state.baseUrl, lesson.gid, { force });
     lesson._loaded = true;
     saveLessonCards(lesson.gid, lesson.cards);
   } catch (e) {
@@ -124,13 +124,13 @@ async function ensureLessonLoaded(lessonId, { silentUI = false } = {}) {
 }
 
 /* 全部混合：把還沒抓過的課程全部補抓（並行）。 */
-async function ensureAllLoaded() {
-  const todo = state.lessons.filter(l => !l._loaded && l.gid && state.baseUrl);
+async function ensureAllLoaded({ force = false } = {}) {
+  const todo = state.lessons.filter(l => (force || !l._loaded) && l.gid && state.baseUrl);
   if (!todo.length) return;
   showLoading(`正在補抓 ${todo.length} 堂未載入的課程…`);
   await Promise.allSettled(todo.map(async l => {
     try {
-      l.cards = await fetchLessonCards(state.baseUrl, l.gid);
+      l.cards = await fetchLessonCards(state.baseUrl, l.gid, { force });
       l._loaded = true;
       saveLessonCards(l.gid, l.cards);
     } catch (e) {
@@ -140,13 +140,13 @@ async function ensureAllLoaded() {
 }
 
 /* 主進入點：publish-to-web 走 lazy，其他走舊版 eager。 */
-async function loadLessonsSmart(onFresh) {
+async function loadLessonsSmart(onFresh, { force = false } = {}) {
   const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
   try {
-    return await loadLessonsLazy(url, onFresh);
+    return await loadLessonsLazy(url, onFresh, { force });
   } catch (e) {
     if (e.message !== 'no-manifest') console.warn('lazy failed:', e.message);
-    return await loadLessonsCacheFirstEager(onFresh);
+    return await loadLessonsCacheFirstEager(onFresh, { force });
   }
 }
 
@@ -340,11 +340,11 @@ async function init() {
       // URL 變了 → 清所有 cache 強制重抓
       clearLessonsCache();
       showLoading('正在從 Google Sheets 抓課程列表…');
-      state.lessons = await loadLessonsSmart(onFreshManifest);
+      state.lessons = await loadLessonsSmart(onFreshManifest, { force: true });
       state.currentLessonId = state.lessons[0]?.id || null;
       state.cardIndex = 0;
       state.flipped = false;
-      await ensureLessonLoaded(state.currentLessonId);
+      await ensureLessonLoaded(state.currentLessonId, { force: true });
     }
     closeModal();
     rerender();
@@ -365,13 +365,13 @@ async function init() {
     if (!confirm('重新從 Google Sheet 抓最新資料？（進度跟收藏不會動）')) return;
     clearLessonsCache();
     showLoading('重新抓 Sheet…');
-    state.lessons = await loadLessonsSmart(onFreshManifest);
+    state.lessons = await loadLessonsSmart(onFreshManifest, { force: true });
     if (!state.lessons.find(l => l.id === state.currentLessonId) &&
         state.currentLessonId !== '__ALL__' && state.currentLessonId !== '__FAV__') {
       state.currentLessonId = state.lessons[0]?.id || null;
       state.cardIndex = 0;
     }
-    await ensureLessonLoaded(state.currentLessonId);
+    await ensureLessonLoaded(state.currentLessonId, { force: true });
     closeModal();
     rerender();
   });

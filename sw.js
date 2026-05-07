@@ -1,7 +1,7 @@
 /* Service Worker：app shell cache + runtime CSV cache。
    改檔後升 CACHE 版本號強制更新。 */
 
-const CACHE = 'thai-review-v27';
+const CACHE = 'thai-review-v28';
 
 const SHELL = [
   './',
@@ -43,10 +43,15 @@ self.addEventListener('fetch', e => {
   // 非 GET 不處理
   if (e.request.method !== 'GET') return;
 
-  // Google Sheets / Fonts：stale-while-revalidate
+  // Google Sheets：network-first（線上一律抓最新，離線才 fallback cache）
   if (url.hostname.includes('docs.google.com') ||
-      url.hostname.includes('googleusercontent.com') ||
-      url.hostname.includes('fonts.googleapis.com') ||
+      url.hostname.includes('googleusercontent.com')) {
+    e.respondWith(networkFirst(e.request));
+    return;
+  }
+
+  // 字型：stale-while-revalidate（內容幾乎不變，可放心 cache）
+  if (url.hostname.includes('fonts.googleapis.com') ||
       url.hostname.includes('fonts.gstatic.com')) {
     e.respondWith(staleWhileRevalidate(e.request));
     return;
@@ -57,6 +62,18 @@ self.addEventListener('fetch', e => {
     e.respondWith(cacheFirst(e.request));
   }
 });
+
+async function networkFirst(req) {
+  const cache = await caches.open(CACHE);
+  try {
+    const res = await fetch(req);
+    if (res.ok) cache.put(req, res.clone());
+    return res;
+  } catch (e) {
+    const cached = await cache.match(req);
+    return cached || Response.error();
+  }
+}
 
 async function cacheFirst(req) {
   const cached = await caches.match(req);

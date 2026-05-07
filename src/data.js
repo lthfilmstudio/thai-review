@@ -89,8 +89,11 @@ function rowsToCards(rows) {
   return cards;
 }
 
-async function fetchCsvCards(url) {
-  const res = await fetch(url);
+async function fetchCsvCards(url, { force = false } = {}) {
+  const finalUrl = force
+    ? url + (url.includes('?') ? '&' : '?') + '_=' + Date.now()
+    : url;
+  const res = await fetch(finalUrl, force ? { cache: 'no-store' } : {});
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return rowsToCards(parseCsv(await res.text()));
 }
@@ -106,11 +109,11 @@ function extractGid(url) {
 }
 
 /* 方案 1：多行 CSV URL，每行一堂課 */
-async function loadMultipleCsvs(urls) {
+async function loadMultipleCsvs(urls, { force = false } = {}) {
   const lessons = [];
   for (let i = 0; i < urls.length; i++) {
     try {
-      const cards = await fetchCsvCards(urls[i]);
+      const cards = await fetchCsvCards(urls[i], { force });
       const lessonName = (cards[0] && cards[0].lesson) || `Lesson ${i + 1}`;
       const gid = extractGid(urls[i]) || String(i);
       lessons.push({ id: 'csv-' + gid, title: lessonName, cards });
@@ -123,7 +126,7 @@ async function loadMultipleCsvs(urls) {
 }
 
 /* 只抓 tab 列表（不抓 CSV），給 lazy 載入用。 */
-export async function loadTabsOnly(input) {
+export async function loadTabsOnly(input, { force = false } = {}) {
   input = (input || '').trim();
   if (!input) return null;
   const lines = input.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -132,7 +135,8 @@ export async function loadTabsOnly(input) {
   if (!/\/d\/e\//.test(one) || /output=csv/i.test(one)) return null;
 
   const base = one.replace(/[?#].*$/, '').replace(/\/pub(html)?$/, '');
-  const res = await fetch(base + '/pubhtml');
+  const htmlUrl = base + '/pubhtml' + (force ? '?_=' + Date.now() : '');
+  const res = await fetch(htmlUrl, force ? { cache: 'no-store' } : {});
   if (!res.ok) throw new Error('pubhtml HTTP ' + res.status);
   const html = await res.text();
   const tabs = parsePubTabs(html);
@@ -141,18 +145,18 @@ export async function loadTabsOnly(input) {
 }
 
 /* 抓單一 tab 的 cards。 */
-export async function fetchLessonCards(baseUrl, gid) {
+export async function fetchLessonCards(baseUrl, gid, { force = false } = {}) {
   const csvUrl = `${baseUrl}/pub?gid=${gid}&single=true&output=csv`;
-  return await fetchCsvCards(csvUrl);
+  return await fetchCsvCards(csvUrl, { force });
 }
 
 /* 方案 2：publish-to-web 整份 Sheet。抓 pubhtml 解析 tab 列表，
    每個 tab 再抓成 CSV。需使用者在 Google Sheets 選「發佈整個文件」。 */
-async function loadFromPublishedSheet(pubUrl) {
+async function loadFromPublishedSheet(pubUrl, { force = false } = {}) {
   // 正規化：去掉 query / fragment / 結尾 /pub 或 /pubhtml
   const base = pubUrl.replace(/[?#].*$/, '').replace(/\/pub(html)?$/, '');
-  const htmlUrl = base + '/pubhtml';
-  const res = await fetch(htmlUrl);
+  const htmlUrl = base + '/pubhtml' + (force ? '?_=' + Date.now() : '');
+  const res = await fetch(htmlUrl, force ? { cache: 'no-store' } : {});
   if (!res.ok) throw new Error('pubhtml HTTP ' + res.status);
   const html = await res.text();
   const tabs = parsePubTabs(html);
@@ -160,7 +164,7 @@ async function loadFromPublishedSheet(pubUrl) {
   // 並行抓所有 tab（28 個 × 300ms 依序 ≈ 10s，並行 <1s）
   const results = await Promise.allSettled(tabs.map(async tab => {
     const csvUrl = `${base}/pub?gid=${tab.gid}&single=true&output=csv`;
-    const cards = await fetchCsvCards(csvUrl);
+    const cards = await fetchCsvCards(csvUrl, { force });
     return { id: 'gid-' + tab.gid, title: tab.name, cards };
   }));
   const lessons = [];
@@ -208,8 +212,8 @@ function dedupeTabs(tabs) {
 }
 
 /* 方案 3：單一 CSV URL，依 lesson 欄分組 */
-async function loadSingleCsv(url) {
-  const cards = await fetchCsvCards(url);
+async function loadSingleCsv(url, { force = false } = {}) {
+  const cards = await fetchCsvCards(url, { force });
   const byLesson = new Map();
   for (const c of cards) {
     const name = c.lesson || '未分類';
@@ -224,25 +228,25 @@ async function loadSingleCsv(url) {
 }
 
 /* 主入口：依輸入型態挑對應方案 */
-export async function loadLessons(input) {
+export async function loadLessons(input, { force = false } = {}) {
   input = (input || '').trim();
   if (!input) return null;
 
   const lines = input.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
   // 多行 → 每行一堂課
-  if (lines.length > 1) return loadMultipleCsvs(lines);
+  if (lines.length > 1) return loadMultipleCsvs(lines, { force });
 
   const one = lines[0];
 
   // publish-to-web 整份（含 /pub 或 /pubhtml 且不是 output=csv）
   if (/\/d\/e\//.test(one) && !/output=csv/i.test(one)) {
-    try { return await loadFromPublishedSheet(one); }
+    try { return await loadFromPublishedSheet(one, { force }); }
     catch (e) { console.warn('publish-to-web 整份抓取失敗：', e.message); }
   }
 
   // 單一 CSV URL
-  if (/output=csv/i.test(one)) return loadSingleCsv(one);
+  if (/output=csv/i.test(one)) return loadSingleCsv(one, { force });
 
   // 編輯 URL / 純 Sheet ID → 提示使用者切到 publish-to-web
   const id = extractSheetId(one);
