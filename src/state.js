@@ -5,6 +5,7 @@ export const STORAGE_KEY = 'thai-review-v1';
 export const LESSONS_CACHE_KEY = 'thai-review-lessons-v1';      // 舊版（full cache）
 export const MANIFEST_CACHE_KEY = 'thai-review-manifest-v1';    // 新版（只 tab 列表）
 export const LESSON_CACHE_PREFIX = 'thai-review-lesson-';       // 新版（單堂 cards）
+export const SYNC_TIME_KEY = 'thai-review-last-sync-v1';        // 上次手動同步成功時間
 
 /* ===== 舊版：整份 lessons cache（保留相容，其他非 publish-to-web 模式還在用） ===== */
 export function saveLessonsCache(url, lessons) {
@@ -74,6 +75,38 @@ export function loadLessonCards(gid) {
   } catch {
     return null;
   }
+}
+
+/* ===== 上次同步時間（按重新同步 Sheet 成功才寫） ===== */
+export function setLastSync(url) {
+  try {
+    localStorage.setItem(SYNC_TIME_KEY, JSON.stringify({ url, ts: Date.now() }));
+  } catch {}
+}
+
+export function getLastSync(url) {
+  try {
+    const raw = localStorage.getItem(SYNC_TIME_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (s.url !== url) return null;
+    return s.ts;
+  } catch {
+    return null;
+  }
+}
+
+export function formatLastSync(ts) {
+  if (!ts) return '尚未同步';
+  const d = new Date(ts);
+  const now = new Date();
+  const sameDay = d.getFullYear() === now.getFullYear()
+    && d.getMonth() === now.getMonth()
+    && d.getDate() === now.getDate();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  if (sameDay) return `今天 ${hh}:${mm}`;
+  return `${d.getMonth() + 1}/${d.getDate()} ${hh}:${mm}`;
 }
 
 /* 預設資料來源：Nalin 的泰文課 Sheet（整份文件發佈）。

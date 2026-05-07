@@ -6,6 +6,7 @@ import {
   filteredCards, setGrade, shuffleCurrentLesson,
   saveLessonsCache, loadLessonsCache, clearLessonsCache,
   loadManifest, saveManifest, loadLessonCards, saveLessonCards,
+  setLastSync, getLastSync, formatLastSync,
 } from './state.js';
 import { loadLessons, loadTabsOnly, fetchLessonCards } from './data.js';
 import { speakCard, warmupVoices } from './tts.js';
@@ -20,8 +21,11 @@ async function fetchFromNetwork(url, { force = false } = {}) {
   try {
     const lessons = await loadLessons(url, { force });
     if (lessons && lessons.length) return lessons;
+    // 空回應時：force 路徑視為失敗讓上層 catch；非 force 才靜默
+    if (force) throw new Error('回應為空');
   } catch (e) {
     console.warn('資料載入失敗：', e.message);
+    if (force) throw e;
     if (state.settings.sheetInput) alert('資料載入失敗：' + e.message);
   }
   return null;
@@ -240,6 +244,13 @@ function showLoading(msg) {
   }
 }
 
+function updateSyncHint() {
+  const el = document.getElementById('syncHint');
+  if (!el) return;
+  const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
+  el.textContent = `上次同步：${formatLastSync(getLastSync(url))}`;
+}
+
 function onFreshLessons(fresh) {
   // 舊版 eager cache revalidation callback
   const sameStructure = fresh.length === state.lessons.length
@@ -293,7 +304,10 @@ async function init() {
   document.getElementById('btnFavPanel')?.addEventListener('click', () => selectLesson('__FAV__'));
   document.getElementById('btnMenu').addEventListener('click', openDrawer);
   document.getElementById('drawerMask').addEventListener('click', closeDrawer);
-  document.getElementById('btnSettings').addEventListener('click', openModal);
+  document.getElementById('btnSettings').addEventListener('click', () => {
+    openModal();
+    updateSyncHint();
+  });
   document.getElementById('btnSearch').addEventListener('click', async () => {
     openSearch();
     // 搜尋要跨全部課程，先補抓
@@ -334,17 +348,39 @@ async function init() {
   document.getElementById('btnSaveSettings').addEventListener('click', async () => {
     const newInput = document.getElementById('inpSheet').value.trim();
     const inputChanged = newInput !== state.settings.sheetInput;
+    const oldInput = state.settings.sheetInput;
     state.settings.sheetInput = newInput;
     saveState();
     if (inputChanged) {
-      // URL 變了 → 清所有 cache 強制重抓
-      clearLessonsCache();
-      showLoading('正在從 Google Sheets 抓課程列表…');
-      state.lessons = await loadLessonsSmart(onFreshManifest, { force: true });
-      state.currentLessonId = state.lessons[0]?.id || null;
-      state.cardIndex = 0;
-      state.flipped = false;
-      await ensureLessonLoaded(state.currentLessonId, { force: true });
+      const btn = document.getElementById('btnSaveSettings');
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '同步中…';
+      try {
+        showLoading('正在從 Google Sheets 抓課程列表…');
+        // 先 fetch，成功才動 cache（避免抓壞時兩邊都沒了）
+        const fresh = await loadLessonsSmart(onFreshManifest, { force: true });
+        if (!fresh || !fresh.length) throw new Error('沒抓到課程');
+        // URL 變了，舊 lesson cards 已不對應新 Sheet → 清掉
+        clearLessonsCache();
+        // saveManifest 已在 loadLessonsSmart 內部覆蓋，重新賦值 lessons
+        state.lessons = fresh;
+        state.currentLessonId = state.lessons[0]?.id || null;
+        state.cardIndex = 0;
+        state.flipped = false;
+        await ensureLessonLoaded(state.currentLessonId, { force: true });
+        setLastSync(newInput || DEFAULT_SHEET_URL);
+      } catch (e) {
+        console.warn('URL 變更後重抓失敗：', e);
+        alert('抓不到 Sheet：' + e.message + '\n\nURL 已存，但資料還是舊的。');
+        // 把 settings 回滾，避免下次又走 inputChanged 分支
+        state.settings.sheetInput = oldInput;
+        saveState();
+        document.getElementById('inpSheet').value = oldInput;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
     }
     closeModal();
     rerender();
@@ -360,20 +396,51 @@ async function init() {
     }
   });
 
-  // 重新同步 Sheet（清 cache 重抓）
+  // 重新同步 Sheet：先抓再覆蓋；失敗保留舊資料；連點防呆
   document.getElementById('btnClearCache').addEventListener('click', async () => {
+    const btn = document.getElementById('btnClearCache');
+    if (btn.disabled) return;
     if (!confirm('重新從 Google Sheet 抓最新資料？（進度跟收藏不會動）')) return;
-    clearLessonsCache();
-    showLoading('重新抓 Sheet…');
-    state.lessons = await loadLessonsSmart(onFreshManifest, { force: true });
-    if (!state.lessons.find(l => l.id === state.currentLessonId) &&
-        state.currentLessonId !== '__ALL__' && state.currentLessonId !== '__FAV__') {
-      state.currentLessonId = state.lessons[0]?.id || null;
-      state.cardIndex = 0;
+
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '同步中…';
+    const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
+
+    try {
+      showLoading('重新抓課程列表…');
+      const fresh = await loadLessonsSmart(onFreshManifest, { force: true });
+      if (!fresh || !fresh.length) throw new Error('沒抓到課程');
+
+      // 走到這裡代表新 manifest 已經 fetch + saveManifest 完成
+      // 現在才清掉舊的 lesson cards（其他 27 堂未來切過去會自動抓網路）
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith('thai-review-lesson-')) localStorage.removeItem(k);
+      });
+
+      state.lessons = fresh;
+      if (!state.lessons.find(l => l.id === state.currentLessonId) &&
+          state.currentLessonId !== '__ALL__' && state.currentLessonId !== '__FAV__') {
+        state.currentLessonId = state.lessons[0]?.id || null;
+        state.cardIndex = 0;
+      }
+
+      const cur = state.lessons.find(l => l.id === state.currentLessonId);
+      if (cur) showLoading(`同步「${cur.title}」…`);
+      await ensureLessonLoaded(state.currentLessonId, { force: true, silentUI: true });
+
+      setLastSync(url);
+      updateSyncHint();
+      closeModal();
+      rerender();
+    } catch (e) {
+      console.warn('重新同步失敗：', e);
+      alert('抓不到 Sheet：' + e.message + '\n\n先用舊資料繼續。');
+      rerender();   // 把 showLoading 蓋掉的內容還原成舊資料
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
     }
-    await ensureLessonLoaded(state.currentLessonId, { force: true });
-    closeModal();
-    rerender();
   });
 
   // 鍵盤快捷鍵
