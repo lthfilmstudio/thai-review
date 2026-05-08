@@ -3,7 +3,7 @@
 import {
   state, loadState, saveState,
   DEMO_LESSONS, DEFAULT_SHEET_URL,
-  filteredCards, setGrade, shuffleCurrentLesson,
+  filteredCards, setGrade, shuffleCurrentLesson, isSrsActive,
   saveLessonsCache, loadLessonsCache, clearLessonsCache,
   loadManifest, saveManifest, loadLessonCards, saveLessonCards,
   setLastSync, getLastSync, formatLastSync,
@@ -222,6 +222,26 @@ function nextCard() {
   state.flipped = false;
   saveState();
   renderContent(rerender);
+}
+
+/* 評分後的行為：
+   - SRS active：剛評的那張 nextReviewAt > now → 從 due 列表消失，cardIndex 不變但 list 變短，
+     直接 rerender 自然指到下一張；clamp 防越界
+   - 一般 mode：cards 不變，往下一張前進 */
+function gradeAndAdvance(g) {
+  setGrade(state.cardIndex, g);
+  state.flipped = false;
+  if (isSrsActive()) {
+    const cards = filteredCards();
+    if (state.cardIndex >= cards.length) state.cardIndex = Math.max(0, cards.length - 1);
+    saveState();
+    rerender();
+  } else {
+    nextCard();
+    // 評分會影響側邊欄徽章，補一次 sidebar render
+    renderSidebar(selectLesson);
+    renderTopbarTitle();
+  }
 }
 
 function prevCard() {
@@ -496,9 +516,9 @@ async function init() {
       e.preventDefault();
       state.flipped = !state.flipped;
       document.getElementById('cardStage')?.classList.toggle('flipped', state.flipped);
-    } else if (e.key === '1') { setGrade(state.cardIndex, 'bad'); renderStats(); nextCard(); }
-    else if (e.key === '2') { setGrade(state.cardIndex, 'ok'); renderStats(); nextCard(); }
-    else if (e.key === '3') { setGrade(state.cardIndex, 'good'); renderStats(); nextCard(); }
+    } else if (e.key === '1') { gradeAndAdvance('bad'); }
+    else if (e.key === '2') { gradeAndAdvance('ok'); }
+    else if (e.key === '3') { gradeAndAdvance('good'); }
     else if (e.key === 'p' || e.key === 'P') {
       const cards = filteredCards();
       if (cards[state.cardIndex]) speakCard(cards[state.cardIndex]);
@@ -510,10 +530,25 @@ async function init() {
     }
   });
 
-  // 字卡頁的上一張 / 下一張按鈕（事件委派，每次 re-render 都有效）
+  // 字卡頁的上一張 / 下一張 + 評分鈕（事件委派，每次 re-render 都有效）
   document.getElementById('content').addEventListener('click', e => {
-    if (e.target.closest('#cardPrev')) { e.stopPropagation(); prevCard(); }
-    else if (e.target.closest('#cardNext')) { e.stopPropagation(); nextCard(); }
+    if (e.target.closest('#cardPrev')) { e.stopPropagation(); prevCard(); return; }
+    if (e.target.closest('#cardNext')) { e.stopPropagation(); nextCard(); return; }
+    const grade = e.target.closest('.pill[data-grade]');
+    if (grade) {
+      e.stopPropagation();
+      gradeAndAdvance(grade.dataset.grade);
+    }
+  });
+
+  // SRS toggle 切換（card / reverse mode 才會 render 出 #srsToggle）
+  document.getElementById('content').addEventListener('change', e => {
+    if (e.target?.id === 'srsToggle') {
+      state.srsToggle = e.target.checked;
+      state.cardIndex = 0;
+      state.flipped = false;
+      rerender();
+    }
   });
 
   // 滑動手勢（content 區內左右滑切卡）

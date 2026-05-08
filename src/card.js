@@ -2,10 +2,11 @@
    （prefers-reduced-motion 時在 CSS 改 cross-fade）。
    reverse=true：中文在正面、泰文在背面。 */
 
-import { state, isFavorite, toggleFavorite } from './state.js';
+import { state, isFavorite, toggleFavorite, srsEntryOf } from './state.js';
 import { speakCard } from './tts.js';
 import { escapeHtml } from './ui.js';
 import { wireSentenceButton, SVG_SPARK_ICON } from './sentence.js';
+import { nextReview, formatNextReview } from './srs.js';
 
 const SVG_PLAY = '<svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 2 L9 6 L3 10 Z" fill="currentColor"/></svg>';
 
@@ -68,7 +69,24 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
   const pct = Math.round(((i + 1) / cards.length) * 100);
   const tag = card.type === 'sentence' ? 'EXAMPLE' : 'VOCAB';
 
+  // 預覽 3 個評分按下去後的間隔（給每顆 pill 帶 meta 文字）
+  const cur = srsEntryOf(card) || {};
+  const previewBad = formatNextReview(nextReview('bad', cur).interval);
+  const previewOk = formatNextReview(nextReview('ok', cur).interval);
+  const previewGood = formatNextReview(nextReview('good', cur).interval);
+
+  // 只在 card / reverse mode 顯示 srsToggle；SRS 主模式不需要
+  const showToggle = state.mode === 'card' || state.mode === 'reverse';
+
   el.innerHTML = `
+    ${showToggle ? `
+      <div class="srs-toggle-row">
+        <label class="srs-toggle">
+          <input type="checkbox" id="srsToggle"${state.srsToggle ? ' checked' : ''}>
+          <span>只看待複習</span>
+        </label>
+      </div>
+    ` : ''}
     <div class="progress-row">
       <div class="progress-track"><div class="progress-bar" style="width:${pct}%"></div></div>
       <div class="progress-count">${i + 1} / ${cards.length}</div>
@@ -95,6 +113,17 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
           <div class="sent-list" id="sentList"></div>
         </div>
       </div>
+    </div>
+    <div class="grade-row" aria-label="評分">
+      <button class="pill red" data-grade="bad" aria-label="差，重新排到明天再見">
+        差<span class="pill-meta">${escapeHtml(previewBad)}</span>
+      </button>
+      <button class="pill neutral" data-grade="ok" aria-label="可以">
+        可以<span class="pill-meta">${escapeHtml(previewOk)}</span>
+      </button>
+      <button class="pill gold" data-grade="good" aria-label="熟">
+        熟<span class="pill-meta">${escapeHtml(previewGood)}</span>
+      </button>
     </div>
     <div class="card-nav-row">
       <button class="nav-side-btn" id="cardPrev" aria-label="上一張">${SVG_CHEV_L}<span>上一張</span></button>

@@ -1,6 +1,8 @@
 /* 應用狀態與持久化。所有 runtime 狀態集中在 state 物件；
    settings 跟 progress 寫進 localStorage，重新開啟能還原。 */
 
+import { nextReview, countDue, getDueCards } from './srs.js';
+
 export const STORAGE_KEY = 'thai-review-v1';
 export const LESSONS_CACHE_KEY = 'thai-review-lessons-v1';      // 舊版（full cache）
 export const MANIFEST_CACHE_KEY = 'thai-review-manifest-v1';    // 新版（只 tab 列表）
@@ -133,10 +135,11 @@ export const DEMO_LESSONS = [
 export const state = {
   lessons: [],
   currentLessonId: null,
-  mode: 'card',              // 'card'（泰→中）| 'reverse'（中→泰）| 'listen' | 'dialog'
+  mode: 'card',              // 'card' | 'reverse' | 'listen' | 'dialog' | 'srs'
+  srsToggle: false,          // card mode 下「只看待複習」開關（不存 localStorage）
   cardIndex: 0,
   flipped: false,
-  progress: {},              // { "lessonId:thai": "good"|"ok"|"bad" }
+  progress: {},              // { "lessonId:thai": { grade, nextReviewAt, interval, easeFactor, reps, ... } }
   favorites: {},             // { "thai": 1 }
   collapsed: {},             // { "初-2": true } → 初級 2 章節收合中
   searchQuery: '',           // 搜尋虛擬課程用（不存 localStorage）
@@ -165,14 +168,42 @@ export function loadState() {
     const s = JSON.parse(raw);
     Object.assign(state.settings, s.settings || {});
     state.progress = s.progress || {};
+    const migrated = migrateProgress(state.progress);
     state.favorites = s.favorites || {};
     state.collapsed = s.collapsed || {};
     state.currentLessonId = s.currentLessonId || null;
     state.mode = s.mode || 'card';
     state.cardIndex = typeof s.cardIndex === 'number' ? s.cardIndex : 0;
+    // 有 migrate 到資料的話立刻寫回，避免 lazy 遺留舊格式
+    if (migrated) saveState();
   } catch (e) {
     // 忽略損毀的 localStorage
   }
+}
+
+/* 把舊版 string grade 轉成 SRS 物件。
+   interval=0 / nextReviewAt=0 表示「未排程」（即 due），下次評分才正式進 SRS 軌道。
+   這樣升級瞬間不會讓所有舊熟字爆量 due，但仍會跑到 SRS 隊伍裡待重新評估。
+   回傳是否有任何項目被 migrate（用來決定要不要立刻 saveState）。 */
+function migrateProgress(progress) {
+  let touched = false;
+  for (const k in progress) {
+    const v = progress[k];
+    if (typeof v === 'string') {
+      progress[k] = {
+        grade: v,
+        reviewedAt: 0,
+        nextReviewAt: 0,
+        interval: 0,
+        easeFactor: 2.5,
+        reps: 0,
+        updatedAt: 0,
+        deviceId: '',
+      };
+      touched = true;
+    }
+  }
+  return touched;
 }
 
 export function saveState() {
@@ -239,31 +270,76 @@ export function currentLesson() {
   return state.lessons.find(l => l.id === state.currentLessonId) || state.lessons[0];
 }
 
-export function filteredCards() {
-  const lesson = currentLesson();
-  return lesson ? lesson.cards : [];
+/* SRS active：mode=srs，或 (mode=card/reverse 且 srsToggle 開)。
+   active 時 filteredCards 自動只回 due 卡並按 nextReviewAt 排序。 */
+export function isSrsActive() {
+  if (state.mode === 'srs') return true;
+  if ((state.mode === 'card' || state.mode === 'reverse') && state.srsToggle) return true;
+  return false;
 }
 
-/* 以 card.thai 當 key，這樣打亂順序或換課不會弄丟評分。 */
+export function filteredCards() {
+  const lesson = currentLesson();
+  if (!lesson) return [];
+  if (!isSrsActive()) return lesson.cards;
+  // 真實課程的 cards 沒有 _lessonId，補上才能跑 SRS key
+  const tagged = lesson.cards.map(c => c._lessonId ? c : { ...c, _lessonId: lesson.id });
+  return getDueCards(tagged, state.progress);
+}
+
+/* 以「真實課程 id : card.thai」當 key，跨虛擬課程（__ALL__/__FAV__/__SEARCH__）也穩定。
+   虛擬課程的 cards 已帶 _lessonId（見 currentLesson()）；真實課程 fallback 到 currentLessonId。 */
 function progKey(cardOrIdx) {
-  const lessonId = state.currentLessonId || 'x';
+  let card;
   if (typeof cardOrIdx === 'number') {
     const cards = currentLesson()?.cards || [];
-    const c = cards[cardOrIdx];
-    return c ? lessonId + ':' + c.thai : lessonId + ':idx:' + cardOrIdx;
+    card = cards[cardOrIdx];
+    if (!card) return (state.currentLessonId || 'x') + ':idx:' + cardOrIdx;
+  } else {
+    card = cardOrIdx;
   }
-  return lessonId + ':' + cardOrIdx.thai;
+  const lessonId = card._lessonId || state.currentLessonId || 'x';
+  return lessonId + ':' + card.thai;
 }
 
 export function gradeOf(idxOrCard) {
-  return state.progress[progKey(idxOrCard)];
+  const v = state.progress[progKey(idxOrCard)];
+  if (typeof v === 'string') return v;
+  if (v && typeof v === 'object') return v.grade;
+  return undefined;
 }
 
-export function setGrade(idxOrCard, g) {
+export function srsEntryOf(idxOrCard) {
+  const v = state.progress[progKey(idxOrCard)];
+  return (v && typeof v === 'object') ? v : null;
+}
+
+export function setGrade(idxOrCard, gradeStr) {
   const k = progKey(idxOrCard);
-  if (g) state.progress[k] = g;
-  else delete state.progress[k];
+  if (!gradeStr) {
+    delete state.progress[k];
+  } else {
+    const prev = state.progress[k];
+    const prevObj = (prev && typeof prev === 'object') ? prev : {};
+    state.progress[k] = nextReview(gradeStr, prevObj);
+  }
   saveState();
+}
+
+/* 攤平 state.lessons 成單一 cards 陣列，每張都帶 _lessonId（給 SRS 跨課程查詢用）。
+   未載入的課程會被 ensureAllLoaded 補上，這裡單純取現有 cards。 */
+export function allCardsWithLessonId() {
+  const out = [];
+  for (const l of state.lessons) {
+    for (const c of l.cards) {
+      out.push(c._lessonId ? c : { ...c, _lessonId: l.id });
+    }
+  }
+  return out;
+}
+
+export function getDueCount(lessonId) {
+  return countDue(allCardsWithLessonId(), state.progress, lessonId);
 }
 
 /* Fisher-Yates 就地打亂當前課程的 cards 陣列 */

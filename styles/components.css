@@ -495,6 +495,101 @@
 }
 .pill.gold:hover { opacity: 1; }
 
+/* Pill 預覽下次間隔（小字第二行） */
+.pill-meta {
+  display: block;
+  font-size: 9px;
+  font-weight: 400;
+  opacity: 0.7;
+  margin-top: 2px;
+  letter-spacing: 0.2px;
+}
+.pill.gold .pill-meta { color: var(--panel); opacity: 0.7; }
+
+/* ===== SRS 「只看待複習」toggle ===== */
+.srs-toggle-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 4px 6px;
+  flex-shrink: 0;
+}
+.srs-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  font-size: 11px;
+  color: var(--text-soft);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, color 0.15s;
+}
+.srs-toggle:hover { background: var(--gold-soft); color: var(--gold); }
+.srs-toggle input { accent-color: var(--gold); margin: 0; }
+.srs-toggle input:checked + span { color: var(--gold); font-weight: 500; }
+
+/* ===== 「今日複習」tab 旁邊的 (N) 徽章 ===== */
+.srs-count:empty { display: none; }
+.srs-count {
+  margin-left: 4px;
+  font-size: 10px;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.mode-tab.active .srs-count,
+.mp-btn.active .srs-count,
+.drawer-item.active .srs-count {
+  color: var(--text);
+}
+
+/* ===== SRS 空狀態（今日複習完成） ===== */
+.srs-done {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: 20px;
+}
+.srs-done-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(196, 165, 116, 0.12);
+  border: 1px solid rgba(196, 165, 116, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gold);
+  animation: srs-done-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes srs-done-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.srs-done-title {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: 0.5px;
+}
+.srs-done-sub {
+  font-size: 13px;
+  color: var(--text-soft);
+  line-height: 1.6;
+  max-width: 280px;
+}
+.srs-done-sub strong {
+  color: var(--gold);
+  font-weight: 500;
+}
+
 /* ===== Listening mode ===== */
 .listen-wrap {
   flex: 1;

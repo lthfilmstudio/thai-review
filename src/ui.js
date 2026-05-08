@@ -1,9 +1,12 @@
 /* UI render 總管：sidebar、drawer、topbar、stats、content dispatcher、modal、主題。 */
 
-import { state, currentLesson, filteredCards, favoriteCount, saveState } from './state.js';
+import { state, currentLesson, filteredCards, favoriteCount, saveState, isSrsActive } from './state.js';
 import { renderCardMode } from './card.js';
 import { renderListenMode, stopListen } from './listen.js';
 import { renderDialogMode } from './dialog.js';
+import { isDue, nextReviewAtMin, daysUntil, formatNextReview } from './srs.js';
+
+const SVG_CHECK = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 
 export function escapeHtml(s) {
   return (s || '').replace(/[&<>"']/g, c => ({
@@ -35,23 +38,66 @@ function groupLessons(lessons) {
   return ordered;
 }
 
+/* 一次掃所有 cards 算出每堂課的 due 數（避免每堂呼叫一次 countDue 變 O(N²)） */
+function dueCountsByLesson() {
+  const counts = new Map();
+  const now = Date.now();
+  for (const l of state.lessons) {
+    let n = 0;
+    for (const c of l.cards) {
+      const lessonId = c._lessonId || l.id;
+      if (isDue(state.progress[`${lessonId}:${c.thai}`], now)) n++;
+    }
+    counts.set(l.id, n);
+  }
+  return counts;
+}
+
+/* 當前 lens（單堂或虛擬課程）的 due 總數，給「今日複習」tab 徽章用 */
+function currentViewDueCount() {
+  const lesson = currentLesson();
+  if (!lesson) return 0;
+  let n = 0;
+  const now = Date.now();
+  for (const c of lesson.cards) {
+    const lessonId = c._lessonId || lesson.id;
+    if (isDue(state.progress[`${lessonId}:${c.thai}`], now)) n++;
+  }
+  return n;
+}
+
+/* 更新 mode tab 上的「今日複習 (N)」徽章 */
+export function updateSrsTabBadges() {
+  const n = currentViewDueCount();
+  const text = n > 0 ? `(${n})` : '';
+  document.querySelectorAll('[data-srs-count]').forEach(el => {
+    el.textContent = text;
+  });
+}
+
 export function renderSidebar(selectLesson) {
   const list = document.getElementById('sideList');
   const dlist = document.getElementById('drawerList');
   list.innerHTML = '';
   dlist.innerHTML = '';
 
+  const dueByLesson = dueCountsByLesson();
+
   const makeSide = (l, isActive, display) => {
     const btn = document.createElement('button');
     btn.className = 'side-item' + (isActive ? ' active' : '');
-    btn.innerHTML = `<span class="dot"></span><span>${escapeHtml(display ?? l.title)}</span>`;
+    const due = dueByLesson.get(l.id) || 0;
+    const dueHtml = due > 0 ? `<span class="lesson-due">${due}</span>` : '';
+    btn.innerHTML = `<span class="dot"></span><span class="lesson-name">${escapeHtml(display ?? l.title)}</span>${dueHtml}`;
     btn.addEventListener('click', () => selectLesson(l.id));
     return btn;
   };
   const makeDrawer = (l, isActive, display) => {
     const btn = document.createElement('button');
     btn.className = 'drawer-item' + (isActive ? ' active' : '');
-    btn.textContent = display ?? l.title;
+    const due = dueByLesson.get(l.id) || 0;
+    const dueHtml = due > 0 ? `<span class="lesson-due">${due}</span>` : '';
+    btn.innerHTML = `<span class="lesson-name">${escapeHtml(display ?? l.title)}</span>${dueHtml}`;
     btn.addEventListener('click', () => { selectLesson(l.id); closeDrawer(); });
     return btn;
   };
@@ -163,16 +209,55 @@ export function renderContent(onGrade) {
   if (state.mode === 'dialog') {
     renderDialogMode(el);
     renderStats();
+    updateSrsTabBadges();
     return;
   }
 
   const cards = filteredCards();
+
+  // SRS 空狀態：今日複習完成（或還沒評過任何字）
+  if (isSrsActive() && cards.length === 0) {
+    const min = nextReviewAtMin(state.progress);
+    const hasAnyProgress = Object.keys(state.progress).some(k => {
+      const v = state.progress[k];
+      return v && typeof v === 'object';
+    });
+    // card / reverse mode 下保留 toggle，讓使用者能取消「只看待複習」
+    const toggleHtml = (state.mode === 'card' || state.mode === 'reverse') ? `
+      <div class="srs-toggle-row">
+        <label class="srs-toggle">
+          <input type="checkbox" id="srsToggle"${state.srsToggle ? ' checked' : ''}>
+          <span>只看待複習</span>
+        </label>
+      </div>` : '';
+    let doneHtml;
+    if (!hasAnyProgress) {
+      doneHtml = `<div class="srs-done">
+        <div class="srs-done-icon">${SVG_CHECK}</div>
+        <div class="srs-done-title">還沒開始</div>
+        <div class="srs-done-sub">先到「字卡」模式評幾張，<br>它們才會排進複習隊列。</div>
+      </div>`;
+    } else {
+      const days = min ? daysUntil(min) : 1;
+      doneHtml = `<div class="srs-done">
+        <div class="srs-done-icon">${SVG_CHECK}</div>
+        <div class="srs-done-title">今日複習完成</div>
+        <div class="srs-done-sub">下次複習：<strong>${escapeHtml(formatNextReview(days))}</strong></div>
+      </div>`;
+    }
+    el.innerHTML = toggleHtml + doneHtml;
+    renderStats();
+    updateSrsTabBadges();
+    return;
+  }
+
   if (!cards.length) {
     el.innerHTML = `<div class="empty">
       <div class="empty-icon">✦</div>
       <div class="empty-title">沒有卡片</div>
       <div class="empty-sub">這堂課沒有內容。試試切到其他課程。</div>
     </div>`;
+    updateSrsTabBadges();
     return;
   }
   if (state.cardIndex >= cards.length) state.cardIndex = 0;
@@ -183,10 +268,11 @@ export function renderContent(onGrade) {
       renderStats();
     });
   } else {
-    // card（正向）或 reverse（中文在正面）
+    // card / reverse / srs 都共用 renderCardMode；reverse 把中文擺正面
     renderCardMode(el, cards, onGrade, { reverse: state.mode === 'reverse' });
     renderStats();
   }
+  updateSrsTabBadges();
 }
 
 export function openDrawer() {

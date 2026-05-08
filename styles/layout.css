@@ -166,6 +166,35 @@
   flex-shrink: 0;
 }
 
+/* 課程列表：name 撐開、due 計數靠右 */
+.side-item .lesson-name,
+.drawer-item .lesson-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lesson-due {
+  flex-shrink: 0;
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(196, 165, 116, 0.18);
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.side-item.active .lesson-due,
+.drawer-item.active .lesson-due {
+  background: rgba(245, 240, 232, 0.18);
+  color: var(--text);
+}
+
 .side-divider {
   height: 1px;
   background: var(--hair);
