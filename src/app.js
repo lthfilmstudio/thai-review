@@ -339,6 +339,7 @@ async function init() {
   wireSegClick('#segGap', b => {
     state.settings.gap = b.dataset.gap === 'auto' ? 'auto' : Number(b.dataset.gap);
   });
+  wireSegClick('#segVoice', b => { state.settings.voice = b.dataset.voice; });
   wireSegClick('#segTheme', b => {
     state.settings.theme = b.dataset.theme;
     applyTheme();

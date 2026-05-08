@@ -194,6 +194,7 @@ export function openModal() {
   syncSegActive('#segRate', b => Number(b.dataset.rate) === state.settings.rate);
   syncSegActive('#segRepeat', b => Number(b.dataset.repeat) === state.settings.repeat);
   syncSegActive('#segGap', b => b.dataset.gap === String(state.settings.gap));
+  syncSegActive('#segVoice', b => b.dataset.voice === state.settings.voice);
   syncSegActive('#segTheme', b => b.dataset.theme === state.settings.theme);
   document.getElementById('modalMask').classList.add('open');
 }

@@ -146,6 +146,7 @@ export const state = {
     repeat: 3,
     gap: 2,                  // number | 'auto'
     theme: 'dark',           // 'auto' | 'dark' | 'light'（預設鎖深色）
+    voice: 'th-TH-Neural2-C',// GCP TTS voice id（thai-tts-proxy 走 Neural2 / Chirp3-HD）
   },
   listen: {
     playing: false,
