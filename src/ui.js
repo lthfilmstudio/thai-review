@@ -3,6 +3,7 @@
 import { state, currentLesson, filteredCards, favoriteCount, saveState } from './state.js';
 import { renderCardMode } from './card.js';
 import { renderListenMode, stopListen } from './listen.js';
+import { renderDialogMode } from './dialog.js';
 
 export function escapeHtml(s) {
   return (s || '').replace(/[&<>"']/g, c => ({
@@ -157,6 +158,14 @@ export function renderStats() {
 
 export function renderContent(onGrade) {
   const el = document.getElementById('content');
+
+  // 對話模式不依賴單張卡片，獨立 render（吃 state.lessons）
+  if (state.mode === 'dialog') {
+    renderDialogMode(el);
+    renderStats();
+    return;
+  }
+
   const cards = filteredCards();
   if (!cards.length) {
     el.innerHTML = `<div class="empty">

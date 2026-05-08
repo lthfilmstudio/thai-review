@@ -133,7 +133,7 @@ export const DEMO_LESSONS = [
 export const state = {
   lessons: [],
   currentLessonId: null,
-  mode: 'card',              // 'card'（泰→中）| 'reverse'（中→泰）| 'listen'
+  mode: 'card',              // 'card'（泰→中）| 'reverse'（中→泰）| 'listen' | 'dialog'
   cardIndex: 0,
   flipped: false,
   progress: {},              // { "lessonId:thai": "good"|"ok"|"bad" }
@@ -147,6 +147,7 @@ export const state = {
     gap: 2,                  // number | 'auto'
     theme: 'dark',           // 'auto' | 'dark' | 'light'（預設鎖深色）
     voice: 'th-TH-Neural2-C',// GCP TTS voice id（thai-tts-proxy 走 Neural2 / Chirp3-HD）
+    dialogSource: 'lesson',  // 'lesson' | 'fav' — 對話模式抽字來源
   },
   listen: {
     playing: false,

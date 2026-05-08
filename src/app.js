@@ -166,7 +166,7 @@ function onSearchPick(match) {
   state.currentLessonId = match.lessonId;
   state.cardIndex = match.index;
   state.flipped = false;
-  if (state.mode === 'listen') state.mode = 'card';
+  if (state.mode === 'listen' || state.mode === 'dialog') state.mode = 'card';
   stopListen();
   saveState();
   closeSearch();
