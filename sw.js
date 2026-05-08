@@ -1,7 +1,7 @@
 /* Service Worker：app shell cache + runtime CSV cache。
    改檔後升 CACHE 版本號強制更新。 */
 
-const CACHE = 'thai-review-v32';
+const CACHE = 'thai-review-v33';
 
 const SHELL = [
   './',
@@ -23,6 +23,9 @@ const SHELL = [
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
   './icons/apple-touch-icon.png',
+  // GitHub Action 每 30 分鐘重生 data.json，這邊 cache 同源讓離線可用；
+  // fetch 端會帶 ?_=ts cache buster 從 network 拿最新版（network-first 在 fetch handler 裡）
+  './data.json',
 ];
 
 self.addEventListener('install', e => {
@@ -56,6 +59,12 @@ self.addEventListener('fetch', e => {
   if (url.hostname.includes('fonts.googleapis.com') ||
       url.hostname.includes('fonts.gstatic.com')) {
     e.respondWith(staleWhileRevalidate(e.request));
+    return;
+  }
+
+  // 同源 data.json：network-first（GitHub Action 每 30 分鐘更新，要拿最新）
+  if (url.origin === location.origin && url.pathname.endsWith('/data.json')) {
+    e.respondWith(networkFirst(e.request));
     return;
   }
 

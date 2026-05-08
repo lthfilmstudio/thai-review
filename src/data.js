@@ -227,6 +227,27 @@ async function loadSingleCsv(url, { force = false } = {}) {
   }));
 }
 
+/* 方案 0：bundled JSON（GitHub Action 預生成）。
+   開 App 預設走這條：同源、CDN cache、< 50ms。
+   若 force=true 表示使用者按了「重新同步 Sheet」想要最新資料 → 跳過 bundled、走 live。 */
+export async function loadFromBundledJson() {
+  // base 用相對路徑，讓 GitHub Pages 子目錄部署也能 work
+  const url = './data.json?_=' + Date.now(); // 加版本碼避開 SW stale cache
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error('bundled JSON HTTP ' + res.status);
+  const data = await res.json();
+  if (!data || !Array.isArray(data.lessons) || !data.lessons.length) {
+    throw new Error('bundled JSON 格式異常');
+  }
+  // 規範成跟 loadFromPublishedSheet 一樣的回傳格式：{ id, gid, title, cards }
+  return data.lessons.map((l) => ({
+    id: l.id || ('gid-' + (l.gid || '')),
+    gid: l.gid || '',
+    title: l.title || '',
+    cards: Array.isArray(l.cards) ? l.cards : [],
+  }));
+}
+
 /* 主入口：依輸入型態挑對應方案 */
 export async function loadLessons(input, { force = false } = {}) {
   input = (input || '').trim();

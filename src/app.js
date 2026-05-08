@@ -8,7 +8,7 @@ import {
   loadManifest, saveManifest, loadLessonCards, saveLessonCards,
   setLastSync, getLastSync, formatLastSync,
 } from './state.js';
-import { loadLessons, loadTabsOnly, fetchLessonCards } from './data.js';
+import { loadLessons, loadTabsOnly, fetchLessonCards, loadFromBundledJson } from './data.js';
 import { speakCard, warmupVoices } from './tts.js';
 import { stopListen } from './listen.js';
 import {
@@ -143,9 +143,26 @@ async function ensureAllLoaded({ force = false } = {}) {
   }));
 }
 
-/* 主進入點：publish-to-web 走 lazy，其他走舊版 eager。 */
+/* 主進入點：
+   1. 預設 Sheet + 非 force → 直接讀同源 ./data.json（GitHub Action 預生成，< 50ms）
+   2. 預設 Sheet + force（重新同步）→ 走 live publish-to-web（保留現有行為）
+   3. 自訂 sheet URL → 永遠走 live（不影響使用者貼自己的 Sheet） */
 async function loadLessonsSmart(onFresh, { force = false } = {}) {
-  const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
+  const customInput = (state.settings.sheetInput || '').trim();
+  const url = customInput || DEFAULT_SHEET_URL;
+
+  // 預設 Sheet + 非 force → 試 bundled JSON
+  if (!customInput && !force) {
+    try {
+      const lessons = await loadFromBundledJson();
+      // 同 lazy 模式格式：補上 _loaded=true（cards 已內含）+ baseUrl 用來提供「重新同步」走 live
+      state.baseUrl = DEFAULT_SHEET_URL.replace(/\/pub(html)?$/, '');
+      return lessons.map((l) => ({ ...l, _loaded: true }));
+    } catch (e) {
+      console.warn('bundled JSON 讀取失敗，退回 live fetch：', e.message);
+    }
+  }
+
   try {
     return await loadLessonsLazy(url, onFresh, { force });
   } catch (e) {

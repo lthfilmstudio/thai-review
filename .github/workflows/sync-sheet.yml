@@ -1,0 +1,42 @@
+name: Sync Sheet → data.json
+
+on:
+  schedule:
+    # 每 30 分鐘跑一次。挑 :07 / :37 兩個冷門 minute（避開 GitHub Actions 整點塞車）
+    # 見 memory feedback_github_actions_cron_rush_hour.md
+    - cron: "7,37 * * * *"
+  workflow_dispatch: # 急要看新 Sheet 內容時，手動點 Run workflow
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-sheet
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run sync script
+        run: python3 scripts/sync-sheet.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data.json; then
+            echo "data.json 沒變化，略過 commit"
+          else
+            git add data.json
+            git commit -m "chore(data): auto-sync Sheet $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
