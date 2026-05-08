@@ -112,8 +112,9 @@ export function renderDialogMode(el, _ignoredCards) {
   // 生成 / 換一組
   document.getElementById('dlgGo').addEventListener('click', () => generate());
 
-  // 進來自動跑一次（如果有現成可抽）
-  generate();
+  // 進來不自動跑；先讓使用者選字源，按下方「生成對話」才開始（避免每次進來就自動消耗 API）
+  document.getElementById('dlgStatus').innerHTML =
+    `<div class="dlg-empty">選好字源後，按下方「生成對話」開始。</div>`;
 
   async function generate() {
     const src = state.settings.dialogSource || 'lesson';
