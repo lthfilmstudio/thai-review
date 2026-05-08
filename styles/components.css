@@ -257,6 +257,143 @@
   transform: scale(0.97);
 }
 
+/* AI 造句按鈕 — 風格沿用 yg-btn 但用紫紅色系區隔 */
+.sent-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(180, 130, 200, 0.4);
+  background: rgba(180, 130, 200, 0.06);
+  color: rgb(196, 142, 220);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sent-btn:hover {
+  background: rgba(180, 130, 200, 0.15);
+  border-color: rgb(196, 142, 220);
+}
+
+.sent-btn:active {
+  transform: scale(0.97);
+}
+
+.sent-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* AI 造句結果列表 */
+.sent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 0 4px;
+}
+
+.sent-list:empty {
+  display: none;
+}
+
+.sent-item {
+  border-left: 2px solid rgba(180, 130, 200, 0.35);
+  padding: 4px 0 4px 12px;
+}
+
+.sent-thai-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sent-play {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(180, 130, 200, 0.4);
+  background: rgba(180, 130, 200, 0.08);
+  color: rgb(196, 142, 220);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sent-play:hover {
+  background: rgba(180, 130, 200, 0.18);
+}
+
+.sent-play:active {
+  transform: scale(0.92);
+}
+
+.sent-thai {
+  font-family: 'Noto Sans Thai', system-ui, sans-serif;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.sent-thai:hover {
+  color: rgb(196, 142, 220);
+}
+
+.sent-karaoke {
+  font-size: 12px;
+  color: var(--text-mute);
+  font-style: italic;
+  margin-left: 30px;
+  margin-bottom: 2px;
+}
+
+.sent-zh {
+  font-size: 13px;
+  color: var(--text-soft);
+  margin-left: 30px;
+}
+
+.sent-loading {
+  font-size: 12px;
+  color: var(--text-mute);
+  text-align: center;
+  padding: 14px 0;
+  font-style: italic;
+}
+
+.sent-error {
+  font-size: 12px;
+  color: #d97777;
+  text-align: center;
+  padding: 12px 0;
+}
+
+/* 淺色主題覆蓋 */
+[data-theme="light"] .sent-btn {
+  color: rgb(140, 90, 170);
+  border-color: rgba(140, 90, 170, 0.4);
+  background: rgba(140, 90, 170, 0.06);
+}
+[data-theme="light"] .sent-btn:hover {
+  background: rgba(140, 90, 170, 0.15);
+}
+[data-theme="light"] .sent-thai:hover { color: rgb(140, 90, 170); }
+[data-theme="light"] .sent-play {
+  color: rgb(140, 90, 170);
+  border-color: rgba(140, 90, 170, 0.4);
+  background: rgba(140, 90, 170, 0.08);
+}
+
 /* 收藏星號按鈕 */
 .fav-btn {
   width: 32px;

@@ -5,6 +5,7 @@
 import { state, isFavorite, toggleFavorite } from './state.js';
 import { speakCard } from './tts.js';
 import { escapeHtml } from './ui.js';
+import { wireSentenceButton, SVG_SPARK_ICON } from './sentence.js';
 
 const SVG_PLAY = '<svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 2 L9 6 L3 10 Z" fill="currentColor"/></svg>';
 
@@ -87,7 +88,11 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
             <a class="yg-btn" href="${youglishUrl(card.thai)}" target="_blank" rel="noopener noreferrer" aria-label="在 YouGlish 聽真人發音">
               ${SVG_EXT}<span>聽真人</span>
             </a>
+            <button class="sent-btn" id="sentBtn" aria-label="AI 造例句">
+              ${SVG_SPARK_ICON}<span>造 3 句</span>
+            </button>
           </div>
+          <div class="sent-list" id="sentList"></div>
         </div>
       </div>
     </div>
@@ -102,7 +107,12 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
 
   const stage = document.getElementById('cardStage');
   stage.addEventListener('click', e => {
-    if (e.target.closest('.play-btn') || e.target.closest('.yg-btn')) return;
+    if (
+      e.target.closest('.play-btn') ||
+      e.target.closest('.yg-btn') ||
+      e.target.closest('.sent-btn') ||
+      e.target.closest('.sent-list')
+    ) return;
     state.flipped = !state.flipped;
     stage.classList.toggle('flipped', state.flipped);
   });
@@ -111,6 +121,13 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
     e.stopPropagation();
     speakCard(card);
   });
+
+  // AI 造句：傳卡片的泰文當 word；按下去 fetch、render；不影響翻面
+  const sentBtn = document.getElementById('sentBtn');
+  const sentList = document.getElementById('sentList');
+  if (sentBtn && sentList) {
+    wireSentenceButton(sentBtn, sentList, card.thai);
+  }
 
   const favBtn = document.getElementById('favBtn');
   favBtn?.addEventListener('click', e => {
