@@ -1,12 +1,16 @@
 /* UI render 總管：sidebar、drawer、topbar、stats、content dispatcher、modal、主題。 */
 
-import { state, currentLesson, filteredCards, favoriteCount, saveState, isSrsActive } from './state.js';
+import {
+  state, currentLesson, filteredCards, favoriteCount, saveState, isSrsActive,
+  allCardsWithLessonId, isFavorite, gradeOf,
+} from './state.js';
 import { renderCardMode } from './card.js';
 import { renderListenMode, stopListen } from './listen.js';
 import { renderDialogMode } from './dialog.js';
 import { isDue, nextReviewAtMin, daysUntil, formatNextReview } from './srs.js';
 
 const SVG_CHECK = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+const SVG_EDIT = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 
 export function escapeHtml(s) {
   return (s || '').replace(/[&<>"']/g, c => ({
@@ -202,8 +206,80 @@ export function renderStats() {
   if (btn) btn.classList.toggle('active', state.currentLessonId === '__FAV__');
 }
 
+function listTitleFor(card, lessonMap) {
+  const title = lessonMap.get(card._lessonId) || '';
+  const { group, display } = parseGroup(title);
+  return group === '其他' ? display : `${GROUP_LABEL[group]} · ${display}`;
+}
+
+function cardsForList(kind, cards) {
+  if (kind === 'fav') return cards.filter(c => isFavorite(c));
+  return cards.filter(c => gradeOf(c) === kind);
+}
+
+function renderListCards(cards, lessonMap) {
+  if (!cards.length) {
+    return `<div class="empty list-empty">
+      <div class="empty-icon">✦</div>
+      <div class="empty-title">這裡還沒有卡片</div>
+      <div class="empty-sub">先收藏或按「差／可以／熟」評幾張，清單就會出現。</div>
+    </div>`;
+  }
+
+  return `<div class="review-list">` + cards.map(card => `
+    <div class="review-list-card${card._edited ? ' edited' : ''}">
+      <button class="review-list-main" data-jump-card="${escapeHtml(card._cardKey)}">
+        <div class="rl-tag">${escapeHtml(listTitleFor(card, lessonMap))}${card._edited ? ' · 已修正' : ''}</div>
+        <div class="rl-thai">${escapeHtml(card.thai)}</div>
+        <div class="rl-karaoke">${escapeHtml(card.karaoke)}</div>
+        <div class="rl-zh">${escapeHtml(card.zh)}</div>
+      </button>
+      <button class="review-list-edit" data-edit-card-key="${escapeHtml(card._cardKey)}" aria-label="編輯這張卡">${SVG_EDIT}</button>
+    </div>
+  `).join('') + `</div>`;
+}
+
+function renderListsMode(el) {
+  const all = allCardsWithLessonId();
+  const lessonMap = new Map(state.lessons.map(l => [l.id, l.title]));
+  const filters = [
+    { id: 'fav', label: '收藏', count: cardsForList('fav', all).length },
+    { id: 'bad', label: '差', count: cardsForList('bad', all).length },
+    { id: 'ok', label: '可以', count: cardsForList('ok', all).length },
+    { id: 'good', label: '熟', count: cardsForList('good', all).length },
+  ];
+  if (!filters.some(f => f.id === state.listFilter)) state.listFilter = 'fav';
+  const cards = cardsForList(state.listFilter, all);
+
+  el.innerHTML = `
+    <div class="lists-wrap">
+      <div class="lists-head">
+        <div>
+          <div class="lists-title">我的清單</div>
+          <div class="lists-sub">收藏、熟悉度、本機修正都在這裡整理。</div>
+        </div>
+      </div>
+      <div class="list-filter-row" role="tablist" aria-label="清單分類">
+        ${filters.map(f => `
+          <button class="list-filter${state.listFilter === f.id ? ' active' : ''}" data-list-filter="${f.id}" role="tab" aria-selected="${state.listFilter === f.id ? 'true' : 'false'}">
+            <span>${escapeHtml(f.label)}</span><strong>${f.count}</strong>
+          </button>
+        `).join('')}
+      </div>
+      ${renderListCards(cards, lessonMap)}
+    </div>
+  `;
+}
+
 export function renderContent(onGrade) {
   const el = document.getElementById('content');
+
+  if (state.mode === 'lists') {
+    renderListsMode(el);
+    renderStats();
+    updateSrsTabBadges();
+    return;
+  }
 
   // 對話模式不依賴單張卡片，獨立 render（吃 state.lessons）
   if (state.mode === 'dialog') {

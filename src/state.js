@@ -141,8 +141,10 @@ export const state = {
   flipped: false,
   progress: {},              // { "lessonId:thai": { grade, nextReviewAt, interval, easeFactor, reps, ... } }
   favorites: {},             // { "thai": 1 }
+  edits: {},                 // { "lessonId:thai": { thai, karaoke, zh, note } }，只存在本機
   collapsed: {},             // { "初-2": true } → 初級 2 章節收合中
   searchQuery: '',           // 搜尋虛擬課程用（不存 localStorage）
+  listFilter: 'fav',         // 'fav' | 'bad' | 'ok' | 'good'
   settings: {
     sheetInput: '',          // sheet URL / ID / csv URL
     rate: 1,
@@ -170,10 +172,12 @@ export function loadState() {
     state.progress = s.progress || {};
     const migrated = migrateProgress(state.progress);
     state.favorites = s.favorites || {};
+    state.edits = s.edits || {};
     state.collapsed = s.collapsed || {};
     state.currentLessonId = s.currentLessonId || null;
     state.mode = s.mode || 'card';
     state.cardIndex = typeof s.cardIndex === 'number' ? s.cardIndex : 0;
+    state.listFilter = s.listFilter || 'fav';
     // 有 migrate 到資料的話立刻寫回，避免 lazy 遺留舊格式
     if (migrated) saveState();
   } catch (e) {
@@ -211,20 +215,64 @@ export function saveState() {
     settings: state.settings,
     progress: state.progress,
     favorites: state.favorites,
+    edits: state.edits,
     collapsed: state.collapsed,
     currentLessonId: state.currentLessonId,
     mode: state.mode,
     cardIndex: state.cardIndex,
+    listFilter: state.listFilter,
   }));
 }
 
+export function sourceThai(card) {
+  return card?._sourceThai || card?.thai || '';
+}
+
+export function cardKey(card, fallbackLessonId = state.currentLessonId) {
+  const lessonId = card?._lessonId || fallbackLessonId || 'x';
+  return `${lessonId}:${sourceThai(card)}`;
+}
+
+export function applyCardEdit(card, lessonId) {
+  if (!card) return card;
+  const source = sourceThai(card);
+  const key = `${lessonId || card._lessonId || state.currentLessonId || 'x'}:${source}`;
+  const edited = state.edits[key];
+  return {
+    ...card,
+    ...(edited || {}),
+    _sourceThai: source,
+    _lessonId: lessonId || card._lessonId,
+    _cardKey: key,
+    _edited: !!edited,
+  };
+}
+
+export function saveCardEdit(card, patch) {
+  if (!card) return;
+  const key = card._cardKey || cardKey(card);
+  const cleaned = {};
+  for (const field of ['thai', 'karaoke', 'zh', 'note']) {
+    cleaned[field] = (patch[field] || '').trim();
+  }
+  state.edits[key] = cleaned;
+  saveState();
+}
+
+export function clearCardEdit(card) {
+  if (!card) return;
+  const key = card._cardKey || cardKey(card);
+  delete state.edits[key];
+  saveState();
+}
+
 export function isFavorite(card) {
-  return !!state.favorites[card?.thai];
+  return !!state.favorites[sourceThai(card)];
 }
 
 export function toggleFavorite(card) {
   if (!card) return;
-  const key = card.thai;
+  const key = sourceThai(card);
   if (state.favorites[key]) delete state.favorites[key];
   else state.favorites[key] = 1;
   saveState();
@@ -236,18 +284,12 @@ export function favoriteCount() {
 
 export function currentLesson() {
   if (state.currentLessonId === '__ALL__') {
-    const all = { id: '__ALL__', title: '全部混合', cards: [] };
-    for (const l of state.lessons) {
-      for (const c of l.cards) all.cards.push({ ...c, _lessonId: l.id });
-    }
-    return all;
+    return { id: '__ALL__', title: '全部混合', cards: allCardsWithLessonId() };
   }
   if (state.currentLessonId === '__FAV__') {
     const fav = { id: '__FAV__', title: '⭐ 收藏', cards: [] };
-    for (const l of state.lessons) {
-      for (const c of l.cards) {
-        if (state.favorites[c.thai]) fav.cards.push({ ...c, _lessonId: l.id });
-      }
+    for (const c of allCardsWithLessonId()) {
+      if (isFavorite(c)) fav.cards.push(c);
     }
     return fav;
   }
@@ -256,18 +298,21 @@ export function currentLesson() {
     const res = { id: '__SEARCH__', title: '🔍 ' + (q || '搜尋'), cards: [] };
     if (q) {
       for (const l of state.lessons) {
-        for (const c of l.cards) {
+        for (const raw of l.cards) {
+          const c = applyCardEdit(raw, l.id);
           if (
             (c.thai || '').toLowerCase().includes(q) ||
             (c.zh || '').toLowerCase().includes(q) ||
             (c.karaoke || '').toLowerCase().includes(q)
-          ) res.cards.push({ ...c, _lessonId: l.id });
+          ) res.cards.push(c);
         }
       }
     }
     return res;
   }
-  return state.lessons.find(l => l.id === state.currentLessonId) || state.lessons[0];
+  const lesson = state.lessons.find(l => l.id === state.currentLessonId) || state.lessons[0];
+  if (!lesson) return lesson;
+  return { ...lesson, cards: lesson.cards.map(c => applyCardEdit(c, lesson.id)) };
 }
 
 /* SRS active：mode=srs，或 (mode=card/reverse 且 srsToggle 開)。
@@ -298,8 +343,7 @@ function progKey(cardOrIdx) {
   } else {
     card = cardOrIdx;
   }
-  const lessonId = card._lessonId || state.currentLessonId || 'x';
-  return lessonId + ':' + card.thai;
+  return cardKey(card);
 }
 
 export function gradeOf(idxOrCard) {
@@ -332,10 +376,20 @@ export function allCardsWithLessonId() {
   const out = [];
   for (const l of state.lessons) {
     for (const c of l.cards) {
-      out.push(c._lessonId ? c : { ...c, _lessonId: l.id });
+      out.push(applyCardEdit(c, l.id));
     }
   }
   return out;
+}
+
+export function findCardByKey(key) {
+  for (const l of state.lessons) {
+    for (let i = 0; i < l.cards.length; i++) {
+      const card = applyCardEdit(l.cards[i], l.id);
+      if (card._cardKey === key) return { card, lessonId: l.id, index: i, lessonTitle: l.title };
+    }
+  }
+  return null;
 }
 
 export function getDueCount(lessonId) {
@@ -344,7 +398,9 @@ export function getDueCount(lessonId) {
 
 /* Fisher-Yates 就地打亂當前課程的 cards 陣列 */
 export function shuffleCurrentLesson() {
-  const lesson = currentLesson();
+  const lesson = ['__ALL__', '__FAV__', '__SEARCH__'].includes(state.currentLessonId)
+    ? currentLesson()
+    : state.lessons.find(l => l.id === state.currentLessonId);
   if (!lesson || !lesson.cards.length) return;
   const arr = lesson.cards;
   for (let i = arr.length - 1; i > 0; i--) {

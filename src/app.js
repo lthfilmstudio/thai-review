@@ -7,6 +7,7 @@ import {
   saveLessonsCache, loadLessonsCache, clearLessonsCache,
   loadManifest, saveManifest, loadLessonCards, saveLessonCards,
   setLastSync, getLastSync, formatLastSync,
+  findCardByKey, saveCardEdit, clearCardEdit,
 } from './state.js';
 import { loadLessons, loadTabsOnly, fetchLessonCards, loadFromBundledJson } from './data.js';
 import { speakCard, warmupVoices } from './tts.js';
@@ -183,11 +184,18 @@ function onSearchPick(match) {
   state.currentLessonId = match.lessonId;
   state.cardIndex = match.index;
   state.flipped = false;
-  if (state.mode === 'listen' || state.mode === 'dialog') state.mode = 'card';
+  if (state.mode === 'listen' || state.mode === 'dialog' || state.mode === 'lists') state.mode = 'card';
   stopListen();
   saveState();
+  syncModeButtons();
   closeSearch();
   rerender();
+}
+
+function syncModeButtons(m = state.mode) {
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === m));
+  document.querySelectorAll('.mp-btn').forEach(t => t.classList.toggle('active', t.dataset.mode === m));
+  document.querySelectorAll('[data-drawer-mode]').forEach(t => t.classList.toggle('active', t.dataset.drawerMode === m));
 }
 
 async function selectLesson(id) {
@@ -203,16 +211,18 @@ async function selectLesson(id) {
   rerender();
 }
 
-function selectMode(m) {
+async function selectMode(m) {
   state.mode = m;
   state.flipped = false;
   stopListen();
-  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === m));
-  document.querySelectorAll('.mp-btn').forEach(t => t.classList.toggle('active', t.dataset.mode === m));
-  document.querySelectorAll('[data-drawer-mode]').forEach(t => t.classList.toggle('active', t.dataset.drawerMode === m));
+  syncModeButtons(m);
   saveState();
   renderContent(rerender);
   renderStats();
+  if (m === 'lists') {
+    await ensureAllLoaded();
+    rerender();
+  }
 }
 
 function nextCard() {
@@ -251,6 +261,65 @@ function prevCard() {
   state.flipped = false;
   saveState();
   renderContent(rerender);
+}
+
+function closeEditModal() {
+  document.getElementById('editMask').classList.remove('open');
+}
+
+function openEditModal(cardKey) {
+  const found = findCardByKey(cardKey);
+  if (!found) {
+    alert('找不到這張卡片，請重新同步後再試一次。');
+    return;
+  }
+  const { card } = found;
+  document.getElementById('editCardKey').value = card._cardKey;
+  document.getElementById('editThai').value = card.thai || '';
+  document.getElementById('editKaraoke').value = card.karaoke || '';
+  document.getElementById('editZh').value = card.zh || '';
+  document.getElementById('editNote').value = card.note || '';
+  document.getElementById('editMask').classList.add('open');
+  setTimeout(() => document.getElementById('editThai').focus(), 50);
+}
+
+function saveEditModal() {
+  const key = document.getElementById('editCardKey').value;
+  const found = findCardByKey(key);
+  if (!found) return closeEditModal();
+  saveCardEdit(found.card, {
+    thai: document.getElementById('editThai').value,
+    karaoke: document.getElementById('editKaraoke').value,
+    zh: document.getElementById('editZh').value,
+    note: document.getElementById('editNote').value,
+  });
+  closeEditModal();
+  rerender();
+}
+
+function clearEditModal() {
+  const key = document.getElementById('editCardKey').value;
+  const found = findCardByKey(key);
+  if (!found) return closeEditModal();
+  clearCardEdit(found.card);
+  closeEditModal();
+  rerender();
+}
+
+function jumpToCard(cardKey) {
+  const found = findCardByKey(cardKey);
+  if (!found) {
+    alert('找不到這張卡片，請重新同步後再試一次。');
+    return;
+  }
+  state.currentLessonId = found.lessonId;
+  state.cardIndex = found.index;
+  state.mode = 'card';
+  state.flipped = false;
+  stopListen();
+  saveState();
+  syncModeButtons('card');
+  rerender();
 }
 
 function wireSegClick(sel, onPick) {
@@ -326,9 +395,7 @@ async function init() {
   rerender();
 
   // 模式切換
-  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === state.mode));
-  document.querySelectorAll('.mp-btn').forEach(t => t.classList.toggle('active', t.dataset.mode === state.mode));
-  document.querySelectorAll('[data-drawer-mode]').forEach(t => t.classList.toggle('active', t.dataset.drawerMode === state.mode));
+  syncModeButtons();
 
   document.querySelectorAll('.mode-tab,.mp-btn').forEach(b =>
     b.addEventListener('click', () => selectMode(b.dataset.mode))
@@ -355,6 +422,13 @@ async function init() {
   document.getElementById('btnCloseSearch').addEventListener('click', closeSearch);
   document.getElementById('searchMask').addEventListener('click', e => {
     if (e.target.id === 'searchMask') closeSearch();
+  });
+  document.getElementById('btnCloseEdit').addEventListener('click', closeEditModal);
+  document.getElementById('btnCancelEdit').addEventListener('click', closeEditModal);
+  document.getElementById('btnSaveEdit').addEventListener('click', saveEditModal);
+  document.getElementById('btnClearEdit').addEventListener('click', clearEditModal);
+  document.getElementById('editMask').addEventListener('click', e => {
+    if (e.target.id === 'editMask') closeEditModal();
   });
   document.getElementById('inpSearch').addEventListener('input', e => {
     renderSearchResults(e.target.value, onSearchPick);
@@ -483,6 +557,10 @@ async function init() {
 
   // 鍵盤快捷鍵
   document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('editMask').classList.contains('open')) {
+      closeEditModal();
+      return;
+    }
     // Esc 關搜尋（搜尋 modal 內也要能關）
     if (e.key === 'Escape' && document.getElementById('searchMask').classList.contains('open')) {
       closeSearch();
@@ -490,6 +568,7 @@ async function init() {
     }
     if (document.getElementById('modalMask').classList.contains('open')) return;
     if (document.getElementById('searchMask').classList.contains('open')) return;
+    if (document.getElementById('editMask').classList.contains('open')) return;
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea') return;
 
@@ -532,6 +611,26 @@ async function init() {
 
   // 字卡頁的上一張 / 下一張 + 評分鈕（事件委派，每次 re-render 都有效）
   document.getElementById('content').addEventListener('click', e => {
+    const editBtn = e.target.closest('[data-edit-card-key]');
+    if (editBtn) {
+      e.stopPropagation();
+      openEditModal(editBtn.dataset.editCardKey);
+      return;
+    }
+    const jumpBtn = e.target.closest('[data-jump-card]');
+    if (jumpBtn) {
+      e.stopPropagation();
+      jumpToCard(jumpBtn.dataset.jumpCard);
+      return;
+    }
+    const listFilter = e.target.closest('[data-list-filter]');
+    if (listFilter) {
+      e.stopPropagation();
+      state.listFilter = listFilter.dataset.listFilter;
+      saveState();
+      renderContent(rerender);
+      return;
+    }
     if (e.target.closest('#cardPrev')) { e.stopPropagation(); prevCard(); return; }
     if (e.target.closest('#cardNext')) { e.stopPropagation(); nextCard(); return; }
     const grade = e.target.closest('.pill[data-grade]');

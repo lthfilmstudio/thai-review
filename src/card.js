@@ -13,6 +13,7 @@ const SVG_PLAY = '<svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 2 
 const SVG_CHEV_L = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
 const SVG_CHEV_R = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
 const SVG_EXT = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>';
+const SVG_EDIT = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 const SVG_STAR_OUTLINE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
 const SVG_STAR_FILLED = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
 
@@ -109,6 +110,9 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
             <button class="sent-btn" id="sentBtn" aria-label="AI 造例句">
               ${SVG_SPARK_ICON}<span>造 3 句</span>
             </button>
+            <button class="edit-card-btn" data-edit-card-key="${escapeHtml(card._cardKey || '')}" aria-label="編輯">
+              ${SVG_EDIT}<span>編輯</span>
+            </button>
           </div>
           <div class="sent-list" id="sentList"></div>
         </div>
@@ -140,6 +144,7 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
       e.target.closest('.play-btn') ||
       e.target.closest('.yg-btn') ||
       e.target.closest('.sent-btn') ||
+      e.target.closest('.edit-card-btn') ||
       e.target.closest('.sent-list')
     ) return;
     state.flipped = !state.flipped;

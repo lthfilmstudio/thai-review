@@ -42,6 +42,7 @@
       <button class="mode-tab" data-mode="reverse">中文</button>
       <button class="mode-tab" data-mode="listen">自動播放</button>
       <button class="mode-tab" data-mode="dialog">對話</button>
+      <button class="mode-tab" data-mode="lists">清單</button>
       <button class="mode-tab srs-tab" data-mode="srs">今日複習<span class="srs-count" data-srs-count></span></button>
     </div>
     <div class="top-title" id="topTitle">清心安神</div>
@@ -62,6 +63,7 @@
   <button class="mp-btn" data-mode="reverse">中文</button>
   <button class="mp-btn" data-mode="listen">自動播放</button>
   <button class="mp-btn" data-mode="dialog">對話</button>
+  <button class="mp-btn" data-mode="lists">清單</button>
   <button class="mp-btn srs-tab" data-mode="srs">今日複習<span class="srs-count" data-srs-count></span></button>
 </div>
 
@@ -100,6 +102,7 @@
   <button class="drawer-item" data-drawer-mode="reverse">中文</button>
   <button class="drawer-item" data-drawer-mode="listen">自動播放</button>
   <button class="drawer-item" data-drawer-mode="dialog">對話</button>
+  <button class="drawer-item" data-drawer-mode="lists">清單</button>
   <button class="drawer-item srs-tab" data-drawer-mode="srs">今日複習<span class="srs-count" data-srs-count></span></button>
   <div class="side-divider"></div>
   <div class="drawer-title">課程</div>
@@ -193,6 +196,39 @@
     </div>
     <div class="search-meta" id="searchMeta"></div>
     <div class="search-results" id="searchResults"></div>
+  </div>
+</div>
+
+<!-- Edit card modal -->
+<div class="modal-mask" id="editMask">
+  <div class="modal edit-modal">
+    <div class="modal-head">
+      <div class="modal-title">編輯卡片</div>
+      <button class="modal-close" id="btnCloseEdit" aria-label="關閉">✕</button>
+    </div>
+    <input type="hidden" id="editCardKey">
+    <div class="field">
+      <label class="field-label">泰文</label>
+      <textarea id="editThai" rows="2"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label">拼音</label>
+      <textarea id="editKaraoke" rows="2"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label">中文</label>
+      <textarea id="editZh" rows="2"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label">備註</label>
+      <textarea id="editNote" rows="2"></textarea>
+    </div>
+    <div class="field-hint">修正只存在這台裝置；重新同步 Sheet 不會清掉。</div>
+    <div class="btn-row">
+      <button class="btn danger" id="btnClearEdit">還原</button>
+      <button class="btn ghost" id="btnCancelEdit">取消</button>
+      <button class="btn primary" id="btnSaveEdit">儲存</button>
+    </div>
   </div>
 </div>
 
