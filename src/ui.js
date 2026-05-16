@@ -204,6 +204,7 @@ export function renderStats() {
   if (el) el.textContent = count ? `${count} 張` : '0 張';
   const btn = document.getElementById('btnFavPanel');
   if (btn) btn.classList.toggle('active', state.currentLessonId === '__FAV__');
+  document.querySelector('[data-mobile-fav-button]')?.classList.toggle('active', state.currentLessonId === '__FAV__');
   const listedCount = allCardsWithLessonId().filter(c => isFavorite(c) || gradeOf(c)).length;
   document.querySelectorAll('#listThaiCount,#listZhCount').forEach(n => {
     n.textContent = String(listedCount);

@@ -219,7 +219,7 @@ async function selectMode(m) {
   saveState();
   renderContent(rerender);
   renderStats();
-  if (m === 'lists') {
+  if (m === 'lists' || m === 'dialog') {
     await ensureAllLoaded();
     rerender();
   }
@@ -400,7 +400,7 @@ async function init() {
 
   rerender();
 
-  if (state.mode === 'lists') {
+  if (state.mode === 'lists' || state.mode === 'dialog') {
     await ensureAllLoaded();
     rerender();
   }
@@ -420,6 +420,7 @@ async function init() {
 
   // Topbar 按鈕
   document.getElementById('btnFavPanel')?.addEventListener('click', () => selectLesson('__FAV__'));
+  document.querySelector('[data-mobile-fav-button]')?.addEventListener('click', () => selectLesson('__FAV__'));
   document.querySelectorAll('[data-list-order-button]').forEach(b =>
     b.addEventListener('click', () => selectListMode(b.dataset.listOrderButton))
   );
