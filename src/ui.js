@@ -70,7 +70,7 @@ function currentViewDueCount() {
   return n;
 }
 
-/* 更新 mode tab 上的「今日複習 (N)」徽章 */
+/* 更新 mode tab 上的「待複習 (N)」徽章 */
 export function updateSrsTabBadges() {
   const n = currentViewDueCount();
   const text = n > 0 ? `(${n})` : '';
@@ -314,37 +314,34 @@ export function renderContent(onGrade) {
 
   const cards = filteredCards();
 
-  // SRS 空狀態：今日複習完成（或還沒評過任何字）
+  // SRS 空狀態：待複習完成（或還沒評過任何字）
   if (isSrsActive() && cards.length === 0) {
     const min = nextReviewAtMin(state.progress);
     const hasAnyProgress = Object.keys(state.progress).some(k => {
       const v = state.progress[k];
       return v && typeof v === 'object';
     });
-    // card / reverse mode 下保留 toggle，讓使用者能取消「只看待複習」
-    const toggleHtml = (state.mode === 'card' || state.mode === 'reverse') ? `
-      <div class="srs-toggle-row">
-        <label class="srs-toggle">
-          <input type="checkbox" id="srsToggle"${state.srsToggle ? ' checked' : ''}>
-          <span>只看待複習</span>
-        </label>
-      </div>` : '';
+    const exitHtml = state.mode === 'srs'
+      ? `<button class="srs-exit-btn" data-mode-back-to-card>回到字卡</button>`
+      : '';
     let doneHtml;
     if (!hasAnyProgress) {
       doneHtml = `<div class="srs-done">
         <div class="srs-done-icon">${SVG_CHECK}</div>
-        <div class="srs-done-title">還沒開始</div>
-        <div class="srs-done-sub">先到「字卡」模式評幾張，<br>它們才會排進複習隊列。</div>
+        <div class="srs-done-title">還沒有待複習卡片</div>
+        <div class="srs-done-sub">先在字卡頁按 <strong>差 / 可以 / 熟</strong>，系統才知道哪些字要再練。</div>
+        ${exitHtml}
       </div>`;
     } else {
       const days = min ? daysUntil(min) : 1;
       doneHtml = `<div class="srs-done">
         <div class="srs-done-icon">${SVG_CHECK}</div>
-        <div class="srs-done-title">今日複習完成</div>
-        <div class="srs-done-sub">下次複習：<strong>${escapeHtml(formatNextReview(days))}</strong></div>
+        <div class="srs-done-title">目前沒有到期卡片</div>
+        <div class="srs-done-sub">下次複習：<strong>${escapeHtml(formatNextReview(days))}</strong><br>現在可以繼續練新字。</div>
+        ${exitHtml}
       </div>`;
     }
-    el.innerHTML = toggleHtml + doneHtml;
+    el.innerHTML = doneHtml;
     renderStats();
     updateSrsTabBadges();
     return;
@@ -368,7 +365,10 @@ export function renderContent(onGrade) {
     });
   } else {
     // card / reverse / srs 都共用 renderCardMode；reverse 把中文擺正面
-    renderCardMode(el, cards, onGrade, { reverse: state.mode === 'reverse' });
+    renderCardMode(el, cards, onGrade, {
+      reverse: state.mode === 'reverse',
+      dueCount: currentViewDueCount(),
+    });
     renderStats();
   }
   updateSrsTabBadges();

@@ -417,6 +417,9 @@ async function init() {
   document.querySelectorAll('[data-drawer-list-order]').forEach(b =>
     b.addEventListener('click', () => selectListMode(b.dataset.drawerListOrder))
   );
+  document.querySelectorAll('[data-mobile-mode]').forEach(b =>
+    b.addEventListener('click', () => selectMode(b.dataset.mobileMode))
+  );
 
   // Topbar 按鈕
   document.getElementById('btnFavPanel')?.addEventListener('click', () => selectLesson('__FAV__'));
@@ -629,6 +632,27 @@ async function init() {
 
   // 字卡頁的上一張 / 下一張 + 評分鈕（事件委派，每次 re-render 都有效）
   document.getElementById('content').addEventListener('click', e => {
+    if (e.target.closest('[data-start-review]')) {
+      e.stopPropagation();
+      state.mode = 'srs';
+      state.cardIndex = 0;
+      state.flipped = false;
+      stopListen();
+      saveState();
+      syncModeButtons('srs');
+      rerender();
+      return;
+    }
+    if (e.target.closest('[data-mode-back-to-card]')) {
+      e.stopPropagation();
+      state.mode = 'card';
+      state.cardIndex = 0;
+      state.flipped = false;
+      saveState();
+      syncModeButtons('card');
+      rerender();
+      return;
+    }
     const editBtn = e.target.closest('[data-edit-card-key]');
     if (editBtn) {
       e.stopPropagation();

@@ -76,16 +76,19 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
   const previewOk = formatNextReview(nextReview('ok', cur).interval);
   const previewGood = formatNextReview(nextReview('good', cur).interval);
 
-  // 只在 card / reverse mode 顯示 srsToggle；SRS 主模式不需要
-  const showToggle = state.mode === 'card' || state.mode === 'reverse';
+  const showReviewHint = state.mode === 'card' || state.mode === 'reverse';
+  const dueCount = Number(opts.dueCount || 0);
+  const reviewHint = dueCount > 0
+    ? `<div class="review-hint-title">今天有 ${dueCount} 張待複習</div>
+       <div class="review-hint-sub">先練到期的字，再繼續新卡。</div>
+       <button class="review-start-btn" data-start-review>開始</button>`
+    : `<div class="review-hint-title">按差 / 可以 / 熟，系統會安排複習</div>
+       <div class="review-hint-sub">評過的字會在適合的時間再次出現。</div>`;
 
   el.innerHTML = `
-    ${showToggle ? `
-      <div class="srs-toggle-row">
-        <label class="srs-toggle">
-          <input type="checkbox" id="srsToggle"${state.srsToggle ? ' checked' : ''}>
-          <span>只看待複習</span>
-        </label>
+    ${showReviewHint ? `
+      <div class="review-hint${dueCount > 0 ? ' due' : ''}">
+        ${reviewHint}
       </div>
     ` : ''}
     <div class="progress-row">
@@ -119,14 +122,14 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
       </div>
     </div>
     <div class="grade-row" aria-label="評分">
-      <button class="pill red" data-grade="bad" aria-label="差，重新排到明天再見">
-        差<span class="pill-meta">${escapeHtml(previewBad)}</span>
+      <button class="pill red" data-grade="bad" aria-label="差，明天再練">
+        差<span class="pill-meta">明天再練</span><span class="pill-time">${escapeHtml(previewBad)}</span>
       </button>
-      <button class="pill neutral" data-grade="ok" aria-label="可以">
-        可以<span class="pill-meta">${escapeHtml(previewOk)}</span>
+      <button class="pill neutral" data-grade="ok" aria-label="可以，短期複習">
+        可以<span class="pill-meta">短期複習</span><span class="pill-time">${escapeHtml(previewOk)}</span>
       </button>
-      <button class="pill gold" data-grade="good" aria-label="熟">
-        熟<span class="pill-meta">${escapeHtml(previewGood)}</span>
+      <button class="pill gold" data-grade="good" aria-label="熟，晚點再出現">
+        熟<span class="pill-meta">晚點再出現</span><span class="pill-time">${escapeHtml(previewGood)}</span>
       </button>
     </div>
     <div class="card-nav-row">
