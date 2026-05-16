@@ -42,7 +42,6 @@
       <button class="mode-tab" data-mode="reverse">中文</button>
       <button class="mode-tab" data-mode="listen">自動播放</button>
       <button class="mode-tab" data-mode="dialog">對話</button>
-      <button class="mode-tab" data-mode="lists">清單</button>
       <button class="mode-tab srs-tab" data-mode="srs">今日複習<span class="srs-count" data-srs-count></span></button>
     </div>
     <div class="top-title" id="topTitle">清心安神</div>
@@ -63,7 +62,6 @@
   <button class="mp-btn" data-mode="reverse">中文</button>
   <button class="mp-btn" data-mode="listen">自動播放</button>
   <button class="mp-btn" data-mode="dialog">對話</button>
-  <button class="mp-btn" data-mode="lists">清單</button>
   <button class="mp-btn srs-tab" data-mode="srs">今日複習<span class="srs-count" data-srs-count></span></button>
 </div>
 
@@ -84,6 +82,17 @@
         <div class="fav-panel-count" id="favPanelCount">0 張</div>
       </div>
     </button>
+    <div class="side-panel-group">
+      <div class="side-panel-label">清單</div>
+      <button class="side-panel-btn" id="btnListThai" data-list-order-button="thai" aria-label="泰文在前的清單">
+        <span>泰文清單</span>
+        <strong id="listThaiCount">0</strong>
+      </button>
+      <button class="side-panel-btn" id="btnListZh" data-list-order-button="zh" aria-label="中文在前的清單">
+        <span>中文清單</span>
+        <strong id="listZhCount">0</strong>
+      </button>
+    </div>
     <div class="shortcuts">
       <div><span class="kbd">←</span> <span class="kbd">→</span> 切卡</div>
       <div><span class="kbd">Space</span> 翻面</div>
@@ -102,8 +111,9 @@
   <button class="drawer-item" data-drawer-mode="reverse">中文</button>
   <button class="drawer-item" data-drawer-mode="listen">自動播放</button>
   <button class="drawer-item" data-drawer-mode="dialog">對話</button>
-  <button class="drawer-item" data-drawer-mode="lists">清單</button>
   <button class="drawer-item srs-tab" data-drawer-mode="srs">今日複習<span class="srs-count" data-srs-count></span></button>
+  <button class="drawer-item" data-drawer-list-order="thai">泰文清單</button>
+  <button class="drawer-item" data-drawer-list-order="zh">中文清單</button>
   <div class="side-divider"></div>
   <div class="drawer-title">課程</div>
   <div id="drawerList"></div>

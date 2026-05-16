@@ -134,6 +134,9 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
       <button class="fav-btn${isFavorite(card) ? ' on' : ''}" id="favBtn" aria-label="收藏">
         ${isFavorite(card) ? SVG_STAR_FILLED : SVG_STAR_OUTLINE}
       </button>
+      <button class="fav-btn edit-nav-btn" data-edit-card-key="${escapeHtml(card._cardKey || '')}" aria-label="編輯這張卡">
+        ${SVG_EDIT}
+      </button>
       <button class="nav-side-btn" id="cardNext" aria-label="下一張"><span>下一張</span>${SVG_CHEV_R}</button>
     </div>
   `;

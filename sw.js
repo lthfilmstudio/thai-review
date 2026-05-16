@@ -1,7 +1,7 @@
 /* Service Worker：app shell cache + runtime CSV cache。
    改檔後升 CACHE 版本號強制更新。 */
 
-const CACHE = 'thai-review-v35';
+const CACHE = 'thai-review-v37';
 
 const SHELL = [
   './',
@@ -31,7 +31,9 @@ const SHELL = [
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then(c => Promise.all(SHELL.map(url => c.add(new Request(url, { cache: 'reload' })))))
+      .then(() => self.skipWaiting())
   );
 });
 

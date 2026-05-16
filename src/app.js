@@ -225,6 +225,12 @@ async function selectMode(m) {
   }
 }
 
+async function selectListMode(order) {
+  state.listOrder = order === 'zh' ? 'zh' : 'thai';
+  await selectMode('lists');
+  closeDrawer();
+}
+
 function nextCard() {
   const cards = filteredCards();
   if (!cards.length) return;
@@ -394,6 +400,11 @@ async function init() {
 
   rerender();
 
+  if (state.mode === 'lists') {
+    await ensureAllLoaded();
+    rerender();
+  }
+
   // 模式切換
   syncModeButtons();
 
@@ -403,9 +414,15 @@ async function init() {
   document.querySelectorAll('[data-drawer-mode]').forEach(b =>
     b.addEventListener('click', () => selectMode(b.dataset.drawerMode))
   );
+  document.querySelectorAll('[data-drawer-list-order]').forEach(b =>
+    b.addEventListener('click', () => selectListMode(b.dataset.drawerListOrder))
+  );
 
   // Topbar 按鈕
   document.getElementById('btnFavPanel')?.addEventListener('click', () => selectLesson('__FAV__'));
+  document.querySelectorAll('[data-list-order-button]').forEach(b =>
+    b.addEventListener('click', () => selectListMode(b.dataset.listOrderButton))
+  );
   document.getElementById('btnMenu').addEventListener('click', openDrawer);
   document.getElementById('drawerMask').addEventListener('click', closeDrawer);
   document.getElementById('btnSettings').addEventListener('click', () => {

@@ -204,6 +204,16 @@ export function renderStats() {
   if (el) el.textContent = count ? `${count} 張` : '0 張';
   const btn = document.getElementById('btnFavPanel');
   if (btn) btn.classList.toggle('active', state.currentLessonId === '__FAV__');
+  const listedCount = allCardsWithLessonId().filter(c => isFavorite(c) || gradeOf(c)).length;
+  document.querySelectorAll('#listThaiCount,#listZhCount').forEach(n => {
+    n.textContent = String(listedCount);
+  });
+  document.querySelectorAll('[data-list-order-button]').forEach(b => {
+    b.classList.toggle('active', state.mode === 'lists' && b.dataset.listOrderButton === state.listOrder);
+  });
+  document.querySelectorAll('[data-drawer-list-order]').forEach(b => {
+    b.classList.toggle('active', state.mode === 'lists' && b.dataset.drawerListOrder === state.listOrder);
+  });
 }
 
 function listTitleFor(card, lessonMap) {
@@ -217,7 +227,7 @@ function cardsForList(kind, cards) {
   return cards.filter(c => gradeOf(c) === kind);
 }
 
-function renderListCards(cards, lessonMap) {
+function renderListCards(cards, lessonMap, order = 'thai') {
   if (!cards.length) {
     return `<div class="empty list-empty">
       <div class="empty-icon">✦</div>
@@ -230,9 +240,16 @@ function renderListCards(cards, lessonMap) {
     <div class="review-list-card${card._edited ? ' edited' : ''}">
       <button class="review-list-main" data-jump-card="${escapeHtml(card._cardKey)}">
         <div class="rl-tag">${escapeHtml(listTitleFor(card, lessonMap))}${card._edited ? ' · 已修正' : ''}</div>
-        <div class="rl-thai">${escapeHtml(card.thai)}</div>
-        <div class="rl-karaoke">${escapeHtml(card.karaoke)}</div>
-        <div class="rl-zh">${escapeHtml(card.zh)}</div>
+        ${order === 'zh' ? `
+          <div class="rl-zh rl-primary">${escapeHtml(card.zh)}</div>
+          ${card.note ? `<div class="rl-note">（${escapeHtml(card.note)}）</div>` : ''}
+          <div class="rl-thai rl-secondary">${escapeHtml(card.thai)}</div>
+          <div class="rl-karaoke">${escapeHtml(card.karaoke)}</div>
+        ` : `
+          <div class="rl-thai">${escapeHtml(card.thai)}</div>
+          <div class="rl-karaoke">${escapeHtml(card.karaoke)}</div>
+          <div class="rl-zh">${escapeHtml(card.zh)}</div>
+        `}
       </button>
       <button class="review-list-edit" data-edit-card-key="${escapeHtml(card._cardKey)}" aria-label="編輯這張卡">${SVG_EDIT}</button>
     </div>
@@ -250,13 +267,18 @@ function renderListsMode(el) {
   ];
   if (!filters.some(f => f.id === state.listFilter)) state.listFilter = 'fav';
   const cards = cardsForList(state.listFilter, all);
+  const order = state.listOrder === 'zh' ? 'zh' : 'thai';
+  const title = order === 'zh' ? '中文清單' : '泰文清單';
+  const sub = order === 'zh'
+    ? '中文在前，點任一張就回到複習頁。'
+    : '泰文在前，點任一張就回到複習頁。';
 
   el.innerHTML = `
     <div class="lists-wrap">
       <div class="lists-head">
         <div>
-          <div class="lists-title">我的清單</div>
-          <div class="lists-sub">收藏、熟悉度、本機修正都在這裡整理。</div>
+          <div class="lists-title">${escapeHtml(title)}</div>
+          <div class="lists-sub">${escapeHtml(sub)}</div>
         </div>
       </div>
       <div class="list-filter-row" role="tablist" aria-label="清單分類">
@@ -266,7 +288,7 @@ function renderListsMode(el) {
           </button>
         `).join('')}
       </div>
-      ${renderListCards(cards, lessonMap)}
+      ${renderListCards(cards, lessonMap, order)}
     </div>
   `;
 }

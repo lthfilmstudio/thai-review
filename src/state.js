@@ -145,6 +145,7 @@ export const state = {
   collapsed: {},             // { "初-2": true } → 初級 2 章節收合中
   searchQuery: '',           // 搜尋虛擬課程用（不存 localStorage）
   listFilter: 'fav',         // 'fav' | 'bad' | 'ok' | 'good'
+  listOrder: 'thai',         // 'thai' | 'zh'，清單卡片主要顯示語言
   settings: {
     sheetInput: '',          // sheet URL / ID / csv URL
     rate: 1,
@@ -152,7 +153,7 @@ export const state = {
     gap: 2,                  // number | 'auto'
     theme: 'dark',           // 'auto' | 'dark' | 'light'（預設鎖深色）
     voice: 'th-TH-Neural2-C',// GCP TTS voice id（thai-tts-proxy 走 Neural2 / Chirp3-HD）
-    dialogSource: 'lesson',  // 'lesson' | 'fav' — 對話模式抽字來源
+    dialogSource: 'lesson',  // 'lesson' | 'fav' | 'bad' | 'ok' — 對話模式抽字來源
   },
   listen: {
     playing: false,
@@ -178,6 +179,7 @@ export function loadState() {
     state.mode = s.mode || 'card';
     state.cardIndex = typeof s.cardIndex === 'number' ? s.cardIndex : 0;
     state.listFilter = s.listFilter || 'fav';
+    state.listOrder = s.listOrder || 'thai';
     // 有 migrate 到資料的話立刻寫回，避免 lazy 遺留舊格式
     if (migrated) saveState();
   } catch (e) {
@@ -221,6 +223,7 @@ export function saveState() {
     mode: state.mode,
     cardIndex: state.cardIndex,
     listFilter: state.listFilter,
+    listOrder: state.listOrder,
   }));
 }
 

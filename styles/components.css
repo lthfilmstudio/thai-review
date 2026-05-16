@@ -424,6 +424,10 @@
   border-color: var(--gold);
 }
 
+.edit-nav-btn {
+  color: var(--gold);
+}
+
 .fav-btn:active {
   transform: scale(0.94);
 }
@@ -721,6 +725,12 @@
   word-break: break-word;
 }
 
+.rl-thai.rl-secondary {
+  margin-top: 6px;
+  font-size: clamp(15px, 3vw, 18px);
+  color: var(--text-soft);
+}
+
 .rl-karaoke {
   margin-top: 3px;
   color: var(--gold);
@@ -734,6 +744,20 @@
   color: var(--text-soft);
   font-size: 13px;
   line-height: 1.45;
+}
+
+.rl-zh.rl-primary {
+  margin-top: 0;
+  color: var(--text);
+  font-size: clamp(17px, 3.4vw, 22px);
+  line-height: 1.35;
+}
+
+.rl-note {
+  margin-top: 3px;
+  color: var(--text-mute);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .list-empty {
