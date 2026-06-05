@@ -23,7 +23,7 @@ const GROUP_ORDER = ['初', '中', '高'];
 const GROUP_LABEL = { '初': '初級', '中': '中級', '高': '高級', '其他': '其他' };
 
 function parseGroup(title) {
-  const m = (title || '').match(/^(初|中|高)\s+(.*)$/);
+  const m = (title || '').match(/^(初|中|高)\s*(.+)$/);
   if (m) return { group: m[1], display: m[2] };
   return { group: '其他', display: title };
 }
