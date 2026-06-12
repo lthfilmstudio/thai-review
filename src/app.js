@@ -10,6 +10,7 @@ import {
   findCardByKey, saveCardEdit, clearCardEdit,
 } from './state.js';
 import { loadLessons, loadTabsOnly, fetchLessonCards, loadFromBundledJson } from './data.js';
+import { initDailyLog, logReview } from './today.js';
 import { speakCard, warmupVoices } from './tts.js';
 import { stopListen } from './listen.js';
 import {
@@ -219,7 +220,7 @@ async function selectMode(m) {
   saveState();
   renderContent(rerender);
   renderStats();
-  if (m === 'lists' || m === 'dialog') {
+  if (m === 'lists' || m === 'dialog' || m === 'today') {
     await ensureAllLoaded();
     rerender();
   }
@@ -246,6 +247,7 @@ function nextCard() {
    - 一般 mode：cards 不變，往下一張前進 */
 function gradeAndAdvance(g) {
   setGrade(state.cardIndex, g);
+  logReview(g);
   state.flipped = false;
   if (isSrsActive()) {
     const cards = filteredCards();
@@ -378,6 +380,7 @@ function onFreshLessons(fresh) {
 
 async function init() {
   loadState();
+  initDailyLog(state.progress);
   applyTheme();
 
   const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
@@ -400,7 +403,7 @@ async function init() {
 
   rerender();
 
-  if (state.mode === 'lists' || state.mode === 'dialog') {
+  if (state.mode === 'lists' || state.mode === 'dialog' || state.mode === 'today') {
     await ensureAllLoaded();
     rerender();
   }
@@ -610,6 +613,9 @@ async function init() {
       return;
     }
 
+    // 今日 mode 沒有當前卡片，卡片快捷鍵（翻面 / 評分 / 換卡）不適用
+    if (state.mode === 'today') return;
+
     if (e.key === 'ArrowLeft') prevCard();
     else if (e.key === 'ArrowRight') nextCard();
     else if (e.code === 'Space') {
@@ -632,6 +638,18 @@ async function init() {
 
   // 字卡頁的上一張 / 下一張 + 評分鈕（事件委派，每次 re-render 都有效）
   document.getElementById('content').addEventListener('click', e => {
+    if (e.target.closest('[data-start-review-all]')) {
+      e.stopPropagation();
+      state.currentLessonId = '__ALL__';
+      state.mode = 'srs';
+      state.cardIndex = 0;
+      state.flipped = false;
+      stopListen();
+      saveState();
+      syncModeButtons('srs');
+      rerender();
+      return;
+    }
     if (e.target.closest('[data-start-review]')) {
       e.stopPropagation();
       state.mode = 'srs';
@@ -704,6 +722,7 @@ async function init() {
     const dx = t.clientX - tx;
     const dy = t.clientY - ty;
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (state.mode === 'today') return;   // 今日 mode 沒有卡片可滑
       if (state.mode === 'listen') stopListen();
       if (dx > 0) prevCard(); else nextCard();
     }

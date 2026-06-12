@@ -135,7 +135,7 @@ export const DEMO_LESSONS = [
 export const state = {
   lessons: [],
   currentLessonId: null,
-  mode: 'card',              // 'card' | 'reverse' | 'listen' | 'dialog' | 'srs'
+  mode: 'card',              // 'card' | 'reverse' | 'listen' | 'dialog' | 'srs' | 'today'
   srsToggle: false,          // card mode 下「只看待複習」開關（不存 localStorage）
   cardIndex: 0,
   flipped: false,

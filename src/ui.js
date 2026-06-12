@@ -7,6 +7,7 @@ import {
 import { renderCardMode } from './card.js';
 import { renderListenMode, stopListen } from './listen.js';
 import { renderDialogMode } from './dialog.js';
+import { renderTodayMode } from './today.js';
 import { isDue, nextReviewAtMin, daysUntil, formatNextReview } from './srs.js';
 
 const SVG_CHECK = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -299,6 +300,13 @@ export function renderContent(onGrade) {
 
   if (state.mode === 'lists') {
     renderListsMode(el);
+    renderStats();
+    updateSrsTabBadges();
+    return;
+  }
+
+  if (state.mode === 'today') {
+    renderTodayMode(el);
     renderStats();
     updateSrsTabBadges();
     return;

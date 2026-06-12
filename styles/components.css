@@ -1567,6 +1567,189 @@
   border-color: rgb(140, 90, 170);
 }
 
+/* ===== 今日 mode：今日計劃 + 月曆 ===== */
+.today-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 12px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.today-plan {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px;
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.today-due {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.today-due-num {
+  color: var(--gold);
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.today-due-label {
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.today-due.done {
+  align-items: center;
+  color: var(--text-soft);
+}
+.today-due-icon { display: inline-flex; color: var(--gold); }
+
+.today-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-mute);
+  font-size: 12px;
+}
+
+.today-streak { color: var(--text-soft); font-weight: 500; }
+
+.today-checkin { display: inline-flex; align-items: center; gap: 5px; }
+.today-checkin.done { color: var(--gold); }
+
+/* 月曆 */
+.cal {
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  background: var(--surface-soft);
+  padding: 12px 12px 10px;
+}
+
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.cal-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.cal-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+.cal-nav:hover { background: var(--surface-hover); color: var(--text); }
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-wd {
+  text-align: center;
+  color: var(--text-mute);
+  font-size: 10px;
+  padding: 2px 0 4px;
+}
+
+.cal-cell {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+.cal-cell.empty { visibility: hidden; }
+
+.cal-cell.past::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--gold);
+  opacity: 0;
+}
+.cal-cell.heat-1::before { opacity: 0.12; }
+.cal-cell.heat-2::before { opacity: 0.25; }
+.cal-cell.heat-3::before { opacity: 0.45; }
+.cal-cell.heat-4::before { opacity: 0.7; }
+
+.cal-cell.today { border: 1px solid var(--gold); }
+
+.cal-day {
+  position: relative;
+  color: var(--text-soft);
+  font-size: 11px;
+  line-height: 1;
+}
+.cal-cell.heat-3 .cal-day,
+.cal-cell.heat-4 .cal-day { color: var(--text); }
+
+.cal-n {
+  position: relative;
+  color: var(--text-mute);
+  font-size: 9px;
+  line-height: 1;
+}
+.cal-n.due { color: var(--gold); font-weight: 600; }
+
+.cal-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+  color: var(--text-mute);
+  font-size: 10px;
+}
+
+.cal-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+
+.cal-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--gold);
+  opacity: 0.45;
+}
+
+.cal-legend-due {
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 10px;
+}
+
+@media (max-width: 640px) {
+  .today-wrap { padding: 10px 12px 20px; gap: 12px; }
+  .cal-grid { gap: 3px; }
+  .cal-day { font-size: 10px; }
+}
+
 /* Silent loop audio hidden */
 #silentLoop {
   position: fixed;
