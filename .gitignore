@@ -16,3 +16,6 @@ playwright-report/
 # 暫存
 *.log
 tmp/
+
+# wrangler 本地狀態
+.wrangler/
