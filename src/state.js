@@ -8,6 +8,7 @@ export const LESSONS_CACHE_KEY = 'thai-review-lessons-v1';      // 舊版（full
 export const MANIFEST_CACHE_KEY = 'thai-review-manifest-v1';    // 新版（只 tab 列表）
 export const LESSON_CACHE_PREFIX = 'thai-review-lesson-';       // 新版（單堂 cards）
 export const SYNC_TIME_KEY = 'thai-review-last-sync-v1';        // 上次手動同步成功時間
+const SETTINGS_VERSION = 2;
 
 /* ===== 舊版：整份 lessons cache（保留相容，其他非 publish-to-web 模式還在用） ===== */
 export function saveLessonsCache(url, lessons) {
@@ -150,7 +151,7 @@ export const state = {
     sheetInput: '',          // sheet URL / ID / csv URL
     rate: 1,
     repeat: 3,
-    gap: 2,                  // number | 'auto'
+    gap: 'auto',             // number | 'auto'
     theme: 'dark',           // 'auto' | 'dark' | 'light'（預設鎖深色）
     voice: 'th-TH-Neural2-C',// GCP TTS voice id（thai-tts-proxy 走 Neural2 / Chirp3-HD）
     dialogSource: 'lesson',  // 'lesson' | 'fav' | 'bad' | 'ok' — 對話模式抽字來源
@@ -170,6 +171,8 @@ export function loadState() {
     if (!raw) return;
     const s = JSON.parse(raw);
     Object.assign(state.settings, s.settings || {});
+    const settingsMigrated = (s.settingsVersion || 1) < SETTINGS_VERSION;
+    if (settingsMigrated) state.settings.gap = 'auto';
     state.progress = s.progress || {};
     const migrated = migrateProgress(state.progress);
     state.favorites = s.favorites || {};
@@ -181,7 +184,7 @@ export function loadState() {
     state.listFilter = s.listFilter || 'fav';
     state.listOrder = s.listOrder || 'thai';
     // 有 migrate 到資料的話立刻寫回，避免 lazy 遺留舊格式
-    if (migrated) saveState();
+    if (migrated || settingsMigrated) saveState();
   } catch (e) {
     // 忽略損毀的 localStorage
   }
@@ -214,6 +217,7 @@ function migrateProgress(progress) {
 
 export function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    settingsVersion: SETTINGS_VERSION,
     settings: state.settings,
     progress: state.progress,
     favorites: state.favorites,

@@ -3,11 +3,18 @@
    （index.html 裡的 #silentLoop）保持 audio session active。 */
 
 import { state, filteredCards } from './state.js';
-import { speakWithPromise, estimateTeacherMs } from './tts.js';
+import {
+  CHINESE_VOICE,
+  cancelSpeech,
+  estimateTeacherMs,
+  speakTextWithPromise,
+  speakWithPromise,
+} from './tts.js';
 import { escapeHtml } from './ui.js';
 
 let onAdvance = null;   // 切卡後的 callback（由 app.js 注入，用來重繪 UI）
 let silentAudio = null;
+let runVersion = 0;
 
 export function renderListenMode(el, cards, advanceCb) {
   onAdvance = advanceCb;
@@ -29,7 +36,7 @@ export function renderListenMode(el, cards, advanceCb) {
         <div class="listen-kara">${escapeHtml(card.karaoke)}</div>
         <div class="listen-zh">${escapeHtml(card.zh)}</div>
         <div class="listen-divider"></div>
-        <div class="phase-row"><div class="phase-dot teacher"></div><div class="phase-label">老師語音</div></div>
+        <div class="phase-row"><div class="phase-dot teacher"></div><div class="phase-label" id="phaseTeacherLabel">${state.listen.phase === 'meaning' ? '中文提示' : '老師泰文'}</div></div>
         <div class="phase-track"><div class="phase-fill teacher" id="barT"></div></div>
         <div class="phase-row"><div class="phase-dot repeat"></div><div class="phase-label">換你跟讀</div></div>
         <div class="phase-track"><div class="phase-fill repeat" id="barR"></div></div>
@@ -66,18 +73,22 @@ export function toggleListen() {
 }
 
 export function startListen() {
+  const version = ++runVersion;
   state.listen.playing = true;
   state.listen.repeatCount = 0;
+  state.listen.phase = 'meaning';
   startSilentLoop();
   registerMediaSessionHandlers();
   navigator.mediaSession && (navigator.mediaSession.playbackState = 'playing');
-  runListenStep();
+  void runListenStep(version);
   updatePlayBtn('❚❚', '暫停');
 }
 
 export function stopListen() {
+  runVersion++;
   state.listen.playing = false;
-  try { window.speechSynthesis.cancel(); } catch (e) {}
+  state.listen.phase = 'idle';
+  cancelSpeech();
   cancelAnimationFrame(state.listen.rafId);
   clearTimeout(state.listen.timeoutId);
   const barT = document.getElementById('barT'); if (barT) barT.style.width = '0';
@@ -94,40 +105,61 @@ function updatePlayBtn(label, aria) {
   btn.setAttribute('aria-label', aria);
 }
 
-async function runListenStep() {
-  if (!state.listen.playing) return;
+async function runListenStep(version) {
+  if (!state.listen.playing || version !== runVersion) return;
   const cards = filteredCards();
   if (!cards.length) { stopListen(); return; }
   const card = cards[state.cardIndex];
 
-  // Phase 1：老師語音
-  const teacherMs = estimateTeacherMs(card);
-  animateBar('barT', teacherMs);
-  await speakWithPromise(card);
-  if (!state.listen.playing) return;
+  // Phase 1：每張卡只唸一次中文提示。
+  if (state.listen.repeatCount === 0) {
+    state.listen.phase = 'meaning';
+    updateTeacherLabel('中文提示');
+    await speakTextWithPromise({
+      text: card.zh,
+      voice: CHINESE_VOICE,
+      lang: 'zh-TW',
+      rate: 1,
+    });
+    if (!state.listen.playing || version !== runVersion) return;
+  }
 
-  // Phase 2：跟讀空白
-  const gap = state.settings.gap === 'auto'
-    ? Math.max(1.5, teacherMs / 1000 * 1.3)
-    : Number(state.settings.gap);
-  const gapMs = gap * 1000;
+  // Phase 2：老師泰文。真實播放時間會拿來算跟讀長度。
+  state.listen.phase = 'teacher';
+  updateTeacherLabel('老師泰文');
+  const estimatedTeacherMs = estimateTeacherMs(card);
+  animateBar('barT', estimatedTeacherMs);
+  const playedTeacherMs = await speakWithPromise(card);
+  if (!state.listen.playing || version !== runVersion) return;
+
+  // Phase 3：跟讀空白。短字至少留 1.5 秒，長句用老師時間的 1.5 倍。
+  state.listen.phase = 'repeat';
+  const teacherMs = playedTeacherMs > 0 ? playedTeacherMs : estimatedTeacherMs;
+  const gapMs = state.settings.gap === 'auto'
+    ? Math.max(1500, teacherMs * 1.5)
+    : Number(state.settings.gap) * 1000;
   animateBar('barR', gapMs);
   await wait(gapMs);
-  if (!state.listen.playing) return;
+  if (!state.listen.playing || version !== runVersion) return;
 
   state.listen.repeatCount++;
   resetBars();
 
   if (state.listen.repeatCount < state.settings.repeat) {
     onAdvance?.('rerender');
-    runListenStep();
+    void runListenStep(version);
   } else {
     state.listen.repeatCount = 0;
     if (state.cardIndex + 1 < cards.length) state.cardIndex++;
     else state.cardIndex = 0;
     onAdvance?.('rerender');
-    runListenStep();
+    void runListenStep(version);
   }
+}
+
+function updateTeacherLabel(label) {
+  const el = document.getElementById('phaseTeacherLabel');
+  if (el) el.textContent = label;
 }
 
 function animateBar(id, durationMs) {
@@ -182,7 +214,7 @@ function stopSilentLoop() {
 /* ===== Media Session（鎖屏顯示 + 控制鍵） ===== */
 
 function registerMediaSessionHandlers() {
-  if (!('mediaSession' in navigator)) return;
+  if (!navigator.mediaSession) return;
   navigator.mediaSession.setActionHandler('play', () => { if (!state.listen.playing) startListen(); });
   navigator.mediaSession.setActionHandler('pause', () => { if (state.listen.playing) stopListen(); });
   navigator.mediaSession.setActionHandler('previoustrack', () => { stopListen(); prevInList(); });
