@@ -2,9 +2,9 @@
 """
 gen-audio.py - dry-run planner for ElevenLabs baked Thai MP3 audio.
 
-This first version intentionally does not call ElevenLabs or write audio files.
-It reads data.json, dedupes Thai strings, checks an optional audio manifest,
-and reports the estimated cost for the selected ElevenLabs voice/model.
+Dry-run mode reads data.json, dedupes Thai strings, checks an optional audio
+manifest, and reports the estimated cost for the selected ElevenLabs voice/model.
+Generate mode is guarded by explicit paid-API confirmation and a character cap.
 """
 
 from __future__ import annotations
@@ -12,10 +12,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from urllib import error, parse, request
 from zoneinfo import ZoneInfo
 
 
@@ -25,10 +27,12 @@ DEFAULT_MODEL_ID = "eleven_v3"
 DEFAULT_LANGUAGE_CODE = "th"
 DEFAULT_OUTPUT_FORMAT = "mp3_44100_128"
 DEFAULT_AUDIO_PREFIX = "audio/jessica-v1"
+DEFAULT_OUT_DIR = Path("out")
 DEFAULT_USD_PER_1K_CHARS = 0.10
 DEFAULT_TWD_RATE = 31.835
 CREATOR_CREDITS = 121_000
 TAIPEI = ZoneInfo("Asia/Taipei")
+ELEVENLABS_TTS_ENDPOINT = "https://api.elevenlabs.io/v1/text-to-speech"
 
 
 @dataclass(frozen=True)
@@ -68,6 +72,10 @@ def audio_key(text: str, spec: AudioSpec) -> str:
 
 def audio_path(key: str, spec: AudioSpec) -> str:
     return f"{spec.audio_prefix.rstrip('/')}/{key}.mp3"
+
+
+def local_audio_path(key: str, spec: AudioSpec, out_dir: Path) -> Path:
+    return out_dir / audio_path(key, spec)
 
 
 def load_data(path: Path) -> dict:
@@ -153,6 +161,54 @@ def manifest_keys(path: Path) -> set[str]:
     return keys
 
 
+def load_manifest(path: Path, spec: AudioSpec) -> dict:
+    if not path.exists():
+        return {
+            "version": 1,
+            "generated_at": None,
+            "spec": manifest_spec(spec),
+            "items": {},
+        }
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"manifest is not valid JSON: {path} ({exc})")
+
+    if not isinstance(data, dict):
+        raise SystemExit(f"manifest root must be a JSON object: {path}")
+
+    data.setdefault("version", 1)
+    data.setdefault("spec", manifest_spec(spec))
+    data.setdefault("items", {})
+    if not isinstance(data["items"], dict):
+        raise SystemExit(f"manifest items must be a JSON object: {path}")
+    return data
+
+
+def manifest_spec(spec: AudioSpec) -> dict:
+    return {
+        "provider": "elevenlabs",
+        "voice_name": spec.voice_name,
+        "voice_id": spec.voice_id,
+        "model_id": spec.model_id,
+        "language_code": spec.language_code,
+        "output_format": spec.output_format,
+        "audio_prefix": spec.audio_prefix,
+    }
+
+
+def write_manifest(path: Path, manifest: dict) -> None:
+    path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def now_taipei_iso() -> str:
+    return datetime.now(TAIPEI).isoformat(timespec="seconds")
+
+
 def build_dry_run(
     *,
     data_path: Path,
@@ -169,12 +225,13 @@ def build_dry_run(
 ) -> dict:
     keyed_items = [
         {
-            "key": audio_key(item.thai, spec),
-            "path": audio_path(audio_key(item.thai, spec), spec),
+            "key": key,
+            "path": audio_path(key, spec),
             "item": item,
             "chars": text_len(item.thai),
         }
         for item in items
+        for key in [audio_key(item.thai, spec)]
     ]
     missing = [entry for entry in keyed_items if entry["key"] not in existing_keys]
     missing_chars = sum(int(entry["chars"]) for entry in missing)
@@ -238,6 +295,127 @@ def taipei_time_from_unix(value: object) -> str:
     return datetime.fromtimestamp(timestamp, TAIPEI).strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
+def select_for_generation(missing: list[dict], limit: int | None, max_chars: int) -> tuple[list[dict], int, bool]:
+    selected: list[dict] = []
+    used_chars = 0
+    hit_cap = False
+
+    for entry in missing:
+        if limit is not None and len(selected) >= limit:
+            break
+
+        entry_chars = int(entry["chars"])
+        if max_chars >= 0 and used_chars + entry_chars > max_chars:
+            hit_cap = True
+            break
+
+        selected.append(entry)
+        used_chars += entry_chars
+
+    return selected, used_chars, hit_cap
+
+
+def call_elevenlabs_tts(text: str, spec: AudioSpec, api_key: str) -> bytes:
+    endpoint = f"{ELEVENLABS_TTS_ENDPOINT}/{parse.quote(spec.voice_id)}"
+    url = f"{endpoint}?output_format={parse.quote(spec.output_format)}"
+    payload = json.dumps(
+        {
+            "text": text,
+            "model_id": spec.model_id,
+            "language_code": spec.language_code,
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+    req = request.Request(
+        url,
+        data=payload,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "audio/mpeg",
+            "xi-api-key": api_key,
+        },
+    )
+    try:
+        with request.urlopen(req, timeout=90) as resp:
+            return resp.read()
+    except error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"ElevenLabs HTTP {exc.code}: {detail}") from exc
+    except error.URLError as exc:
+        raise RuntimeError(f"ElevenLabs request failed: {exc}") from exc
+
+
+def write_audio_file(path: Path, audio: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_bytes(audio)
+    tmp_path.replace(path)
+
+
+def generate_audio(dry_run: dict, spec: AudioSpec, args: argparse.Namespace) -> int:
+    if not args.confirm_paid_api:
+        print("ERROR: --generate requires --confirm-paid-api.", file=sys.stderr)
+        return 2
+
+    if args.max_chars is None:
+        print("ERROR: --generate requires --max-chars to cap paid API usage.", file=sys.stderr)
+        return 2
+
+    missing = dry_run["missing"]
+    limit = args.limit if args.limit is not None else None
+    selected, selected_chars, hit_cap = select_for_generation(missing, limit, args.max_chars)
+
+    print("ElevenLabs Thai audio generation")
+    print("=" * 36)
+    print(f"Selected files: {len(selected):,}")
+    print(f"Selected chars: {selected_chars:,}")
+    print(f"Max chars: {args.max_chars:,}")
+    if limit is not None:
+        print(f"Limit: {limit:,}")
+    if hit_cap:
+        print("Stopped at max char cap before selecting all missing items.")
+
+    if not selected:
+        print("Nothing selected; no API calls made.")
+        return 0
+
+    api_key = os.environ.get("ELEVENLABS_API_KEY")
+    if not api_key:
+        print("ERROR: ELEVENLABS_API_KEY is required for --generate.", file=sys.stderr)
+        return 2
+
+    manifest = load_manifest(args.manifest, spec)
+    manifest["spec"] = manifest_spec(spec)
+    manifest["generated_at"] = now_taipei_iso()
+    items = manifest["items"]
+
+    for index, entry in enumerate(selected, start=1):
+        key = entry["key"]
+        item: ThaiItem = entry["item"]
+        rel_path = entry["path"]
+        file_path = local_audio_path(key, spec, args.out_dir)
+        if file_path.exists():
+            print(f"[{index}/{len(selected)}] skip existing file {rel_path}")
+        else:
+            print(f"[{index}/{len(selected)}] generate {rel_path} ({entry['chars']} chars)")
+            audio = call_elevenlabs_tts(item.thai, spec, api_key)
+            write_audio_file(file_path, audio)
+
+        items[key] = {
+            "path": rel_path,
+            "chars": entry["chars"],
+            "first_lesson": item.lesson,
+            "thai": item.thai,
+            "generated_at": now_taipei_iso(),
+        }
+        write_manifest(args.manifest, manifest)
+
+    print(f"Updated manifest: {args.manifest}")
+    print(f"Local audio root: {args.out_dir}")
+    return 0
+
+
 def print_report(
     dry_run: dict,
     show_examples: int,
@@ -287,8 +465,8 @@ def print_report(
         print("  WARNING: Creator credits are not enough for this run without top-up or batching.")
     print()
     print("Safety")
-    print("- This command did not call ElevenLabs.")
-    print("- This command did not write MP3 files.")
+    print("- Dry-run did not call ElevenLabs.")
+    print("- Dry-run did not write MP3 files.")
     print("- Free plan cannot use this Voice Library voice through the API; paid plan is required for generation.")
 
     if show_examples > 0 and missing:
@@ -316,9 +494,12 @@ def json_ready(value: object) -> object:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Plan ElevenLabs baked Thai MP3 generation.")
-    parser.add_argument("--dry-run", action="store_true", help="Report missing audio and cost. Required in this version.")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", action="store_true", help="Report missing audio and cost.")
+    mode.add_argument("--generate", action="store_true", help="Generate missing audio through ElevenLabs.")
     parser.add_argument("--data", default="data.json", type=Path, help="Path to thai-review data.json.")
     parser.add_argument("--manifest", default="audio-manifest.json", type=Path, help="Path to audio manifest JSON.")
+    parser.add_argument("--out-dir", default=DEFAULT_OUT_DIR, type=Path, help="Local root for generated audio files.")
     parser.add_argument("--voice-name", default=DEFAULT_VOICE_NAME)
     parser.add_argument("--voice-id", default=DEFAULT_VOICE_ID)
     parser.add_argument("--model-id", default=DEFAULT_MODEL_ID)
@@ -329,13 +510,25 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--twd-rate", default=DEFAULT_TWD_RATE, type=float)
     parser.add_argument("--show-examples", default=5, type=int)
     parser.add_argument("--json", action="store_true", help="Print a machine-readable summary without the full missing list.")
+    parser.add_argument("--limit", type=int, help="Maximum number of missing items to generate.")
+    parser.add_argument("--max-chars", type=int, help="Maximum paid characters allowed for this generate run.")
+    parser.add_argument("--confirm-paid-api", action="store_true", help="Required with --generate to acknowledge paid API usage.")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
-    if not args.dry_run:
-        print("ERROR: this version only supports --dry-run and never generates audio.", file=sys.stderr)
+    if not args.dry_run and not args.generate:
+        print("ERROR: choose --dry-run or --generate.", file=sys.stderr)
+        return 2
+    if args.generate and args.json:
+        print("ERROR: --json is only supported with --dry-run.", file=sys.stderr)
+        return 2
+    if args.limit is not None and args.limit < 0:
+        print("ERROR: --limit must be >= 0.", file=sys.stderr)
+        return 2
+    if args.max_chars is not None and args.max_chars < 0:
+        print("ERROR: --max-chars must be >= 0.", file=sys.stderr)
         return 2
 
     data_path = args.data
@@ -366,8 +559,10 @@ def main(argv: list[str]) -> int:
     )
     if args.json:
         print(json.dumps(json_ready(dry_run), ensure_ascii=False, indent=2))
-    else:
+    elif args.dry_run:
         print_report(dry_run=dry_run, show_examples=max(args.show_examples, 0))
+    else:
+        return generate_audio(dry_run, spec, args)
     return 0
 
 
