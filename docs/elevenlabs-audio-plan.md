@@ -89,7 +89,35 @@ ElevenLabs 生成的 MP3 視為原始母帶，先維持預設速度。網站端�
 
 ## 每週新增課程流程
 
-新增課程資料進 `data.json` 後，先 dry-run：
+新增課程資料進 `data.json` 後，先跑一鍵腳本的安全 dry-run：
+
+```bash
+scripts/update-audio-deploy.sh
+```
+
+這只會檢查：
+
+- 最新 `data.json`
+- 目前 `out/site-preview/audio-manifest.json`
+- 缺幾個 MP3
+- 缺多少字
+- 預估 ElevenLabs 成本
+
+如果 missing 是 `0`，不用補音檔；只要需要更新網站 app shell 或資料，就部署：
+
+```bash
+scripts/update-audio-deploy.sh --deploy
+```
+
+如果有缺檔，確認成本後再補音檔並部署：
+
+```bash
+scripts/update-audio-deploy.sh --generate --confirm-paid-api --deploy
+```
+
+腳本會從環境變數 `ELEVENLABS_API_KEY` 讀 key；沒有環境變數時，會嘗試從 macOS Keychain 的 `elevenlabs-thai-review-sample` 讀取。
+
+手動流程如下，主要當除錯備案。先 dry-run：
 
 ```bash
 python3 scripts/gen-audio.py --dry-run --manifest out/site-preview/audio-manifest.json
