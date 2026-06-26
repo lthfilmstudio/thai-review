@@ -51,6 +51,19 @@ ElevenLabs 生成的 MP3 視為原始母帶，先維持預設速度。網站端�
 
 這代表網站可以先局部部署 MP3，不需要一次全站到位；還沒生成的句子會照舊有聲音。
 
+## 第一批部署紀錄
+
+2026-06-26 已先生成並部署第一批：
+
+- 生成上限：`10,000` 字
+- 實際生成：`1,042` 個 MP3
+- 本機輸出：`out/site-preview/`
+- Cloudflare Pages 部署目錄：`out/pages-deploy/`
+- 部署指令：`npx wrangler pages deploy out/pages-deploy --project-name thai-review --branch main`
+- Production deployment：`https://55a55f65.thai-review.pages.dev`
+
+這批音檔在 `out/`，不進 git。部署前要把網站檔案、`audio-manifest.json`、`audio/` 整成同一個 Pages 目錄；若前端檔案有改，記得同步提升 `sw.js` 的 cache 版本。
+
 ## Dry-run
 
 Dry-run 完全不呼叫 ElevenLabs：
