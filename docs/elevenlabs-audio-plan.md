@@ -74,7 +74,7 @@ ElevenLabs 生成的 MP3 視為原始母帶，先維持預設速度。網站端�
 - 本機輸出：`out/site-preview/`
 - Cloudflare Pages 部署目錄：`out/pages-deploy/`
 - 部署包大小：約 `260 MB`
-- Production deployment：`https://129674a0.thai-review.pages.dev`
+- Production deployment：每次部署會產生新的 Pages preview URL；最新 URL 以 `npx wrangler pages deployment list --project-name thai-review` 為準。
 - Manifest generated_at：`2026-06-26T19:05:22+08:00`
 
 驗證結果：
