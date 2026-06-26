@@ -137,18 +137,20 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
   max-width: 100%;
 }
 
 .thai-main {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Noto Sans Thai', 'Sarabun', sans-serif;
   font-size: clamp(28px, 6vw, 48px);
   font-weight: 500;
   color: var(--text);
-  line-height: 1.15;
+  line-height: 1.38;
   text-align: center;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: break-word;
+  padding-block: 0.14em;
 }
 
 /* 字卡反面（比正面略小，配其他資訊） */
@@ -162,8 +164,11 @@
   font-size: clamp(14px, 3vw, 22px);
   font-weight: 400;
   color: var(--text-soft);
-  line-height: 1.15;
+  line-height: 1.35;
   text-align: center;
+  word-break: normal;
+  overflow-wrap: break-word;
+  padding-block: 0.04em;
 }
 
 .karaoke {
@@ -345,7 +350,10 @@
   font-weight: 500;
   color: var(--text);
   cursor: pointer;
-  line-height: 1.4;
+  line-height: 1.6;
+  padding-block: 0.05em;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .sent-thai:hover {
@@ -816,8 +824,10 @@
   font-family: 'Noto Sans Thai', sans-serif;
   font-size: clamp(19px, 4vw, 24px);
   color: var(--text);
-  line-height: 1.25;
-  word-break: break-word;
+  line-height: 1.45;
+  word-break: normal;
+  overflow-wrap: break-word;
+  padding-block: 0.04em;
 }
 
 .rl-thai.rl-secondary {
@@ -1263,9 +1273,13 @@
 }
 
 .search-item .si-thai {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Noto Sans Thai', 'Sarabun', sans-serif;
   font-size: 17px;
   color: var(--text);
+  line-height: 1.45;
+  word-break: normal;
+  overflow-wrap: break-word;
+  padding-block: 0.04em;
 }
 
 .search-item .si-karaoke {
@@ -1588,7 +1602,10 @@
   font-weight: 500;
   color: var(--text);
   cursor: pointer;
-  line-height: 1.5;
+  line-height: 1.6;
+  padding-block: 0.05em;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .dlg-thai:hover { color: rgb(196, 142, 220); }
 
