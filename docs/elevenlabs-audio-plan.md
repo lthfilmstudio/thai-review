@@ -17,7 +17,7 @@ Nalin 已用 ElevenLabs 網頁試聽確認：泰文要選 Eleven v3 才能正確
 
 ## 成本基準
 
-目前 `data.json` 盤點（資料生成時間：`2026-06-26 16:17:44 CST`）：
+目前 `data.json` 盤點（資料生成時間：`2026-06-26 19:27:55 CST`）：
 
 - 課程：39 堂
 - 泰文卡片：11,694 張
@@ -63,6 +63,59 @@ ElevenLabs 生成的 MP3 視為原始母帶，先維持預設速度。網站端�
 - Production deployment：`https://55a55f65.thai-review.pages.dev`
 
 這批音檔在 `out/`，不進 git。部署前要把網站檔案、`audio-manifest.json`、`audio/` 整成同一個 Pages 目錄；若前端檔案有改，記得同步提升 `sw.js` 的 cache 版本。
+
+## 全站部署紀錄
+
+2026-06-26 已完成全站泰文 MP3 生成與部署：
+
+- 實際生成：`8,566` 個 MP3
+- 實際字元：`110,059`
+- 實際成本估算：約 `US$11.01`
+- 本機輸出：`out/site-preview/`
+- Cloudflare Pages 部署目錄：`out/pages-deploy/`
+- 部署包大小：約 `260 MB`
+- Production deployment：`https://129674a0.thai-review.pages.dev`
+- Manifest generated_at：`2026-06-26T19:05:22+08:00`
+
+驗證結果：
+
+- `python3 scripts/gen-audio.py --dry-run --manifest out/site-preview/audio-manifest.json`
+- Missing audio files：`0`
+- Missing chars to generate：`0`
+- 線上 manifest：`8,566` 筆、`110,059` 字
+- 線上 MP3：`audio/mpeg` HTTP `200`
+- 線上 `data.json`：`2026-06-26 19:27:55 CST`
+- `node --test tests/autoplay.test.mjs`：`5/5` 通過
+
+## 每週新增課程流程
+
+新增課程資料進 `data.json` 後，先 dry-run：
+
+```bash
+python3 scripts/gen-audio.py --dry-run --manifest out/site-preview/audio-manifest.json
+```
+
+如果有缺檔，再依 dry-run 回報的缺字數設定 `--max-chars` 續跑：
+
+```bash
+ELEVENLABS_API_KEY=... python3 scripts/gen-audio.py \
+  --generate \
+  --confirm-paid-api \
+  --max-chars <dry-run-missing-chars> \
+  --out-dir out/site-preview \
+  --manifest out/site-preview/audio-manifest.json
+```
+
+續跑只會補 manifest 裡沒有的 key，不會重做既有 MP3。每新增 1 課粗估約 `US$0.28`，實際以 dry-run 的 `Missing chars to generate` 為準。
+
+生成後重新打包並部署：
+
+```bash
+rm -rf out/pages-deploy
+mkdir -p out/pages-deploy
+rsync -aL --delete out/site-preview/ out/pages-deploy/
+npx wrangler pages deploy out/pages-deploy --project-name thai-review --branch main
+```
 
 ## Dry-run
 
