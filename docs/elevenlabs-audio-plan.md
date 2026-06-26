@@ -9,25 +9,47 @@
 - Output：`mp3_44100_128`
 - 語言：`th`
 - 預設音檔路徑：`audio/jessica-v1/<key>.mp3`
+- 生成語速：ElevenLabs 預設速度，不在 API 端調整。
+- 播放語速：網站播放器端用 `playbackRate` 調整，不重新生成 MP3、不增加 ElevenLabs 成本。
+- 音高：先不調整，避免影響泰語聲調判斷。
 
 Nalin 已用 ElevenLabs 網頁試聽確認：泰文要選 Eleven v3 才能正確發音。
 
 ## 成本基準
 
-目前 `data.json` 盤點：
+目前 `data.json` 盤點（資料生成時間：`2026-06-26 16:17:44 CST`）：
 
 - 課程：39 堂
 - 泰文卡片：11,694 張
-- 去重後泰文字串：8,567 筆
-- 去重後泰文字元：110,067
+- 未去重泰文字元：136,246
+- 去重後泰文字串：8,566 筆
+- 去重後泰文字元：110,059
+- 去重節省：26,187 字，約 `US$2.62`
 
 用 ElevenLabs API pricing `US$0.10 / 1,000 characters` 估算：
 
 - 全站泰文去重一次：約 `US$11.01`
 - 加 10% 緩衝：約 `US$12.11`
 - 每新增 1 課粗估：約 `US$0.28`
+- 若使用 Creator `121,000` credits，全站生成後約剩 `10,941` credits。
 
 注意：Free plan 不能透過 API 使用 Voice Library voices。正式生成需要付費方案或可用的付費 API 權限。
+
+## 語速策略
+
+ElevenLabs 生成的 MP3 視為原始母帶，先維持預設速度。網站端播放時可提供速度選項，例如 `0.6×`、`0.8×`、`1×`、`1.2×`；這只改瀏覽器播放速度，不會改檔案，也不會重新燒 credits。
+
+中文提示固定正常語速。泰文老師音才套用使用者選的播放速度。
+
+## 網站播放策略
+
+前端播放泰文時會優先嘗試載入網站根目錄的 `audio-manifest.json`：
+
+1. 如果 manifest 裡有相同泰文文字，播放對應的靜態 MP3。
+2. 如果 manifest 不存在、沒有命中、或靜態 MP3 播放失敗，fallback 回原本 `thai-tts-proxy` GCP TTS。
+3. 如果 Worker 也失敗，再 fallback 到瀏覽器內建 `speechSynthesis`。
+
+這代表網站可以先局部部署 MP3，不需要一次全站到位；還沒生成的句子會照舊有聲音。
 
 ## Dry-run
 

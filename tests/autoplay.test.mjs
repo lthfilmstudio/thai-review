@@ -25,7 +25,11 @@ function element(id) {
   return domElements.get(id);
 }
 
-globalThis.document = { getElementById: element };
+globalThis.document = { baseURI: 'http://example.test/', getElementById: element };
+Object.defineProperty(globalThis, 'location', {
+  configurable: true,
+  value: { href: 'http://example.test/' },
+});
 Object.defineProperty(globalThis, 'navigator', {
   configurable: true,
   value: {},
@@ -42,7 +46,24 @@ let blobCounter = 0;
 URL.createObjectURL = () => `blob:test-${++blobCounter}`;
 
 const requests = [];
-globalThis.fetch = async (_url, init) => {
+let audioManifest = {
+  version: 1,
+  items: {
+    baked1: {
+      thai: 'เสียงอบแล้ว',
+      path: 'audio/jessica-v1/baked1.mp3',
+    },
+  },
+};
+globalThis.fetch = async (url, init) => {
+  if (String(url).endsWith('audio-manifest.json')) {
+    if (!audioManifest) return new Response('', { status: 404 });
+    return new Response(JSON.stringify(audioManifest), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   requests.push(JSON.parse(init.body));
   return new Response(JSON.stringify({ audio: 'YXVkaW8=' }), {
     status: 200,
@@ -99,6 +120,16 @@ function resetRuntime() {
   state.settings.repeat = 1;
   state.settings.gap = 0;
 }
+
+test('baked Thai audio plays from manifest without worker TTS', async () => {
+  resetRuntime();
+
+  const durationMs = await speakWithPromise({ thai: 'เสียงอบแล้ว' });
+
+  assert.equal(Math.round(durationMs), 2000);
+  assert.deepEqual(requests, []);
+  assert.deepEqual(playedUrls, ['http://example.test/audio/jessica-v1/baked1.mp3']);
+});
 
 test('old saved 2-second gap migrates to auto once', () => {
   resetRuntime();

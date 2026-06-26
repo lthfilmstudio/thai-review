@@ -2,7 +2,7 @@
    手機鎖屏背景播放靠 Media Session API + 一條極短的靜音 audio loop
    （index.html 裡的 #silentLoop）保持 audio session active。 */
 
-import { state, filteredCards } from './state.js';
+import { state, filteredCards, saveState } from './state.js';
 import {
   CHINESE_VOICE,
   cancelSpeech,
@@ -15,6 +15,7 @@ import { escapeHtml } from './ui.js';
 let onAdvance = null;   // 切卡後的 callback（由 app.js 注入，用來重繪 UI）
 let silentAudio = null;
 let runVersion = 0;
+const PLAYBACK_RATES = [0.6, 0.8, 1, 1.2];
 
 export function renderListenMode(el, cards, advanceCb) {
   onAdvance = advanceCb;
@@ -49,6 +50,14 @@ export function renderListenMode(el, cards, advanceCb) {
       </div>
       <div class="listen-settings">
         <div class="setting-row">
+          <div class="setting-label">泰文語速</div>
+          <div class="listen-rate-seg" id="listenRateSeg">
+            ${PLAYBACK_RATES.map(rate => `
+              <button class="listen-rate-btn ${state.settings.rate === rate ? 'active' : ''}" data-rate="${rate}">${rate}×</button>
+            `).join('')}
+          </div>
+        </div>
+        <div class="setting-row">
           <div class="setting-label">重複次數</div>
           <div style="font-size:12px;font-weight:500">${rep}×</div>
         </div>
@@ -63,6 +72,15 @@ export function renderListenMode(el, cards, advanceCb) {
   document.getElementById('lPlay').addEventListener('click', toggleListen);
   document.getElementById('lPrev').addEventListener('click', () => { stopListen(); prevInList(); });
   document.getElementById('lNext').addEventListener('click', () => { stopListen(); nextInList(); });
+  document.getElementById('listenRateSeg')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-rate]');
+    if (!btn) return;
+    state.settings.rate = Number(btn.dataset.rate);
+    saveState();
+    document.querySelectorAll('#listenRateSeg .listen-rate-btn').forEach(rateBtn => {
+      rateBtn.classList.toggle('active', rateBtn === btn);
+    });
+  });
 
   updateMediaSessionMetadata(card);
 }

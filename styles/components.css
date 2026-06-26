@@ -981,6 +981,28 @@
   color: var(--text-soft);
 }
 
+.listen-rate-seg {
+  display: flex;
+  gap: 2px;
+  background: var(--surface-deep);
+  border-radius: 7px;
+  padding: 2px;
+}
+
+.listen-rate-btn {
+  min-width: 36px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-soft);
+  transition: all 0.12s;
+}
+
+.listen-rate-btn.active {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
 /* ===== Segmented control ===== */
 .seg {
   display: flex;
