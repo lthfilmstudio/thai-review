@@ -21,6 +21,10 @@ function pickVoice() {
   return state.settings?.voice || DEFAULT_VOICE;
 }
 
+function pickVoiceProvider() {
+  return state.settings?.voiceProvider === 'gcp' ? 'gcp' : 'elevenlabs';
+}
+
 function pickRate() {
   return state.settings?.rate || 1;
 }
@@ -121,7 +125,7 @@ export function cancelSpeech() {
   playback?.resolve?.(0);
 }
 
-export function speakTextWithPromise({ text, voice, lang, rate = 1 }) {
+export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked = true }) {
   cancelSpeech();
   const generation = playbackGeneration;
 
@@ -183,7 +187,8 @@ export function speakTextWithPromise({ text, voice, lang, rate = 1 }) {
       });
     };
 
-    findBakedAudioUrl(trimmed, lang).then(url => {
+    const baked = preferBaked ? findBakedAudioUrl(trimmed, lang) : Promise.resolve(null);
+    baked.then(url => {
       playAudio(url, playWorkerAudio);
     });
   });
@@ -201,6 +206,7 @@ export function speakWithPromise(card) {
     voice: pickVoice(),
     lang: 'th-TH',
     rate: pickRate(),
+    preferBaked: pickVoiceProvider() === 'elevenlabs',
   });
 }
 

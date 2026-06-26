@@ -676,7 +676,7 @@
 
 .list-filter-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   flex-shrink: 0;
 }
@@ -706,6 +706,54 @@
 }
 
 .list-filter.active strong { color: var(--gold); }
+
+.lesson-picker {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 0 2px 2px;
+  flex-shrink: 0;
+  scrollbar-width: thin;
+}
+
+.lesson-picker-btn {
+  flex: 0 0 auto;
+  min-width: 82px;
+  max-width: 132px;
+  height: 38px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  border: 1px solid var(--hair);
+  color: var(--text-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.lesson-picker-btn span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lesson-picker-btn strong {
+  color: var(--text-mute);
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.lesson-picker-btn.active {
+  background: var(--gold-soft);
+  border-color: rgba(196, 165, 116, 0.3);
+  color: var(--gold);
+}
+
+.lesson-picker-btn.active strong { color: var(--gold); }
 
 .review-list {
   flex: 1;
@@ -810,6 +858,20 @@
 .list-empty {
   flex: 1;
   min-height: 260px;
+}
+
+@media (max-width: 640px) {
+  .list-filter-row {
+    grid-template-columns: repeat(5, minmax(54px, 1fr));
+  }
+  .list-filter {
+    padding: 8px 7px;
+    gap: 4px;
+    font-size: 11px;
+  }
+  .list-filter strong {
+    font-size: 10px;
+  }
 }
 
 /* ===== Listening mode ===== */

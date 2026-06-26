@@ -227,7 +227,9 @@ async function selectMode(m) {
 }
 
 async function selectListMode(order) {
+  const enteringLists = state.mode !== 'lists';
   state.listOrder = order === 'zh' ? 'zh' : 'thai';
+  if (enteringLists) state.listFilter = 'all';
   await selectMode('lists');
   closeDrawer();
 }
@@ -474,7 +476,7 @@ async function init() {
   wireSegClick('#segGap', b => {
     state.settings.gap = b.dataset.gap === 'auto' ? 'auto' : Number(b.dataset.gap);
   });
-  wireSegClick('#segVoice', b => { state.settings.voice = b.dataset.voice; });
+  wireSegClick('#segVoiceProvider', b => { state.settings.voiceProvider = b.dataset.voiceProvider; });
   wireSegClick('#segTheme', b => {
     state.settings.theme = b.dataset.theme;
     applyTheme();
@@ -687,6 +689,14 @@ async function init() {
     if (listFilter) {
       e.stopPropagation();
       state.listFilter = listFilter.dataset.listFilter;
+      saveState();
+      renderContent(rerender);
+      return;
+    }
+    const listLesson = e.target.closest('[data-list-lesson]');
+    if (listLesson) {
+      e.stopPropagation();
+      state.listLessonId = listLesson.dataset.listLesson;
       saveState();
       renderContent(rerender);
       return;

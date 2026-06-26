@@ -109,6 +109,7 @@ stateRef = state;
 
 function resetRuntime() {
   requests.length = 0;
+  blobCounter = 0;
   playedUrls = [];
   pausedUrls = [];
   autoEnd = true;
@@ -116,6 +117,7 @@ function resetRuntime() {
   state.listen.playing = false;
   state.listen.repeatCount = 0;
   state.cardIndex = 0;
+  state.settings.voiceProvider = 'elevenlabs';
   state.settings.rate = 1;
   state.settings.repeat = 1;
   state.settings.gap = 0;
@@ -129,6 +131,19 @@ test('baked Thai audio plays from manifest without worker TTS', async () => {
   assert.equal(Math.round(durationMs), 2000);
   assert.deepEqual(requests, []);
   assert.deepEqual(playedUrls, ['http://example.test/audio/jessica-v1/baked1.mp3']);
+});
+
+test('GCP provider skips baked Thai audio and uses worker TTS', async () => {
+  resetRuntime();
+  state.settings.voiceProvider = 'gcp';
+
+  const durationMs = await speakWithPromise({ thai: 'เสียงอบแล้ว' });
+
+  assert.equal(Math.round(durationMs), 2000);
+  assert.deepEqual(requests.map(item => [item.text, item.voice]), [
+    ['เสียงอบแล้ว', 'th-TH-Neural2-C'],
+  ]);
+  assert.deepEqual(playedUrls, ['blob:test-1']);
 });
 
 test('old saved 2-second gap migrates to auto once', () => {
@@ -182,5 +197,5 @@ test('a card plays Chinese once, then Thai for every repetition', async () => {
     ['你好', 'cmn-TW-Wavenet-A'],
     ['สวัสดี', 'th-TH-Neural2-C'],
   ]);
-  assert.deepEqual(playedUrls, ['blob:test-3', 'blob:test-4', 'blob:test-4']);
+  assert.deepEqual(playedUrls, ['blob:test-1', 'blob:test-2', 'blob:test-2']);
 });

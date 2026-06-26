@@ -145,7 +145,8 @@ export const state = {
   edits: {},                 // { "lessonId:thai": { thai, karaoke, zh, note } }，只存在本機
   collapsed: {},             // { "初-2": true } → 初級 2 章節收合中
   searchQuery: '',           // 搜尋虛擬課程用（不存 localStorage）
-  listFilter: 'fav',         // 'fav' | 'bad' | 'ok' | 'good'
+  listFilter: 'all',         // 'all' | 'fav' | 'bad' | 'ok' | 'good'
+  listLessonId: null,        // 全部清單目前選中的課堂
   listOrder: 'thai',         // 'thai' | 'zh'，清單卡片主要顯示語言
   settings: {
     sheetInput: '',          // sheet URL / ID / csv URL
@@ -153,6 +154,7 @@ export const state = {
     repeat: 3,
     gap: 'auto',             // number | 'auto'
     theme: 'dark',           // 'auto' | 'dark' | 'light'（預設鎖深色）
+    voiceProvider: 'elevenlabs', // 'elevenlabs' | 'gcp'
     voice: 'th-TH-Neural2-C',// GCP TTS voice id（thai-tts-proxy 走 Neural2 / Chirp3-HD）
     dialogSource: 'lesson',  // 'lesson' | 'fav' | 'bad' | 'ok' — 對話模式抽字來源
   },
@@ -181,7 +183,8 @@ export function loadState() {
     state.currentLessonId = s.currentLessonId || null;
     state.mode = s.mode || 'card';
     state.cardIndex = typeof s.cardIndex === 'number' ? s.cardIndex : 0;
-    state.listFilter = s.listFilter || 'fav';
+    state.listFilter = s.listFilter || 'all';
+    state.listLessonId = s.listLessonId || null;
     state.listOrder = s.listOrder || 'thai';
     // 有 migrate 到資料的話立刻寫回，避免 lazy 遺留舊格式
     if (migrated || settingsMigrated) saveState();
@@ -227,6 +230,7 @@ export function saveState() {
     mode: state.mode,
     cardIndex: state.cardIndex,
     listFilter: state.listFilter,
+    listLessonId: state.listLessonId,
     listOrder: state.listOrder,
   }));
 }

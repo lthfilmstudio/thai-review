@@ -2,7 +2,7 @@
 
 import {
   state, currentLesson, filteredCards, favoriteCount, saveState, isSrsActive,
-  allCardsWithLessonId, isFavorite, gradeOf,
+  allCardsWithLessonId, applyCardEdit, isFavorite, gradeOf,
 } from './state.js';
 import { renderCardMode } from './card.js';
 import { renderListenMode, stopListen } from './listen.js';
@@ -206,7 +206,7 @@ export function renderStats() {
   const btn = document.getElementById('btnFavPanel');
   if (btn) btn.classList.toggle('active', state.currentLessonId === '__FAV__');
   document.querySelector('[data-mobile-fav-button]')?.classList.toggle('active', state.currentLessonId === '__FAV__');
-  const listedCount = allCardsWithLessonId().filter(c => isFavorite(c) || gradeOf(c)).length;
+  const listedCount = allCardsWithLessonId().length;
   document.querySelectorAll('#listThaiCount,#listZhCount').forEach(n => {
     n.textContent = String(listedCount);
   });
@@ -225,6 +225,7 @@ function listTitleFor(card, lessonMap) {
 }
 
 function cardsForList(kind, cards) {
+  if (kind === 'all') return cards;
   if (kind === 'fav') return cards.filter(c => isFavorite(c));
   return cards.filter(c => gradeOf(c) === kind);
 }
@@ -258,20 +259,70 @@ function renderListCards(cards, lessonMap, order = 'thai') {
   `).join('') + `</div>`;
 }
 
+function displayLessonTitle(title) {
+  const { group, display } = parseGroup(title);
+  return group === '其他' ? display : `${GROUP_LABEL[group]} ${display}`;
+}
+
+function realLessonsWithCards() {
+  return state.lessons.filter(l => !l.id.startsWith('__') && l.cards?.length);
+}
+
+function selectedListLesson(lessons) {
+  const currentReal = lessons.find(l => l.id === state.currentLessonId);
+  if (!state.listLessonId && currentReal) state.listLessonId = currentReal.id;
+  let lesson = lessons.find(l => l.id === state.listLessonId);
+  if (!lesson) {
+    lesson = currentReal || lessons[0] || null;
+    state.listLessonId = lesson?.id || null;
+  }
+  return lesson;
+}
+
+function renderLessonPicker(lessons, selectedId) {
+  if (!lessons.length) return '';
+  return `<div class="lesson-picker" aria-label="課堂">
+    ${lessons.map(l => `
+      <button class="lesson-picker-btn${l.id === selectedId ? ' active' : ''}" data-list-lesson="${escapeHtml(l.id)}">
+        <span>${escapeHtml(displayLessonTitle(l.title))}</span>
+        <strong>${l.cards.length}</strong>
+      </button>
+    `).join('')}
+  </div>`;
+}
+
+function renderAllLessonList(lesson, order) {
+  if (!lesson) {
+    return `<div class="empty list-empty">
+      <div class="empty-icon">✦</div>
+      <div class="empty-title">還沒有課堂內容</div>
+      <div class="empty-sub">重新同步 Sheet 後再試一次。</div>
+    </div>`;
+  }
+  const lessonMap = new Map([[lesson.id, lesson.title]]);
+  const cards = lesson.cards.map(c => applyCardEdit(c, lesson.id));
+  return renderListCards(cards, lessonMap, order);
+}
+
 function renderListsMode(el) {
   const all = allCardsWithLessonId();
   const lessonMap = new Map(state.lessons.map(l => [l.id, l.title]));
+  const realLessons = realLessonsWithCards();
+  const selectedLesson = selectedListLesson(realLessons);
   const filters = [
+    { id: 'all', label: '全部', count: all.length },
     { id: 'fav', label: '收藏', count: cardsForList('fav', all).length },
     { id: 'bad', label: '差', count: cardsForList('bad', all).length },
     { id: 'ok', label: '可以', count: cardsForList('ok', all).length },
     { id: 'good', label: '熟', count: cardsForList('good', all).length },
   ];
-  if (!filters.some(f => f.id === state.listFilter)) state.listFilter = 'fav';
+  if (!filters.some(f => f.id === state.listFilter)) state.listFilter = 'all';
   const cards = cardsForList(state.listFilter, all);
   const order = state.listOrder === 'zh' ? 'zh' : 'thai';
   const title = order === 'zh' ? '中文清單' : '泰文清單';
-  const sub = order === 'zh'
+  const sub = state.listFilter === 'all'
+    ? '依照課堂切換，點任一張就回到複習頁。'
+    : order === 'zh'
     ? '中文在前，點任一張就回到複習頁。'
     : '泰文在前，點任一張就回到複習頁。';
 
@@ -290,7 +341,10 @@ function renderListsMode(el) {
           </button>
         `).join('')}
       </div>
-      ${renderListCards(cards, lessonMap, order)}
+      ${state.listFilter === 'all' ? renderLessonPicker(realLessons, selectedLesson?.id) : ''}
+      ${state.listFilter === 'all'
+        ? renderAllLessonList(selectedLesson, order)
+        : renderListCards(cards, lessonMap, order)}
     </div>
   `;
 }
@@ -396,7 +450,7 @@ export function openModal() {
   syncSegActive('#segRate', b => Number(b.dataset.rate) === state.settings.rate);
   syncSegActive('#segRepeat', b => Number(b.dataset.repeat) === state.settings.repeat);
   syncSegActive('#segGap', b => b.dataset.gap === String(state.settings.gap));
-  syncSegActive('#segVoice', b => b.dataset.voice === state.settings.voice);
+  syncSegActive('#segVoiceProvider', b => b.dataset.voiceProvider === (state.settings.voiceProvider || 'elevenlabs'));
   syncSegActive('#segTheme', b => b.dataset.theme === state.settings.theme);
   document.getElementById('modalMask').classList.add('open');
 }

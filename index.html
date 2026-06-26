@@ -159,13 +159,11 @@
 
     <div class="field">
       <label class="field-label">聲音</label>
-      <div class="seg" id="segVoice">
-        <button class="seg-btn active" data-voice="th-TH-Neural2-C">Neural2 女</button>
-        <button class="seg-btn" data-voice="th-TH-Chirp3-HD-Aoede">Chirp3 女</button>
-        <button class="seg-btn" data-voice="th-TH-Chirp3-HD-Charon">Chirp3 男</button>
-        <button class="seg-btn" data-voice="th-TH-Standard-A">Standard 女</button>
+      <div class="seg" id="segVoiceProvider">
+        <button class="seg-btn active" data-voice-provider="elevenlabs">ElevenLabs v3</button>
+        <button class="seg-btn" data-voice-provider="gcp">GCP</button>
       </div>
-      <div class="field-hint">離線或載入失敗時自動退回瀏覽器內建語音。</div>
+      <div class="field-hint">ElevenLabs v3 使用 Jessica 靜態 MP3。GCP 使用線上 TTS，靜態 MP3 載入失敗時也會自動退回 GCP / 瀏覽器內建語音。</div>
     </div>
 
     <div class="field">
