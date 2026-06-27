@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime
@@ -55,6 +56,10 @@ class ThaiItem:
 
 def text_len(text: str) -> int:
     return len(text)
+
+
+def normalize_audio_text(text: str) -> str:
+    return re.sub(r"\s+", "", str(text or "").strip())
 
 
 def audio_key(text: str, spec: AudioSpec) -> str:
@@ -123,9 +128,9 @@ def collect_unique_thai(data: dict) -> tuple[list[ThaiItem], int, int, int]:
     return items, total_cards, total_chars, unique_chars
 
 
-def manifest_keys(path: Path) -> set[str]:
+def manifest_coverage(path: Path) -> tuple[set[str], set[str]]:
     if not path.exists():
-        return set()
+        return set(), set()
 
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -133,6 +138,21 @@ def manifest_keys(path: Path) -> set[str]:
         raise SystemExit(f"manifest is not valid JSON: {path} ({exc})")
 
     keys: set[str] = set()
+    normalized_thai: set[str] = set()
+
+    def add_entry(entry: object, fallback_key: object = None) -> None:
+        if fallback_key:
+            keys.add(str(fallback_key))
+        if isinstance(entry, dict):
+            key = entry.get("key") or entry.get("audio_key") or entry.get("hash")
+            if key:
+                keys.add(str(key))
+            normalized = normalize_audio_text(str(entry.get("thai") or ""))
+            if normalized:
+                normalized_thai.add(normalized)
+        elif isinstance(entry, str):
+            keys.add(entry)
+
     if isinstance(data, dict):
         for field in ("keys", "generated_keys", "audio_keys"):
             value = data.get(field)
@@ -142,22 +162,20 @@ def manifest_keys(path: Path) -> set[str]:
         entries = data.get("entries") or data.get("items") or data.get("audio")
         if isinstance(entries, list):
             for entry in entries:
-                if isinstance(entry, dict):
-                    key = entry.get("key") or entry.get("audio_key") or entry.get("hash")
-                    if key:
-                        keys.add(str(key))
+                add_entry(entry)
         elif isinstance(entries, dict):
-            keys.update(str(key) for key in entries.keys())
+            for key, entry in entries.items():
+                add_entry(entry, key)
 
     elif isinstance(data, list):
         for entry in data:
-            if isinstance(entry, dict):
-                key = entry.get("key") or entry.get("audio_key") or entry.get("hash")
-                if key:
-                    keys.add(str(key))
-            elif isinstance(entry, str):
-                keys.add(entry)
+            add_entry(entry)
 
+    return keys, normalized_thai
+
+
+def manifest_keys(path: Path) -> set[str]:
+    keys, _ = manifest_coverage(path)
     return keys
 
 
@@ -222,7 +240,9 @@ def build_dry_run(
     existing_keys: set[str],
     usd_per_1k_chars: float,
     twd_rate: float,
+    existing_normalized_thai: set[str] | None = None,
 ) -> dict:
+    existing_normalized_thai = existing_normalized_thai or set()
     keyed_items = [
         {
             "key": key,
@@ -233,7 +253,16 @@ def build_dry_run(
         for item in items
         for key in [audio_key(item.thai, spec)]
     ]
-    missing = [entry for entry in keyed_items if entry["key"] not in existing_keys]
+    normalized_reused = [
+        entry for entry in keyed_items
+        if entry["key"] not in existing_keys
+        and normalize_audio_text(entry["item"].thai) in existing_normalized_thai
+    ]
+    missing = [
+        entry for entry in keyed_items
+        if entry["key"] not in existing_keys
+        and normalize_audio_text(entry["item"].thai) not in existing_normalized_thai
+    ]
     missing_chars = sum(int(entry["chars"]) for entry in missing)
     estimated_usd = missing_chars / 1000 * usd_per_1k_chars
     duplicate_saved_chars = total_chars - unique_chars
@@ -262,6 +291,7 @@ def build_dry_run(
             "dedupe_saved_chars": duplicate_saved_chars,
             "dedupe_saved_usd": duplicate_saved_usd,
             "existing_generated_keys": len(existing_keys),
+            "space_normalized_reused_files": len(normalized_reused),
             "missing_audio_files": len(missing),
             "missing_chars_to_generate": missing_chars,
         },
@@ -450,6 +480,8 @@ def print_report(
     if dry_run["manifest_found"]:
         print(f"Manifest: {dry_run['manifest_path']}")
         print(f"- Existing generated keys: {coverage['existing_generated_keys']:,}")
+        if coverage.get("space_normalized_reused_files"):
+            print(f"- Reused after whitespace normalization: {coverage['space_normalized_reused_files']:,}")
     else:
         print(f"Manifest: not found ({dry_run['manifest_path']})")
         print("- Existing generated keys: 0")
@@ -543,7 +575,7 @@ def main(argv: list[str]) -> int:
         audio_prefix=args.audio_prefix,
     )
     items, total_cards, total_chars, unique_chars = collect_unique_thai(data)
-    existing_keys = manifest_keys(manifest_path)
+    existing_keys, existing_normalized_thai = manifest_coverage(manifest_path)
     dry_run = build_dry_run(
         data_path=data_path,
         manifest_path=manifest_path,
@@ -554,6 +586,7 @@ def main(argv: list[str]) -> int:
         total_chars=total_chars,
         unique_chars=unique_chars,
         existing_keys=existing_keys,
+        existing_normalized_thai=existing_normalized_thai,
         usd_per_1k_chars=args.usd_per_1k_chars,
         twd_rate=args.twd_rate,
     )

@@ -17,6 +17,10 @@ let currentPlayback = null;
 let playbackGeneration = 0;
 let audioManifestPromise = null;
 
+function normalizeThaiAudioText(text) {
+  return String(text || '').trim().replace(/\s+/g, '');
+}
+
 function pickVoice() {
   return state.settings?.voice || DEFAULT_VOICE;
 }
@@ -49,7 +53,11 @@ function buildAudioMap(manifest) {
     if (!entry || typeof entry !== 'object') return;
     const thai = String(entry.thai || '').trim();
     const path = String(entry.path || entry.url || '').trim();
-    if (thai && path) map.set(thai, absoluteAudioUrl(path));
+    if (!thai || !path) return;
+    const url = absoluteAudioUrl(path);
+    map.set(thai, url);
+    const normalized = normalizeThaiAudioText(thai);
+    if (normalized && !map.has(normalized)) map.set(normalized, url);
   });
   return map;
 }
@@ -70,7 +78,7 @@ async function findBakedAudioUrl(text, lang) {
   if (bakedAudioCache.has(trimmed)) return bakedAudioCache.get(trimmed);
 
   const manifest = await loadAudioManifest();
-  const url = manifest.get(trimmed) || null;
+  const url = manifest.get(trimmed) || manifest.get(normalizeThaiAudioText(trimmed)) || null;
   bakedAudioCache.set(trimmed, url);
   return url;
 }

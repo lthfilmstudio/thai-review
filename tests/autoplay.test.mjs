@@ -53,6 +53,10 @@ let audioManifest = {
       thai: 'เสียงอบแล้ว',
       path: 'audio/jessica-v1/baked1.mp3',
     },
+    spaced1: {
+      thai: 'ฟัง แล้ว อยาก ย้าย ไป อยู่ ด้วย เลย',
+      path: 'audio/jessica-v1/spaced1.mp3',
+    },
   },
 };
 globalThis.fetch = async (url, init) => {
@@ -131,6 +135,16 @@ test('baked Thai audio plays from manifest without worker TTS', async () => {
   assert.equal(Math.round(durationMs), 2000);
   assert.deepEqual(requests, []);
   assert.deepEqual(playedUrls, ['http://example.test/audio/jessica-v1/baked1.mp3']);
+});
+
+test('baked Thai audio survives whitespace-only Sheet edits', async () => {
+  resetRuntime();
+
+  const durationMs = await speakWithPromise({ thai: 'ฟังแล้วอยากย้ายไปอยู่ด้วยเลย' });
+
+  assert.equal(Math.round(durationMs), 2000);
+  assert.deepEqual(requests, []);
+  assert.deepEqual(playedUrls, ['http://example.test/audio/jessica-v1/spaced1.mp3']);
 });
 
 test('GCP provider skips baked Thai audio and uses worker TTS', async () => {
