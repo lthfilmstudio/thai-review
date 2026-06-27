@@ -3,7 +3,7 @@
 
 export const TTS_PROMPT_MANIFEST = {
   "version": 1,
-  "generated_at": "2026-06-27T19:44:00+08:00",
+  "generated_at": "2026-06-27T19:57:17+08:00",
   "description": "ElevenLabs v3 prompt sidecar. Visible card thai stays unchanged; tts_prompt is used only for generated ElevenLabs audio.",
   "lessons": {
     "gid-202574020": {
@@ -449,177 +449,111 @@ export const TTS_PROMPT_MANIFEST = {
         },
         {
           "row": 127,
-          "zh": "Poppy曾經去過水門",
-          "thai": "ป๊อบปี้เคยไปประตูน้ำ",
-          "tts_prompt": "[natural, conversational] ป๊อบปี้เคยไปประตูน้ำ"
-        },
-        {
-          "row": 130,
-          "zh": "Poppy去，去",
-          "thai": "ป๊อบปี้ไปค่ะไป",
-          "tts_prompt": "[natural, conversational] ป๊อบปี้ไปค่ะไป"
-        },
-        {
-          "row": 132,
           "zh": "一起來喔",
           "thai": "มากันนะ",
           "tts_prompt": "[curious, conversational] มากันนะ"
         },
         {
-          "row": 134,
+          "row": 129,
           "zh": "曾經去過",
           "thai": "เคยไปค่ะ",
           "tts_prompt": "[natural, conversational] เคยไปค่ะ"
         },
         {
-          "row": 135,
+          "row": 130,
           "zh": "什麼時候去的",
           "thai": "ไปตอนไหน",
           "tts_prompt": "[curious, conversational] ไปตอนไหน"
         },
         {
-          "row": 138,
+          "row": 132,
           "zh": "最長的喔",
           "thai": "ยาวที่สุดนะคะ",
           "tts_prompt": "[curious, conversational] ยาวที่สุดนะคะ"
         },
         {
-          "row": 140,
+          "row": 133,
           "zh": "去做什麼",
           "thai": "ไปทำไม",
           "tts_prompt": "[curious, conversational] ไปทำไม"
         },
         {
-          "row": 145,
-          "zh": "是嗎",
-          "thai": "ใช่มั้ย",
-          "tts_prompt": "[curious, conversational] ใช่มั้ย"
-        },
-        {
-          "row": 146,
+          "row": 137,
           "zh": "哥哥/姐姐去哪裡",
           "thai": "อ้าไปไหนพี่",
           "tts_prompt": "[curious, conversational] อ้าไปไหนพี่"
         },
         {
-          "row": 149,
-          "zh": "顏色嗎",
-          "thai": "สีเหรอ",
-          "tts_prompt": "[curious, conversational] สีเหรอ"
-        },
-        {
-          "row": 151,
-          "zh": "記得嗎",
-          "thai": "จำได้ไหม",
-          "tts_prompt": "[curious, conversational] จำได้ไหม"
-        },
-        {
-          "row": 153,
+          "row": 142,
           "zh": "摩七客運站",
           "thai": "สถานีขนส่งหมอชิต",
           "tts_prompt": "[natural, conversational] สถานีขนส่งหมอชิต"
         },
         {
-          "row": 157,
+          "row": 146,
           "zh": "昭披耶河",
           "thai": "แม่น้ำเจ้าพระยา",
           "tts_prompt": "[natural, conversational] แม่น้ำเจ้าพระยา"
         },
         {
-          "row": 159,
+          "row": 148,
           "zh": "在昭披耶河搭船啊",
           "thai": "นั่งเรือในน้ำเจ้าพระยาไง",
           "tts_prompt": "[natural, conversational] นั่งเรือในน้ำเจ้าพระยาไง"
         },
         {
-          "row": 160,
+          "row": 149,
           "zh": "找到了對嗎",
           "thai": "เจอใช่มั้ย",
           "tts_prompt": "[curious, conversational] เจอใช่มั้ย"
         },
         {
-          "row": 163,
-          "zh": "媽媽的",
-          "thai": "ของแม่",
-          "tts_prompt": "[polite, asking for help] ของแม่"
-        },
-        {
-          "row": 166,
-          "zh": "Roger曾經去過嗎",
-          "thai": "โรเจอร์เคยไปคะ",
-          "tts_prompt": "[curious, conversational] โรเจอร์เคยไปคะ"
-        },
-        {
-          "row": 171,
-          "zh": "去，去",
-          "thai": "ไปค่ะไป",
-          "tts_prompt": "[natural, conversational] ไปค่ะไป"
-        },
-        {
-          "row": 173,
+          "row": 156,
           "zh": "國家博物館喔",
           "thai": "พิพิธภัณฑ์แห่งชาตินะคะ",
           "tts_prompt": "[curious, conversational] พิพิธภัณฑ์แห่งชาตินะคะ"
         },
         {
-          "row": 176,
+          "row": 158,
           "zh": "誰去的",
           "thai": "ใครไปคะ",
           "tts_prompt": "[curious, conversational] ใครไปคะ"
         },
         {
-          "row": 177,
+          "row": 159,
           "zh": "不曾去過",
           "thai": "ไม่เคยไป",
           "tts_prompt": "[matter-of-fact, clear] ไม่เคยไป"
         },
         {
-          "row": 178,
+          "row": 160,
           "zh": "懂了嗎",
           "thai": "เข้าใจนะคะ",
           "tts_prompt": "[curious, conversational] เข้าใจนะคะ"
         },
         {
-          "row": 181,
+          "row": 163,
           "zh": "幫忙洗澡喔",
           "thai": "อาบน้ำให้นะคะ",
           "tts_prompt": "[polite, asking for help] อาบน้ำให้นะคะ"
         },
         {
-          "row": 187,
-          "zh": "佛塔問喔",
-          "thai": "เจดีย์ถามนะคะ",
-          "tts_prompt": "[curious, conversational] เจดีย์ถามนะคะ"
-        },
-        {
-          "row": 194,
+          "row": 175,
           "zh": "曾經吃過嗎",
           "thai": "เคยกินมั้ย",
           "tts_prompt": "[curious, conversational] เคยกินมั้ย"
         },
         {
-          "row": 195,
+          "row": 176,
           "zh": "看起來好吃嗎",
           "thai": "น่ากินมั้ย",
           "tts_prompt": "[curious, conversational] น่ากินมั้ย"
         },
         {
-          "row": 199,
+          "row": 180,
           "zh": "馬來西亞邊境",
           "thai": "ชายแดนมาเลเซีย",
           "tts_prompt": "[natural, conversational] ชายแดนมาเลเซีย"
-        },
-        {
-          "row": 202,
-          "zh": "下週見喔",
-          "thai": "อาทิตย์หน้าเจอกันนะคะ",
-          "tts_prompt": "[curious, conversational] อาทิตย์หน้าเจอกันนะคะ"
-        },
-        {
-          "row": 203,
-          "zh": "今天謝謝喔",
-          "thai": "วันนี้ขอบคุณนะคะ",
-          "tts_prompt": "[warm, appreciative] วันนี้ขอบคุณนะคะ"
         }
       ]
     },
