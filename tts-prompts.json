@@ -1,8 +1,625 @@
 {
   "version": 1,
-  "generated_at": "2026-06-27T19:06:09+08:00",
+  "generated_at": "2026-06-27T19:44:00+08:00",
   "description": "ElevenLabs v3 prompt sidecar. Visible card thai stays unchanged; tts_prompt is used only for generated ElevenLabs audio.",
   "lessons": {
+    "gid-202574020": {
+      "title": "初 5-7",
+      "items": [
+        {
+          "row": 1,
+          "zh": "最近天氣很糟",
+          "thai": "ช่วงนี้อากาศแย่",
+          "tts_prompt": "[natural, conversational] ช่วงนี้อากาศแย่"
+        },
+        {
+          "row": 3,
+          "zh": "別太相信別人",
+          "thai": "อย่าเชื่อคนอื่นมากเกินไป",
+          "tts_prompt": "[warning, direct] อย่าเชื่อคนอื่นมากเกินไป"
+        },
+        {
+          "row": 5,
+          "zh": "他被騙錢",
+          "thai": "เขาถูกหลอกเงิน",
+          "tts_prompt": "[practical, matter-of-fact] เขาถูกหลอกเงิน"
+        },
+        {
+          "row": 6,
+          "zh": "他騙我",
+          "thai": "เขาหลอกฉัน",
+          "tts_prompt": "[natural, conversational] เขาหลอกฉัน"
+        },
+        {
+          "row": 7,
+          "zh": "他騙我說他是大富翁",
+          "thai": "เค้าหลอกฉันว่าเค้าเป็นมหาเศรษฐี",
+          "tts_prompt": "[natural, conversational] เค้าหลอกฉันว่าเค้าเป็นมหาเศรษฐี"
+        },
+        {
+          "row": 9,
+          "zh": "別嚇到他",
+          "thai": "อย่าทำให้เขาตกใจ",
+          "tts_prompt": "[warning, direct] อย่าทำให้เขาตกใจ"
+        },
+        {
+          "row": 10,
+          "zh": "他有心臟病",
+          "thai": "เขาเป็นโรคหัวใจ",
+          "tts_prompt": "[concerned, gentle] เขาเป็นโรคหัวใจ"
+        },
+        {
+          "row": 11,
+          "zh": "瘋了嚇死我了",
+          "thai": "บ้าตกใจหมดเลย",
+          "tts_prompt": "[natural, conversational] บ้าตกใจหมดเลย"
+        },
+        {
+          "row": 12,
+          "zh": "哎呀嚇死我了",
+          "thai": "อุ๊ยตกใจหมดเลย",
+          "tts_prompt": "[natural, conversational] อุ๊ยตกใจหมดเลย"
+        },
+        {
+          "row": 13,
+          "zh": "哎呀好痛",
+          "thai": "อุ๊ยเจ็บจังเลย",
+          "tts_prompt": "[natural, conversational] อุ๊ยเจ็บจังเลย"
+        },
+        {
+          "row": 14,
+          "zh": "否則",
+          "thai": "ไม่อย่างนั้น",
+          "tts_prompt": "[matter-of-fact, clear] ไม่อย่างนั้น"
+        },
+        {
+          "row": 15,
+          "zh": "必須馬上吃",
+          "thai": "ต้องกินทันที",
+          "tts_prompt": "[firm, clear] ต้องกินทันที"
+        },
+        {
+          "row": 16,
+          "zh": "否則不好吃",
+          "thai": "ไม่อย่างนั้นไม่อร่อย",
+          "tts_prompt": "[matter-of-fact, clear] ไม่อย่างนั้นไม่อร่อย"
+        },
+        {
+          "row": 17,
+          "zh": "必須先訂位",
+          "thai": "ต้องจองก่อน",
+          "tts_prompt": "[firm, clear] ต้องจองก่อน"
+        },
+        {
+          "row": 18,
+          "zh": "否則一定等很久",
+          "thai": "ไม่อย่างนั้นรอนานแน่นอน",
+          "tts_prompt": "[firm, clear] ไม่อย่างนั้นรอนานแน่นอน"
+        },
+        {
+          "row": 20,
+          "zh": "糟了流血不止",
+          "thai": "แย่แล้วเลือดไหลไม่หยุด",
+          "tts_prompt": "[matter-of-fact, clear] แย่แล้วเลือดไหลไม่หยุด"
+        },
+        {
+          "row": 21,
+          "zh": "怎麼辦才好",
+          "thai": "ทำอย่างไรดี",
+          "tts_prompt": "[curious, conversational] ทำอย่างไรดี"
+        },
+        {
+          "row": 22,
+          "zh": "怎麼辦",
+          "thai": "ทำยังไงดี",
+          "tts_prompt": "[curious, conversational] ทำยังไงดี"
+        },
+        {
+          "row": 26,
+          "zh": "讓我們流汗",
+          "thai": "ทำให้พวกเราเหงื่อไหล",
+          "tts_prompt": "[natural, conversational] ทำให้พวกเราเหงื่อไหล"
+        },
+        {
+          "row": 31,
+          "zh": "看了會流淚",
+          "thai": "ดูแล้วน้ำตาไหล",
+          "tts_prompt": "[natural, conversational] ดูแล้วน้ำตาไหล"
+        },
+        {
+          "row": 32,
+          "zh": "哭但沒眼淚",
+          "thai": "ร้องไห้แต่ไม่มีน้ำตา",
+          "tts_prompt": "[matter-of-fact, clear] ร้องไห้แต่ไม่มีน้ำตา"
+        },
+        {
+          "row": 35,
+          "zh": "看起來不好吃",
+          "thai": "ไม่น่ากิน",
+          "tts_prompt": "[matter-of-fact, clear] ไม่น่ากิน"
+        },
+        {
+          "row": 36,
+          "zh": "看了就流口水",
+          "thai": "เห็นแล้วน้ำลายไหล",
+          "tts_prompt": "[natural, conversational] เห็นแล้วน้ำลายไหล"
+        },
+        {
+          "row": 37,
+          "zh": "有什麼症狀",
+          "thai": "มีอาการยังไงบ้าง",
+          "tts_prompt": "[curious, conversational] มีอาการยังไงบ้าง"
+        },
+        {
+          "row": 38,
+          "zh": "有流鼻涕嗎",
+          "thai": "มีน้ำมูกไหม",
+          "tts_prompt": "[curious, conversational] มีน้ำมูกไหม"
+        },
+        {
+          "row": 39,
+          "zh": "沒有流鼻涕",
+          "thai": "ไม่มีน้ำมูก",
+          "tts_prompt": "[matter-of-fact, clear] ไม่มีน้ำมูก"
+        },
+        {
+          "row": 40,
+          "zh": "如果沒有流鼻涕",
+          "thai": "ถ้าไม่มีน้ำมูก",
+          "tts_prompt": "[matter-of-fact, clear] ถ้าไม่มีน้ำมูก"
+        },
+        {
+          "row": 41,
+          "zh": "就不用吃藥",
+          "thai": "ก็ไม่ต้องกินยา",
+          "tts_prompt": "[firm, clear] ก็ไม่ต้องกินยา"
+        },
+        {
+          "row": 42,
+          "zh": "停水",
+          "thai": "น้ำไม่ไหล",
+          "tts_prompt": "[matter-of-fact, clear] น้ำไม่ไหล"
+        },
+        {
+          "row": 43,
+          "zh": "請來幫忙看一下",
+          "thai": "ช่วยมาดูให้หน่อย",
+          "tts_prompt": "[polite, asking for help] ช่วยมาดูให้หน่อย"
+        },
+        {
+          "row": 44,
+          "zh": "可以嗎",
+          "thai": "ได้มั้คะ",
+          "tts_prompt": "[curious, conversational] ได้มั้คะ"
+        },
+        {
+          "row": 47,
+          "zh": "禁止這樣做",
+          "thai": "ห้ามทำอย่างนี้",
+          "tts_prompt": "[natural, conversational] ห้ามทำอย่างนี้"
+        },
+        {
+          "row": 51,
+          "zh": "快到聖誕節了",
+          "thai": "ใกล้จะถึงคริสต์มาสแล้ว",
+          "tts_prompt": "[natural, conversational] ใกล้จะถึงคริสต์มาสแล้ว"
+        },
+        {
+          "row": 52,
+          "zh": "要佈置家裡",
+          "thai": "ต้องแต่งบ้าน",
+          "tts_prompt": "[firm, clear] ต้องแต่งบ้าน"
+        },
+        {
+          "row": 53,
+          "zh": "快到春節了",
+          "thai": "ใกล้จะถึงตรุษจีนแล้ว",
+          "tts_prompt": "[natural, conversational] ใกล้จะถึงตรุษจีนแล้ว"
+        },
+        {
+          "row": 59,
+          "zh": "裝潢需要時間",
+          "thai": "ตกแต่งต้องใช้เวลา",
+          "tts_prompt": "[firm, clear] ตกแต่งต้องใช้เวลา"
+        },
+        {
+          "row": 60,
+          "zh": "大約需要三個星期",
+          "thai": "ใช้เวลาประมาณสามอาทิตย์",
+          "tts_prompt": "[firm, clear] ใช้เวลาประมาณสามอาทิตย์"
+        },
+        {
+          "row": 64,
+          "zh": "我不怎麼喜歡化濃妝的女生",
+          "thai": "ผมไม่ค่อยชอบผู้หญิงแต่งหน้าเข้ม",
+          "tts_prompt": "[curious, conversational] ผมไม่ค่อยชอบผู้หญิงแต่งหน้าเข้ม"
+        },
+        {
+          "row": 66,
+          "zh": "不化妝也漂亮",
+          "thai": "ไม่แต่งหน้าก็สวย",
+          "tts_prompt": "[matter-of-fact, clear] ไม่แต่งหน้าก็สวย"
+        },
+        {
+          "row": 67,
+          "zh": "會做蛋糕嗎",
+          "thai": "ทำเค้กเป็นมย",
+          "tts_prompt": "[curious, conversational] ทำเค้กเป็นมย"
+        },
+        {
+          "row": 68,
+          "zh": "不會做",
+          "thai": "ทำไม่เป็น",
+          "tts_prompt": "[curious, conversational] ทำไม่เป็น"
+        },
+        {
+          "row": 72,
+          "zh": "去寺廟必須穿著端莊",
+          "thai": "ไปวัดต้องแต่งตัวสุภาพ",
+          "tts_prompt": "[firm, clear] ไปวัดต้องแต่งตัวสุภาพ"
+        },
+        {
+          "row": 73,
+          "zh": "去寺廟禁止穿著性感",
+          "thai": "ไปวัดห้ามแต่งตัวเซ็กซี่",
+          "tts_prompt": "[warning, direct] ไปวัดห้ามแต่งตัวเซ็กซี่"
+        },
+        {
+          "row": 75,
+          "zh": "這位明星很帥",
+          "thai": "ดาราคนนี้เท่มาก",
+          "tts_prompt": "[natural, conversational] ดาราคนนี้เท่มาก"
+        },
+        {
+          "row": 77,
+          "zh": "這個包包很酷",
+          "thai": "กระเป๋าใบนี้เท่มาก",
+          "tts_prompt": "[natural, conversational] กระเป๋าใบนี้เท่มาก"
+        },
+        {
+          "row": 78,
+          "zh": "不同意",
+          "thai": "ไม่เห็นด้วย",
+          "tts_prompt": "[natural, comparing] ไม่เห็นด้วย"
+        },
+        {
+          "row": 79,
+          "zh": "這個包包不酷",
+          "thai": "กระเป๋าใบนี้ไม่เท่",
+          "tts_prompt": "[matter-of-fact, clear] กระเป๋าใบนี้ไม่เท่"
+        },
+        {
+          "row": 81,
+          "zh": "你不認識他真土",
+          "thai": "เธอไม่รู้จักเขาเชยจริงๆ",
+          "tts_prompt": "[expressive, conversational] เธอไม่รู้จักเขาเชยจริงๆ"
+        },
+        {
+          "row": 82,
+          "zh": "為什麼這麼老土",
+          "thai": "ทำไมเชยอย่างนี้",
+          "tts_prompt": "[curious, conversational] ทำไมเชยอย่างนี้"
+        },
+        {
+          "row": 85,
+          "zh": "真不跟上時代",
+          "thai": "ไม่ทันสมัยจริงๆ",
+          "tts_prompt": "[expressive, conversational] ไม่ทันสมัยจริงๆ"
+        },
+        {
+          "row": 88,
+          "zh": "被情人拋棄根本沒關係",
+          "thai": "ถูกแฟนทิ้งไม่เห็นเป็นไรเลย",
+          "tts_prompt": "[practical, matter-of-fact] ถูกแฟนทิ้งไม่เห็นเป็นไรเลย"
+        },
+        {
+          "row": 89,
+          "zh": "臭豆腐根本不覺得好吃",
+          "thai": "เต้าหู้เหม็นไม่เห็นอร่อยเลย",
+          "tts_prompt": "[thoughtful, conversational] เต้าหู้เหม็นไม่เห็นอร่อยเลย"
+        },
+        {
+          "row": 90,
+          "zh": "他很閒根本不覺得忙",
+          "thai": "เขาว่างมากไม่เห็นยุ่งเลย",
+          "tts_prompt": "[thoughtful, conversational] เขาว่างมากไม่เห็นยุ่งเลย"
+        },
+        {
+          "row": 91,
+          "zh": "如果吃不完",
+          "thai": "ถ้ากินไม่หมด",
+          "tts_prompt": "[matter-of-fact, clear] ถ้ากินไม่หมด"
+        },
+        {
+          "row": 94,
+          "zh": "別忘了放冰箱",
+          "thai": "อย่าลืมแช่ตู้เย็น",
+          "tts_prompt": "[warning, direct] อย่าลืมแช่ตู้เย็น"
+        },
+        {
+          "row": 99,
+          "zh": "喜歡去日本泡溫泉",
+          "thai": "ชอบไปญี่ปุ่นแช่ออนเซ็น",
+          "tts_prompt": "[natural, conversational] ชอบไปญี่ปุ่นแช่ออนเซ็น"
+        },
+        {
+          "row": 101,
+          "zh": "你洗澡了嗎",
+          "thai": "คุณอาบน้ำหรือยัง",
+          "tts_prompt": "[curious, conversational] คุณอาบน้ำหรือยัง"
+        },
+        {
+          "row": 102,
+          "zh": "我洗澡了",
+          "thai": "ผมอาบน้ำแล้ว",
+          "tts_prompt": "[natural, conversational] ผมอาบน้ำแล้ว"
+        },
+        {
+          "row": 103,
+          "zh": "還沒洗澡",
+          "thai": "ยังไม่อาบน้ำ",
+          "tts_prompt": "[matter-of-fact, clear] ยังไม่อาบน้ำ"
+        },
+        {
+          "row": 104,
+          "zh": "熱水器壞了",
+          "thai": "เครื่องทำน้ำอุ่นเสีย",
+          "tts_prompt": "[natural, conversational] เครื่องทำน้ำอุ่นเสีย"
+        },
+        {
+          "row": 105,
+          "zh": "我要怎麼洗澡",
+          "thai": "ฉันจะอาบน้ำได้ยังไง",
+          "tts_prompt": "[curious, conversational] ฉันจะอาบน้ำได้ยังไง"
+        },
+        {
+          "row": 108,
+          "zh": "睡前也要刷牙",
+          "thai": "ก่อนนอนก็ต้องแปรงฟัน",
+          "tts_prompt": "[firm, clear] ก่อนนอนก็ต้องแปรงฟัน"
+        },
+        {
+          "row": 109,
+          "zh": "如果不刷牙",
+          "thai": "ถ้าไม่แปรงฟัน",
+          "tts_prompt": "[matter-of-fact, clear] ถ้าไม่แปรงฟัน"
+        },
+        {
+          "row": 111,
+          "zh": "就會有口臭",
+          "thai": "ก็จะมีกลิ่นปาก",
+          "tts_prompt": "[natural, conversational] ก็จะมีกลิ่นปาก"
+        },
+        {
+          "row": 113,
+          "zh": "跑很快",
+          "thai": "วิ่งเร็วมาก",
+          "tts_prompt": "[natural, conversational] วิ่งเร็วมาก"
+        },
+        {
+          "row": 114,
+          "zh": "他跑得非常快",
+          "thai": "เค้าวิ่งเร็วมาก",
+          "tts_prompt": "[expressive, conversational] เค้าวิ่งเร็วมาก"
+        },
+        {
+          "row": 115,
+          "zh": "追不上",
+          "thai": "วิ่งตามไม่ทัน",
+          "tts_prompt": "[matter-of-fact, clear] วิ่งตามไม่ทัน"
+        },
+        {
+          "row": 116,
+          "zh": "我跑得追不上他",
+          "thai": "ฉันวิ่งตามเค้าไม่ทัน",
+          "tts_prompt": "[matter-of-fact, clear] ฉันวิ่งตามเค้าไม่ทัน"
+        },
+        {
+          "row": 117,
+          "zh": "可以嗎",
+          "thai": "โอเคมั้ยคะ",
+          "tts_prompt": "[curious, conversational] โอเคมั้ยคะ"
+        },
+        {
+          "row": 119,
+          "zh": "非常感謝",
+          "thai": "ขอบคุณมากค่ะ",
+          "tts_prompt": "[warm, appreciative] ขอบคุณมากค่ะ"
+        },
+        {
+          "row": 120,
+          "zh": "等一下喔",
+          "thai": "เดี๋ยวนะคะ",
+          "tts_prompt": "[curious, conversational] เดี๋ยวนะคะ"
+        },
+        {
+          "row": 121,
+          "zh": "曾經去過了",
+          "thai": "เคยไปแล้ว",
+          "tts_prompt": "[natural, conversational] เคยไปแล้ว"
+        },
+        {
+          "row": 122,
+          "zh": "去過了",
+          "thai": "ไปแล้ว",
+          "tts_prompt": "[natural, conversational] ไปแล้ว"
+        },
+        {
+          "row": 127,
+          "zh": "Poppy曾經去過水門",
+          "thai": "ป๊อบปี้เคยไปประตูน้ำ",
+          "tts_prompt": "[natural, conversational] ป๊อบปี้เคยไปประตูน้ำ"
+        },
+        {
+          "row": 130,
+          "zh": "Poppy去，去",
+          "thai": "ป๊อบปี้ไปค่ะไป",
+          "tts_prompt": "[natural, conversational] ป๊อบปี้ไปค่ะไป"
+        },
+        {
+          "row": 132,
+          "zh": "一起來喔",
+          "thai": "มากันนะ",
+          "tts_prompt": "[curious, conversational] มากันนะ"
+        },
+        {
+          "row": 134,
+          "zh": "曾經去過",
+          "thai": "เคยไปค่ะ",
+          "tts_prompt": "[natural, conversational] เคยไปค่ะ"
+        },
+        {
+          "row": 135,
+          "zh": "什麼時候去的",
+          "thai": "ไปตอนไหน",
+          "tts_prompt": "[curious, conversational] ไปตอนไหน"
+        },
+        {
+          "row": 138,
+          "zh": "最長的喔",
+          "thai": "ยาวที่สุดนะคะ",
+          "tts_prompt": "[curious, conversational] ยาวที่สุดนะคะ"
+        },
+        {
+          "row": 140,
+          "zh": "去做什麼",
+          "thai": "ไปทำไม",
+          "tts_prompt": "[curious, conversational] ไปทำไม"
+        },
+        {
+          "row": 145,
+          "zh": "是嗎",
+          "thai": "ใช่มั้ย",
+          "tts_prompt": "[curious, conversational] ใช่มั้ย"
+        },
+        {
+          "row": 146,
+          "zh": "哥哥/姐姐去哪裡",
+          "thai": "อ้าไปไหนพี่",
+          "tts_prompt": "[curious, conversational] อ้าไปไหนพี่"
+        },
+        {
+          "row": 149,
+          "zh": "顏色嗎",
+          "thai": "สีเหรอ",
+          "tts_prompt": "[curious, conversational] สีเหรอ"
+        },
+        {
+          "row": 151,
+          "zh": "記得嗎",
+          "thai": "จำได้ไหม",
+          "tts_prompt": "[curious, conversational] จำได้ไหม"
+        },
+        {
+          "row": 153,
+          "zh": "摩七客運站",
+          "thai": "สถานีขนส่งหมอชิต",
+          "tts_prompt": "[natural, conversational] สถานีขนส่งหมอชิต"
+        },
+        {
+          "row": 157,
+          "zh": "昭披耶河",
+          "thai": "แม่น้ำเจ้าพระยา",
+          "tts_prompt": "[natural, conversational] แม่น้ำเจ้าพระยา"
+        },
+        {
+          "row": 159,
+          "zh": "在昭披耶河搭船啊",
+          "thai": "นั่งเรือในน้ำเจ้าพระยาไง",
+          "tts_prompt": "[natural, conversational] นั่งเรือในน้ำเจ้าพระยาไง"
+        },
+        {
+          "row": 160,
+          "zh": "找到了對嗎",
+          "thai": "เจอใช่มั้ย",
+          "tts_prompt": "[curious, conversational] เจอใช่มั้ย"
+        },
+        {
+          "row": 163,
+          "zh": "媽媽的",
+          "thai": "ของแม่",
+          "tts_prompt": "[polite, asking for help] ของแม่"
+        },
+        {
+          "row": 166,
+          "zh": "Roger曾經去過嗎",
+          "thai": "โรเจอร์เคยไปคะ",
+          "tts_prompt": "[curious, conversational] โรเจอร์เคยไปคะ"
+        },
+        {
+          "row": 171,
+          "zh": "去，去",
+          "thai": "ไปค่ะไป",
+          "tts_prompt": "[natural, conversational] ไปค่ะไป"
+        },
+        {
+          "row": 173,
+          "zh": "國家博物館喔",
+          "thai": "พิพิธภัณฑ์แห่งชาตินะคะ",
+          "tts_prompt": "[curious, conversational] พิพิธภัณฑ์แห่งชาตินะคะ"
+        },
+        {
+          "row": 176,
+          "zh": "誰去的",
+          "thai": "ใครไปคะ",
+          "tts_prompt": "[curious, conversational] ใครไปคะ"
+        },
+        {
+          "row": 177,
+          "zh": "不曾去過",
+          "thai": "ไม่เคยไป",
+          "tts_prompt": "[matter-of-fact, clear] ไม่เคยไป"
+        },
+        {
+          "row": 178,
+          "zh": "懂了嗎",
+          "thai": "เข้าใจนะคะ",
+          "tts_prompt": "[curious, conversational] เข้าใจนะคะ"
+        },
+        {
+          "row": 181,
+          "zh": "幫忙洗澡喔",
+          "thai": "อาบน้ำให้นะคะ",
+          "tts_prompt": "[polite, asking for help] อาบน้ำให้นะคะ"
+        },
+        {
+          "row": 187,
+          "zh": "佛塔問喔",
+          "thai": "เจดีย์ถามนะคะ",
+          "tts_prompt": "[curious, conversational] เจดีย์ถามนะคะ"
+        },
+        {
+          "row": 194,
+          "zh": "曾經吃過嗎",
+          "thai": "เคยกินมั้ย",
+          "tts_prompt": "[curious, conversational] เคยกินมั้ย"
+        },
+        {
+          "row": 195,
+          "zh": "看起來好吃嗎",
+          "thai": "น่ากินมั้ย",
+          "tts_prompt": "[curious, conversational] น่ากินมั้ย"
+        },
+        {
+          "row": 199,
+          "zh": "馬來西亞邊境",
+          "thai": "ชายแดนมาเลเซีย",
+          "tts_prompt": "[natural, conversational] ชายแดนมาเลเซีย"
+        },
+        {
+          "row": 202,
+          "zh": "下週見喔",
+          "thai": "อาทิตย์หน้าเจอกันนะคะ",
+          "tts_prompt": "[curious, conversational] อาทิตย์หน้าเจอกันนะคะ"
+        },
+        {
+          "row": 203,
+          "zh": "今天謝謝喔",
+          "thai": "วันนี้ขอบคุณนะคะ",
+          "tts_prompt": "[warm, appreciative] วันนี้ขอบคุณนะคะ"
+        }
+      ]
+    },
     "gid-575399065": {
       "title": "初 5-8",
       "items": [
@@ -232,7 +849,7 @@
           "row": 54,
           "zh": "他跳起舞來像瘋子一樣",
           "thai": "เค้าเต้นเหมือนคนบ้าเลย",
-          "tts_prompt": "[natural, conversational] เค้าเต้นเหมือนคนบ้าเลย"
+          "tts_prompt": "[natural, comparing] เค้าเต้นเหมือนคนบ้าเลย"
         },
         {
           "row": 55,
@@ -273,26 +890,26 @@
         {
           "row": 61,
           "zh": "為什麼跟照片完全不一樣",
-          "thai": "做什麼不跟在照片裡面一樣 -> 做什麼不跟在照片裡面一樣",
-          "tts_prompt": "[curious, conversational] 做什麼不跟在照片裡面一樣 -> 做什麼不跟在照片裡面一樣"
+          "thai": "ทำไมไม่เหมือนในรูปเลย",
+          "tts_prompt": "[curious, slightly surprised] ทำไมไม่เหมือนในรูปเลย"
         },
         {
           "row": 62,
           "zh": "也感到緊張",
           "thai": "รู้สึกตื่นเต้นเหมือนกัน",
-          "tts_prompt": "[thoughtful, conversational] รู้สึกตื่นเต้นเหมือนกัน"
+          "tts_prompt": "[natural, comparing] รู้สึกตื่นเต้นเหมือนกัน"
         },
         {
           "row": 63,
           "zh": "我也嚇一跳",
           "thai": "ฉันก็ตกใจเหมือนกัน",
-          "tts_prompt": "[natural, conversational] ฉันก็ตกใจเหมือนกัน"
+          "tts_prompt": "[natural, comparing] ฉันก็ตกใจเหมือนกัน"
         },
         {
           "row": 64,
           "zh": "我也害怕",
           "thai": "ฉันก็กลัวเหมือนกัน",
-          "tts_prompt": "[natural, conversational] ฉันก็กลัวเหมือนกัน"
+          "tts_prompt": "[natural, comparing] ฉันก็กลัวเหมือนกัน"
         },
         {
           "row": 65,
@@ -577,10 +1194,16 @@
           "tts_prompt": "[natural, conversational] ใช้บ่อยๆเดี๋ยวก็ชิน"
         },
         {
+          "row": 135,
+          "zh": "年紀差20歲",
+          "thai": "อายุต่างกัน 20 ปี",
+          "tts_prompt": "[natural, comparing] อายุต่างกันยี่สิบปี"
+        },
+        {
           "row": 137,
           "zh": "這兩張照片哪裡不一樣？",
           "thai": "2 รูปนี้ ต่างกันตรงไหน",
-          "tts_prompt": "[curious, conversational] สองรูปนี้ต่างกันตรงไหน"
+          "tts_prompt": "[curious, slightly surprised] สองรูปนี้ต่างกันตรงไหน"
         },
         {
           "row": 138,
