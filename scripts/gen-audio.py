@@ -29,6 +29,7 @@ DEFAULT_LANGUAGE_CODE = "th"
 DEFAULT_OUTPUT_FORMAT = "mp3_44100_128"
 DEFAULT_AUDIO_PREFIX = "audio/jessica-v1"
 DEFAULT_OUT_DIR = Path("out")
+DEFAULT_TTS_PROMPTS_PATH = Path("tts-prompts.json")
 DEFAULT_USD_PER_1K_CHARS = 0.10
 DEFAULT_TWD_RATE = 31.835
 CREATOR_CREDITS = 121_000
@@ -49,6 +50,7 @@ class AudioSpec:
 @dataclass(frozen=True)
 class ThaiItem:
     thai: str
+    tts_text: str
     zh: str
     lesson: str
     count: int
@@ -92,6 +94,87 @@ def load_data(path: Path) -> dict:
         raise SystemExit(f"data file is not valid JSON: {path} ({exc})")
 
 
+def load_tts_prompts(path: Path | None) -> dict | None:
+    if not path or not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"tts prompts file is not valid JSON: {path} ({exc})")
+    return data if isinstance(data, dict) else None
+
+
+def prompt_bucket_for_lesson(prompt_data: dict | None, lesson: dict) -> dict | None:
+    lessons = (prompt_data or {}).get("lessons")
+    if not isinstance(lessons, dict):
+        return None
+
+    gid = str(lesson.get("gid") or "")
+    keys = [
+        str(lesson.get("id") or ""),
+        gid,
+        f"gid-{gid}" if gid else "",
+        str(lesson.get("title") or ""),
+    ]
+    for key in keys:
+        bucket = lessons.get(key)
+        if isinstance(bucket, dict):
+            return bucket
+    return None
+
+
+def apply_tts_prompts(data: dict, prompt_data: dict | None) -> dict:
+    if not prompt_data:
+        return data
+
+    lessons_out: list[dict] = []
+    for lesson in data.get("lessons") or []:
+        bucket = prompt_bucket_for_lesson(prompt_data, lesson)
+        if not bucket or not isinstance(bucket.get("items"), list):
+            lessons_out.append(lesson)
+            continue
+
+        prompts_by_row: dict[int, dict] = {}
+        for item in bucket["items"]:
+            if not isinstance(item, dict):
+                continue
+            try:
+                row_num = int(item.get("row"))
+            except (TypeError, ValueError):
+                continue
+            prompts_by_row[row_num] = item
+
+        cards_out: list[dict] = []
+        for index, card in enumerate(lesson.get("cards") or [], start=1):
+            item = prompts_by_row.get(index)
+            prompt = str((item or {}).get("tts_prompt") or "").strip()
+            if not item or not prompt:
+                cards_out.append(card)
+                continue
+
+            card_thai = str(card.get("thai") or "").strip()
+            prompt_thai = str(item.get("thai") or "").strip()
+            card_zh = str(card.get("zh") or "").strip()
+            prompt_zh = str(item.get("zh") or "").strip()
+            thai_matches = normalize_audio_text(card_thai) == normalize_audio_text(prompt_thai)
+            zh_matches = not prompt_zh or card_zh == prompt_zh
+            if not thai_matches and not zh_matches:
+                cards_out.append(card)
+                continue
+
+            next_card = dict(card)
+            next_card["tts_prompt"] = prompt
+            cards_out.append(next_card)
+
+        next_lesson = dict(lesson)
+        next_lesson["cards"] = cards_out
+        lessons_out.append(next_lesson)
+
+    next_data = dict(data)
+    next_data["lessons"] = lessons_out
+    return next_data
+
+
 def collect_unique_thai(data: dict) -> tuple[list[ThaiItem], int, int, int]:
     lessons = data.get("lessons") or []
     first_seen: dict[str, dict[str, str]] = {}
@@ -105,12 +188,16 @@ def collect_unique_thai(data: dict) -> tuple[list[ThaiItem], int, int, int]:
             thai = str(card.get("thai") or "").strip()
             if not thai:
                 continue
+            tts_text = str(card.get("tts_prompt") or card.get("ttsPrompt") or thai).strip()
+            if not tts_text:
+                continue
             total_cards += 1
-            total_chars += text_len(thai)
-            counts[thai] = counts.get(thai, 0) + 1
-            if thai not in first_seen:
-                first_seen[thai] = {
+            total_chars += text_len(tts_text)
+            counts[tts_text] = counts.get(tts_text, 0) + 1
+            if tts_text not in first_seen:
+                first_seen[tts_text] = {
                     "thai": thai,
+                    "tts_text": tts_text,
                     "zh": str(card.get("zh") or "").strip(),
                     "lesson": lesson_title,
                 }
@@ -118,13 +205,14 @@ def collect_unique_thai(data: dict) -> tuple[list[ThaiItem], int, int, int]:
     items = [
         ThaiItem(
             thai=value["thai"],
+            tts_text=value["tts_text"],
             zh=value["zh"],
             lesson=value["lesson"],
-            count=counts[value["thai"]],
+            count=counts[value["tts_text"]],
         )
         for value in first_seen.values()
     ]
-    unique_chars = sum(text_len(item.thai) for item in items)
+    unique_chars = sum(text_len(item.tts_text) for item in items)
     return items, total_cards, total_chars, unique_chars
 
 
@@ -147,9 +235,12 @@ def manifest_coverage(path: Path) -> tuple[set[str], set[str]]:
             key = entry.get("key") or entry.get("audio_key") or entry.get("hash")
             if key:
                 keys.add(str(key))
-            normalized = normalize_audio_text(str(entry.get("thai") or ""))
-            if normalized:
-                normalized_thai.add(normalized)
+            prompt_text = str(entry.get("tts_prompt") or entry.get("ttsPrompt") or "").strip()
+            fields = ("tts_prompt", "ttsPrompt") if prompt_text else ("text", "thai")
+            for field in fields:
+                normalized = normalize_audio_text(str(entry.get(field) or ""))
+                if normalized:
+                    normalized_thai.add(normalized)
         elif isinstance(entry, str):
             keys.add(entry)
 
@@ -248,20 +339,20 @@ def build_dry_run(
             "key": key,
             "path": audio_path(key, spec),
             "item": item,
-            "chars": text_len(item.thai),
+            "chars": text_len(item.tts_text),
         }
         for item in items
-        for key in [audio_key(item.thai, spec)]
+        for key in [audio_key(item.tts_text, spec)]
     ]
     normalized_reused = [
         entry for entry in keyed_items
         if entry["key"] not in existing_keys
-        and normalize_audio_text(entry["item"].thai) in existing_normalized_thai
+        and normalize_audio_text(entry["item"].tts_text) in existing_normalized_thai
     ]
     missing = [
         entry for entry in keyed_items
         if entry["key"] not in existing_keys
-        and normalize_audio_text(entry["item"].thai) not in existing_normalized_thai
+        and normalize_audio_text(entry["item"].tts_text) not in existing_normalized_thai
     ]
     missing_chars = sum(int(entry["chars"]) for entry in missing)
     estimated_usd = missing_chars / 1000 * usd_per_1k_chars
@@ -429,16 +520,19 @@ def generate_audio(dry_run: dict, spec: AudioSpec, args: argparse.Namespace) -> 
             print(f"[{index}/{len(selected)}] skip existing file {rel_path}")
         else:
             print(f"[{index}/{len(selected)}] generate {rel_path} ({entry['chars']} chars)")
-            audio = call_elevenlabs_tts(item.thai, spec, api_key)
+            audio = call_elevenlabs_tts(item.tts_text, spec, api_key)
             write_audio_file(file_path, audio)
 
-        items[key] = {
+        manifest_item = {
             "path": rel_path,
             "chars": entry["chars"],
             "first_lesson": item.lesson,
             "thai": item.thai,
             "generated_at": now_taipei_iso(),
         }
+        if item.tts_text != item.thai:
+            manifest_item["tts_prompt"] = item.tts_text
+        items[key] = manifest_item
         write_manifest(args.manifest, manifest)
 
     print(f"Updated manifest: {args.manifest}")
@@ -506,13 +600,14 @@ def print_report(
         print(f"First {min(show_examples, len(missing))} missing examples")
         for entry in missing[:show_examples]:
             item = entry["item"]
-            print(f"- {entry['key']} | {entry['chars']} chars | {entry['path']} | {item.lesson} | {item.thai}")
+            print(f"- {entry['key']} | {entry['chars']} chars | {entry['path']} | {item.lesson} | {item.tts_text}")
 
 
 def json_ready(value: object) -> object:
     if isinstance(value, ThaiItem):
         return {
             "thai": value.thai,
+            "tts_text": value.tts_text,
             "zh": value.zh,
             "lesson": value.lesson,
             "count": value.count,
@@ -530,6 +625,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     mode.add_argument("--dry-run", action="store_true", help="Report missing audio and cost.")
     mode.add_argument("--generate", action="store_true", help="Generate missing audio through ElevenLabs.")
     parser.add_argument("--data", default="data.json", type=Path, help="Path to thai-review data.json.")
+    parser.add_argument("--tts-prompts", default=DEFAULT_TTS_PROMPTS_PATH, type=Path, help="Optional tts_prompt sidecar JSON.")
     parser.add_argument("--manifest", default="audio-manifest.json", type=Path, help="Path to audio manifest JSON.")
     parser.add_argument("--out-dir", default=DEFAULT_OUT_DIR, type=Path, help="Local root for generated audio files.")
     parser.add_argument("--voice-name", default=DEFAULT_VOICE_NAME)
@@ -565,7 +661,7 @@ def main(argv: list[str]) -> int:
 
     data_path = args.data
     manifest_path = args.manifest
-    data = load_data(data_path)
+    data = apply_tts_prompts(load_data(data_path), load_tts_prompts(args.tts_prompts))
     spec = AudioSpec(
         voice_name=args.voice_name,
         voice_id=args.voice_id,

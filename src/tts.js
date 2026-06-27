@@ -51,13 +51,20 @@ function buildAudioMap(manifest) {
   const entries = Array.isArray(items) ? items : Object.values(items || {});
   entries.forEach(entry => {
     if (!entry || typeof entry !== 'object') return;
-    const thai = String(entry.thai || '').trim();
     const path = String(entry.path || entry.url || '').trim();
-    if (!thai || !path) return;
+    if (!path) return;
     const url = absoluteAudioUrl(path);
-    map.set(thai, url);
-    const normalized = normalizeThaiAudioText(thai);
-    if (normalized && !map.has(normalized)) map.set(normalized, url);
+    const promptText = String(entry.tts_prompt || entry.ttsPrompt || '').trim();
+    const texts = (
+      promptText
+        ? [promptText]
+        : [entry.text, entry.thai]
+    ).map(value => String(value || '').trim()).filter(Boolean);
+    texts.forEach(text => {
+      map.set(text, url);
+      const normalized = normalizeThaiAudioText(text);
+      if (normalized && !map.has(normalized)) map.set(normalized, url);
+    });
   });
   return map;
 }
@@ -209,8 +216,9 @@ export function speakCard(card) {
 
 /* Promise 版本（被動聽力用），回傳實際播放毫秒數。 */
 export function speakWithPromise(card) {
+  const usePrompt = pickVoiceProvider() === 'elevenlabs' && !card?._edited && card?.tts_prompt;
   return speakTextWithPromise({
-    text: card?.thai,
+    text: usePrompt ? card.tts_prompt : card?.thai,
     voice: pickVoice(),
     lang: 'th-TH',
     rate: pickRate(),

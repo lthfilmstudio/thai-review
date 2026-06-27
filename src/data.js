@@ -5,6 +5,8 @@
    3. 單一 CSV URL → 依 CSV 內的 lesson 欄分組（原型行為）
 */
 
+import { applyTtsPromptsToLesson, applyTtsPromptsToLessons } from './tts-prompts.js';
+
 export function parseCsv(text) {
   const rows = [];
   let row = [];
@@ -116,13 +118,13 @@ async function loadMultipleCsvs(urls, { force = false } = {}) {
       const cards = await fetchCsvCards(urls[i], { force });
       const lessonName = (cards[0] && cards[0].lesson) || `Lesson ${i + 1}`;
       const gid = extractGid(urls[i]) || String(i);
-      lessons.push({ id: 'csv-' + gid, title: lessonName, cards });
+      lessons.push({ id: 'csv-' + gid, gid, title: lessonName, cards });
     } catch (e) {
       console.warn('CSV load failed:', urls[i], e);
     }
   }
   if (!lessons.length) throw new Error('所有 CSV 都讀取失敗');
-  return lessons;
+  return applyTtsPromptsToLessons(lessons);
 }
 
 /* 只抓 tab 列表（不抓 CSV），給 lazy 載入用。 */
@@ -145,9 +147,10 @@ export async function loadTabsOnly(input, { force = false } = {}) {
 }
 
 /* 抓單一 tab 的 cards。 */
-export async function fetchLessonCards(baseUrl, gid, { force = false } = {}) {
+export async function fetchLessonCards(baseUrl, gid, { force = false, id = '', title = '' } = {}) {
   const csvUrl = `${baseUrl}/pub?gid=${gid}&single=true&output=csv`;
-  return await fetchCsvCards(csvUrl, { force });
+  const cards = await fetchCsvCards(csvUrl, { force });
+  return applyTtsPromptsToLesson({ id: id || ('gid-' + gid), gid, title, cards }).cards;
 }
 
 /* 方案 2：publish-to-web 整份 Sheet。抓 pubhtml 解析 tab 列表，
@@ -165,7 +168,7 @@ async function loadFromPublishedSheet(pubUrl, { force = false } = {}) {
   const results = await Promise.allSettled(tabs.map(async tab => {
     const csvUrl = `${base}/pub?gid=${tab.gid}&single=true&output=csv`;
     const cards = await fetchCsvCards(csvUrl, { force });
-    return { id: 'gid-' + tab.gid, title: tab.name, cards };
+    return { id: 'gid-' + tab.gid, gid: tab.gid, title: tab.name, cards };
   }));
   const lessons = [];
   results.forEach((r, i) => {
@@ -173,7 +176,7 @@ async function loadFromPublishedSheet(pubUrl, { force = false } = {}) {
     else if (r.status === 'rejected') console.warn('tab skipped:', tabs[i].name, r.reason);
   });
   if (!lessons.length) throw new Error('所有 tab 都讀取失敗');
-  return lessons;
+  return applyTtsPromptsToLessons(lessons);
 }
 
 function parsePubTabs(html) {
@@ -220,11 +223,11 @@ async function loadSingleCsv(url, { force = false } = {}) {
     if (!byLesson.has(name)) byLesson.set(name, []);
     byLesson.get(name).push(c);
   }
-  return [...byLesson.entries()].map(([title, cards], idx) => ({
+  return applyTtsPromptsToLessons([...byLesson.entries()].map(([title, cards], idx) => ({
     id: 'csv-' + idx + '-' + title.replace(/\s+/g, '_'),
     title,
     cards,
-  }));
+  })));
 }
 
 /* 方案 0：bundled JSON（GitHub Action 預生成）。
@@ -240,12 +243,12 @@ export async function loadFromBundledJson() {
     throw new Error('bundled JSON 格式異常');
   }
   // 規範成跟 loadFromPublishedSheet 一樣的回傳格式：{ id, gid, title, cards }
-  return data.lessons.map((l) => ({
+  return applyTtsPromptsToLessons(data.lessons.map((l) => ({
     id: l.id || ('gid-' + (l.gid || '')),
     gid: l.gid || '',
     title: l.title || '',
     cards: Array.isArray(l.cards) ? l.cards : [],
-  }));
+  })));
 }
 
 /* 主入口：依輸入型態挑對應方案 */

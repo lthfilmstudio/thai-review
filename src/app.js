@@ -120,7 +120,11 @@ async function ensureLessonLoaded(lessonId, { silentUI = false, force = false } 
 
   if (!silentUI) showLoading(`載入「${lesson.title}」…`);
   try {
-    lesson.cards = await fetchLessonCards(state.baseUrl, lesson.gid, { force });
+    lesson.cards = await fetchLessonCards(state.baseUrl, lesson.gid, {
+      force,
+      id: lesson.id,
+      title: lesson.title,
+    });
     lesson._loaded = true;
     saveLessonCards(lesson.gid, lesson.cards);
   } catch (e) {
@@ -136,7 +140,11 @@ async function ensureAllLoaded({ force = false } = {}) {
   showLoading(`正在補抓 ${todo.length} 堂未載入的課程…`);
   await Promise.allSettled(todo.map(async l => {
     try {
-      l.cards = await fetchLessonCards(state.baseUrl, l.gid, { force });
+      l.cards = await fetchLessonCards(state.baseUrl, l.gid, {
+        force,
+        id: l.id,
+        title: l.title,
+      });
       l._loaded = true;
       saveLessonCards(l.gid, l.cards);
     } catch (e) {

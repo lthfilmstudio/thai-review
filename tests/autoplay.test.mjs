@@ -53,6 +53,11 @@ let audioManifest = {
       thai: 'เสียงอบแล้ว',
       path: 'audio/jessica-v1/baked1.mp3',
     },
+    prompted1: {
+      thai: 'เสียงอบแล้ว',
+      tts_prompt: '[warm, natural] เสียงอบแล้ว',
+      path: 'audio/jessica-v3/prompted1.mp3',
+    },
     spaced1: {
       thai: 'ฟัง แล้ว อยาก ย้าย ไป อยู่ ด้วย เลย',
       path: 'audio/jessica-v1/spaced1.mp3',
@@ -137,6 +142,19 @@ test('baked Thai audio plays from manifest without worker TTS', async () => {
   assert.deepEqual(playedUrls, ['http://example.test/audio/jessica-v1/baked1.mp3']);
 });
 
+test('ElevenLabs prompt cards play prompted baked audio without changing display Thai', async () => {
+  resetRuntime();
+
+  const durationMs = await speakWithPromise({
+    thai: 'เสียงอบแล้ว',
+    tts_prompt: '[warm, natural] เสียงอบแล้ว',
+  });
+
+  assert.equal(Math.round(durationMs), 2000);
+  assert.deepEqual(requests, []);
+  assert.deepEqual(playedUrls, ['http://example.test/audio/jessica-v3/prompted1.mp3']);
+});
+
 test('baked Thai audio survives whitespace-only Sheet edits', async () => {
   resetRuntime();
 
@@ -151,11 +169,30 @@ test('GCP provider skips baked Thai audio and uses worker TTS', async () => {
   resetRuntime();
   state.settings.voiceProvider = 'gcp';
 
-  const durationMs = await speakWithPromise({ thai: 'เสียงอบแล้ว' });
+  const durationMs = await speakWithPromise({
+    thai: 'เสียงอบแล้ว',
+    tts_prompt: '[warm, natural] เสียงอบแล้ว',
+  });
 
   assert.equal(Math.round(durationMs), 2000);
   assert.deepEqual(requests.map(item => [item.text, item.voice]), [
     ['เสียงอบแล้ว', 'th-TH-Neural2-C'],
+  ]);
+  assert.deepEqual(playedUrls, ['blob:test-1']);
+});
+
+test('locally edited cards ignore stale ElevenLabs prompts', async () => {
+  resetRuntime();
+
+  const durationMs = await speakWithPromise({
+    thai: 'เสียงแก้เอง',
+    tts_prompt: '[warm, natural] เสียงอบแล้ว',
+    _edited: true,
+  });
+
+  assert.equal(Math.round(durationMs), 2000);
+  assert.deepEqual(requests.map(item => [item.text, item.voice]), [
+    ['เสียงแก้เอง', 'th-TH-Neural2-C'],
   ]);
   assert.deepEqual(playedUrls, ['blob:test-1']);
 });
