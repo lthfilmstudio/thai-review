@@ -142,7 +142,7 @@
 }
 
 .thai-main {
-  font-family: 'Noto Sans Thai', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: clamp(28px, 6vw, 48px);
   font-weight: 500;
   color: var(--text);
