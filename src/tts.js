@@ -405,15 +405,34 @@ function encodeWav(buffer) {
   return new Blob([out], { type: 'audio/wav' });
 }
 
-export async function buildListenCycle(card) {
+const cycleBuilds = new Map(); // key → in-flight Promise（去重併發拼裝）
+
+function cycleKey(card) {
+  return [
+    card?.thai, card?.tts_prompt || '', card?.zh || '',
+    pickVoiceProvider(), pickVoice(), pickRate(),
+    state.settings?.gap ?? 'auto', state.settings?.repeat || 1,
+  ].join('|');
+}
+
+/* 只查快取，不碰網路——背景換卡時用這個，不能 await 網路。 */
+export function getCachedCycle(card) {
+  return cycleCache.get(cycleKey(card)) || null;
+}
+
+export function buildListenCycle(card) {
+  const key = cycleKey(card);
+  if (cycleCache.has(key)) return Promise.resolve(cycleCache.get(key));
+  if (cycleBuilds.has(key)) return cycleBuilds.get(key);
+  const build = buildListenCycleUncached(card, key).finally(() => cycleBuilds.delete(key));
+  cycleBuilds.set(key, build);
+  return build;
+}
+
+async function buildListenCycleUncached(card, key) {
   const rate = pickRate();
   const repeat = state.settings?.repeat || 1;
   const gap = state.settings?.gap ?? 'auto';
-  const key = [
-    card?.thai, card?.tts_prompt || '', card?.zh || '',
-    pickVoiceProvider(), pickVoice(), rate, gap, repeat,
-  ].join('|');
-  if (cycleCache.has(key)) return cycleCache.get(key);
 
   const thaiUrl = await resolveThaiAudioUrl(card);
   const zhText = (card?.zh || '').trim();
@@ -441,7 +460,7 @@ export async function buildListenCycle(card) {
   const rendered = await ctx.startRendering();
   const cycle = { url: URL.createObjectURL(encodeWav(rendered)), totalMs, timeline };
   cycleCache.set(key, cycle);
-  while (cycleCache.size > 8) {
+  while (cycleCache.size > 14) {
     const oldest = cycleCache.keys().next().value;
     try { URL.revokeObjectURL(cycleCache.get(oldest).url); } catch {}
     cycleCache.delete(oldest);

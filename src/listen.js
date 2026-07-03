@@ -8,6 +8,8 @@ import {
   buildListenCycle,
   cancelSpeech,
   estimateTeacherMs,
+  getCachedCycle,
+  getSilenceUrl,
   isPlaybackStalled,
   logListenEvent,
   playSilenceWithPromise,
@@ -22,8 +24,31 @@ import { escapeHtml } from './ui.js';
 
 let onAdvance = null;   // 切卡後的 callback（由 app.js 注入，用來重繪 UI）
 let runVersion = 0;
+let fillerRuns = 0;     // 背景中連續播過場空白的次數（保命機制）
+let warming = false;
+const WARM_AHEAD = 6;   // 播放中預先拼好後面幾張卡
 const PLAYBACK_RATES = [0.6, 0.8, 1, 1.2];
 const GAP_OPTIONS = ['auto', 1, 2, 3, 4];
+
+/* 播放中把後面幾張卡的循環先拼好（趁還有網路 / 還沒被凍結）。 */
+async function warmUpcomingCycles(cards, version) {
+  if (warming || !supportsCycleAssembly()) return;
+  warming = true;
+  try {
+    for (let i = 1; i <= Math.min(WARM_AHEAD, cards.length - 1); i++) {
+      if (!state.listen.playing || version !== runVersion) return;
+      const card = cards[(state.cardIndex + i) % cards.length];
+      if (!card || getCachedCycle(card)) continue;
+      try {
+        await buildListenCycle(card);
+      } catch (e) {
+        logListenEvent(`warm-fail +${i} ${e?.name || e?.message || e}`);
+      }
+    }
+  } finally {
+    warming = false;
+  }
+}
 
 export function renderListenMode(el, cards, advanceCb) {
   onAdvance = advanceCb;
@@ -115,6 +140,7 @@ export function startListen() {
   state.listen.playing = true;
   state.listen.repeatCount = 0;
   state.listen.phase = 'meaning';
+  fillerRuns = 0;
   unlockAudioPlayback();
   registerMediaSessionHandlers();
   navigator.mediaSession && (navigator.mediaSession.playbackState = 'playing');
@@ -154,22 +180,41 @@ async function runListenStep(version) {
   // 主路徑：整卡循環拼成一個 ≥5 秒的音檔一次播（Chrome 才給背景播放待遇）。
   // 只在卡片開頭走這條；拼不出來（離線、TTS 失敗）就掉回逐段模式。
   if (state.listen.repeatCount === 0 && supportsCycleAssembly()) {
-    let cycle = null;
-    try {
-      cycle = await buildListenCycle(card);
-    } catch (e) {
-      logListenEvent(`cycle-build-fail ${e?.name || e?.message || e}`);
+    let cycle = getCachedCycle(card);
+    if (!cycle) {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        // 前景：可以等網路現拼
+        try {
+          cycle = await buildListenCycle(card);
+        } catch (e) {
+          logListenEvent(`cycle-build-fail ${e?.name || e?.message || e}`);
+        }
+        if (!state.listen.playing || version !== runVersion) return;
+      } else {
+        // 背景 / 鎖屏：await 網路會被系統凍住 → 播 8 秒過場空白保住媒體工作階段，
+        // 同時非同步拼這張，過場播完再回來查快取。連續 5 次拼不出來才放棄。
+        void buildListenCycle(card).catch(e => logListenEvent(`cycle-build-fail ${e?.name || e?.message || e}`));
+        fillerRuns++;
+        if (fillerRuns > 5) { logListenEvent('filler-give-up'); stopListen(); return; }
+        logListenEvent(`filler ${fillerRuns}`);
+        const fillerMs = await playUrlWithPromise(getSilenceUrl(8000));
+        if (!state.listen.playing || version !== runVersion) return;
+        if (fillerMs <= 0) await wait(2000);
+        if (!state.listen.playing || version !== runVersion) return;
+        void runListenStep(version);
+        return;
+      }
     }
-    if (!state.listen.playing || version !== runVersion) return;
     if (cycle) {
+      fillerRuns = 0;
       logListenEvent(`c${state.cardIndex} cycle ${(cycle.totalMs / 1000).toFixed(1)}s`);
-      const nextCard = cards[(state.cardIndex + 1) % cards.length];
-      if (nextCard && nextCard !== card) void buildListenCycle(nextCard).catch(() => {}); // 預拼下一張
+      void warmUpcomingCycles(cards, version); // 持續補貨後面幾張
       scheduleCycleUi(cycle.timeline);
       const playedMs = await playUrlWithPromise(cycle.url);
       clearUiTimers();
       if (!state.listen.playing || version !== runVersion) return;
       if (playedMs > 0) {
+        logListenEvent(`c${state.cardIndex} done`);
         state.listen.repeatCount = 0;
         state.cardIndex = (state.cardIndex + 1) % cards.length;
         onAdvance?.('rerender');
