@@ -7,6 +7,7 @@ import {
   CHINESE_VOICE,
   buildListenCycle,
   cancelSpeech,
+  downloadLessonAudio,
   estimateTeacherMs,
   getCachedCycle,
   getSilenceUrl,
@@ -26,9 +27,37 @@ let onAdvance = null;   // 切卡後的 callback（由 app.js 注入，用來重
 let runVersion = 0;
 let fillerRuns = 0;     // 背景中連續播過場空白的次數（保命機制）
 let warming = false;
-const WARM_AHEAD = 6;   // 播放中預先拼好後面幾張卡
+let dlState = null;     // { key, done, total, failed, running } 這堂課音檔下載進度
+const WARM_AHEAD = 20;  // 播放中預先拼好後面幾張卡（約 5 分鐘鎖屏糧倉）
 const PLAYBACK_RATES = [0.6, 0.8, 1, 1.2];
 const GAP_OPTIONS = ['auto', 1, 2, 3, 4];
+
+/* 按播放就把整堂課來源音檔抓下來，之後拼卡不碰網路。 */
+function kickLessonDownload(cards) {
+  const key = `${state.currentLessonId}|${state.settings.voiceProvider}|${state.settings.voice}`;
+  if (dlState?.key === key && (dlState.running || dlState.done === dlState.total)) return;
+  dlState = { key, done: 0, total: cards.length, failed: 0, running: true };
+  renderDlStatus();
+  void downloadLessonAudio(cards, (done, total, failed) => {
+    if (dlState?.key !== key) return;
+    Object.assign(dlState, { done, total, failed });
+    renderDlStatus();
+  }).then(r => {
+    if (dlState?.key !== key) return;
+    dlState.running = false;
+    logListenEvent(`lesson-audio ${r.done - r.failed}/${r.total} ready${r.failed ? ` (${r.failed} failed)` : ''}`);
+    renderDlStatus();
+  });
+}
+
+function renderDlStatus() {
+  const el = document.getElementById('listenDlStatus');
+  if (!el || !dlState) return;
+  const ok = dlState.done - dlState.failed;
+  el.textContent = dlState.running
+    ? `下載中 ${dlState.done}/${dlState.total}`
+    : `${ok}/${dlState.total} 已備妥${dlState.failed ? `（${dlState.failed} 失敗）` : ''}`;
+}
 
 /* 播放中把後面幾張卡的循環先拼好（趁還有網路 / 還沒被凍結）。 */
 async function warmUpcomingCycles(cards, version) {
@@ -94,6 +123,10 @@ export function renderListenMode(el, cards, advanceCb) {
           <div style="font-size:12px;font-weight:500">${rep}×</div>
         </div>
         <div class="setting-row">
+          <div class="setting-label">離線音檔</div>
+          <div style="font-size:12px;font-weight:500" id="listenDlStatus">按播放自動下載</div>
+        </div>
+        <div class="setting-row">
           <div class="setting-label">跟讀間隔</div>
           <div class="listen-rate-seg" id="listenGapSeg">
             ${GAP_OPTIONS.map(gap => `
@@ -106,6 +139,7 @@ export function renderListenMode(el, cards, advanceCb) {
   `;
 
   document.getElementById('lPlay').addEventListener('click', toggleListen);
+  renderDlStatus();
   document.getElementById('lPrev').addEventListener('click', () => { stopListen(); prevInList(); });
   document.getElementById('lNext').addEventListener('click', () => { stopListen(); nextInList(); });
   document.getElementById('listenRateSeg')?.addEventListener('click', e => {
@@ -142,6 +176,7 @@ export function startListen() {
   state.listen.phase = 'meaning';
   fillerRuns = 0;
   unlockAudioPlayback();
+  if (supportsCycleAssembly()) kickLessonDownload(filteredCards());
   registerMediaSessionHandlers();
   navigator.mediaSession && (navigator.mediaSession.playbackState = 'playing');
   logListenEvent('start');

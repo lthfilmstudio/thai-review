@@ -447,7 +447,7 @@ async function buildListenCycleUncached(card, key) {
     thaiBuf.duration * 1000,
     { rate, gap, repeat },
   );
-  const sampleRate = 32000;
+  const sampleRate = 24000; // 語音夠用，20 張快取省記憶體
   const ctx = new OfflineAudioContext(1, Math.ceil(totalMs / 1000 * sampleRate), sampleRate);
   timeline.forEach(seg => {
     if (seg.phase === 'repeat') return; // 空白＝什麼都不排
@@ -460,12 +460,48 @@ async function buildListenCycleUncached(card, key) {
   const rendered = await ctx.startRendering();
   const cycle = { url: URL.createObjectURL(encodeWav(rendered)), totalMs, timeline };
   cycleCache.set(key, cycle);
-  while (cycleCache.size > 14) {
+  while (cycleCache.size > 24) {
     const oldest = cycleCache.keys().next().value;
     try { URL.revokeObjectURL(cycleCache.get(oldest).url); } catch {}
     cycleCache.delete(oldest);
   }
   return cycle;
+}
+
+/* ===== 整堂課音檔下載（背景播放的糧倉） =====
+   把整堂課每張卡的泰文（baked MP3 → SW cache）與中文（worker → 記憶體 blob）
+   先抓下來，之後拼卡完全不碰網路，鎖屏中補拼才不會餓死。 */
+
+const preparedCards = new Set();
+
+async function prepareCardAudio(card) {
+  const key = [card?.thai, card?.tts_prompt || '', card?.zh || '', pickVoiceProvider(), pickVoice()].join('|');
+  if (preparedCards.has(key)) return;
+  const thaiUrl = await resolveThaiAudioUrl(card);
+  if (!String(thaiUrl).startsWith('blob:')) {
+    const res = await fetch(thaiUrl); // 暖 SW runtime cache
+    if (!res.ok) throw new Error(`thai ${res.status}`);
+    await res.arrayBuffer();
+  }
+  const zhText = (card?.zh || '').trim();
+  if (zhText) await fetchWorkerTtsBlob(zhText, CHINESE_VOICE);
+  preparedCards.add(key);
+}
+
+/* 下載整堂課的來源音檔，onProgress(done, total, failed) 回報進度。 */
+export async function downloadLessonAudio(cards, onProgress) {
+  const list = (cards || []).filter(c => c?.thai);
+  let done = 0;
+  let failed = 0;
+  const CONCURRENCY = 3;
+  for (let i = 0; i < list.length; i += CONCURRENCY) {
+    await Promise.all(list.slice(i, i + CONCURRENCY).map(async card => {
+      try { await prepareCardAudio(card); } catch { failed++; }
+      done++;
+      onProgress?.(done, list.length, failed);
+    }));
+  }
+  return { done, total: list.length, failed };
 }
 
 /* 播一整個組裝好的循環（rate 已內嵌，播放器固定 1×）。回傳實際播放毫秒數。 */
