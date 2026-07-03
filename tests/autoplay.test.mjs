@@ -274,9 +274,9 @@ test('auto gap plays adaptive silence sized to teacher duration', async () => {
     await new Promise(resolve => setTimeout(resolve, 0));
   }
 
-  // 老師音檔 2 秒 → 跟讀空白 = 2000 × 1.5 = 3000ms 的真靜音
+  // 老師音檔 2 秒 → 跟讀空白 = 2000 × 1.8 = 3600ms 的真靜音
   assert.equal(playedUrls.length, 3);
   assert.equal(playedUrls[1], 'http://example.test/audio/jessica-v1/baked1.mp3');
-  assert.equal(playedUrls[2], getSilenceUrl(3000));
+  assert.equal(playedUrls[2], getSilenceUrl(3600));
   assert.notEqual(playedUrls[2], getSilenceUrl(1500));
 });

@@ -163,12 +163,12 @@ async function runListenStep(version) {
   const playedTeacherMs = await speakWithPromise(card);
   if (!state.listen.playing || version !== runVersion) return;
 
-  // Phase 3：跟讀空白。短字至少留 1.5 秒，長句用老師時間的 1.5 倍。
+  // Phase 3：跟讀空白。短字至少留 1.5 秒，長句用老師時間的 1.8 倍。
   // 播等長靜音而不是 setTimeout，背景 / 鎖屏中流程才不會被凍結。
   state.listen.phase = 'repeat';
   const teacherMs = playedTeacherMs > 0 ? playedTeacherMs : estimatedTeacherMs;
   const gapMs = state.settings.gap === 'auto'
-    ? Math.max(1500, teacherMs * 1.5)
+    ? Math.max(1500, teacherMs * 1.8)
     : Number(state.settings.gap) * 1000;
   if (gapMs > 0) {
     animateBar('barR', gapMs);

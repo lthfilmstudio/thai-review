@@ -752,6 +752,21 @@ async function init() {
   // Service worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW register failed:', e));
+    // 新版 SW 接管時自動重載，Android PWA 常駐背景才不會一直跑舊版 code。
+    let hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController) { hadController = true; return; } // 首次安裝不重載
+      location.reload();
+    });
+  }
+
+  // 設定裡顯示目前 cache 版本，方便確認裝置跑的是不是新版
+  if ('caches' in window) {
+    caches.keys().then(keys => {
+      const v = keys.find(k => k.startsWith('thai-review-'));
+      const el = document.getElementById('appVersionHint');
+      if (el && v) el.textContent = `App 版本：${v.replace('thai-review-', '')}`;
+    }).catch(() => {});
   }
 }
 

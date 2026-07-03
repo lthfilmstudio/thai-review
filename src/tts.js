@@ -206,6 +206,8 @@ export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked 
 
     const fallback = () => {
       if (generation !== playbackGeneration) { finish(0); return; }
+      // 背景中 speechSynthesis 不會出聲、也常不回 onend，直接跳過避免聲音鏈卡死。
+      if (typeof document !== 'undefined' && document.hidden) { finish(0); return; }
       if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) {
         finish(0);
         return;
@@ -217,10 +219,12 @@ export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked 
       const browserVoice = pickBrowserVoice(lang);
       if (browserVoice) utterance.voice = browserVoice;
 
+      // speechSynthesis 偶爾一個事件都不回，保險絲逾時直接放行。
+      const watchdog = setTimeout(() => finish(0), Math.max(4000, trimmed.length * 300));
       let startedAt = Date.now();
       utterance.onstart = () => { startedAt = Date.now(); };
-      utterance.onend = () => finish(Date.now() - startedAt);
-      utterance.onerror = () => finish(0);
+      utterance.onend = () => { clearTimeout(watchdog); finish(Date.now() - startedAt); };
+      utterance.onerror = () => { clearTimeout(watchdog); finish(0); };
       currentPlayback = { generation, utterance, resolve: finish };
       window.speechSynthesis.speak(utterance);
     };
