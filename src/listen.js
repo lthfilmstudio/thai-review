@@ -3,6 +3,7 @@
    跟讀空白也是播真靜音音檔（不是 setTimeout），audio session 不會斷。 */
 
 import { state, filteredCards, saveState } from './state.js';
+import { prepareLockListenSession } from './listen-lock.js';
 import {
   CHINESE_VOICE,
   buildListenCycle,
@@ -28,7 +29,12 @@ let runVersion = 0;
 let fillerRuns = 0;     // 背景中連續播過場空白的次數（保命機制）
 let warming = false;
 let dlState = null;     // { key, done, total, failed, running } 這堂課音檔下載進度
+let playbackMode = localStorage.getItem('thai-review-listen-playback-mode') || 'normal';
+let lockSession = null;
+let lockPreparing = false;
+let lockStatus = '';
 const WARM_AHEAD = 20;  // 播放中預先拼好後面幾張卡（約 5 分鐘鎖屏糧倉）
+const LOCK_CARD_LIMIT = 40;
 const PLAYBACK_RATES = [0.6, 0.8, 1, 1.2];
 const GAP_OPTIONS = ['auto', 1, 2, 3, 4];
 
@@ -105,11 +111,18 @@ export function renderListenMode(el, cards, advanceCb) {
         <div class="listen-spacer"></div>
         <div class="listen-controls">
           <button class="l-btn" id="lPrev" aria-label="上一張">◀◀</button>
-          <button class="l-main" id="lPlay" aria-label="${state.listen.playing ? '暫停' : '播放'}">${state.listen.playing ? '❚❚' : '▶'}</button>
+          <button class="l-main" id="lPlay" aria-label="${mainButtonAria()}">${mainButtonLabel()}</button>
           <button class="l-btn" id="lNext" aria-label="下一張">▶▶</button>
         </div>
       </div>
       <div class="listen-settings">
+        <div class="setting-row">
+          <div class="setting-label">播放模式</div>
+          <div class="listen-rate-seg" id="listenPlaybackSeg">
+            <button class="listen-rate-btn ${playbackMode === 'normal' ? 'active' : ''}" data-playback="normal">一般</button>
+            <button class="listen-rate-btn ${playbackMode === 'lock' ? 'active' : ''}" data-playback="lock">鎖屏</button>
+          </div>
+        </div>
         <div class="setting-row">
           <div class="setting-label">泰文語速</div>
           <div class="listen-rate-seg" id="listenRateSeg">
@@ -126,6 +139,10 @@ export function renderListenMode(el, cards, advanceCb) {
           <div class="setting-label">離線音檔</div>
           <div style="font-size:12px;font-weight:500" id="listenDlStatus">按播放自動下載</div>
         </div>
+        <div class="setting-row" id="lockStatusRow" style="${playbackMode === 'lock' ? '' : 'display:none'}">
+          <div class="setting-label">鎖屏音檔</div>
+          <div style="font-size:12px;font-weight:500" id="lockListenStatus">${lockStatus || '先按準備'}</div>
+        </div>
         <div class="setting-row">
           <div class="setting-label">跟讀間隔</div>
           <div class="listen-rate-seg" id="listenGapSeg">
@@ -140,12 +157,23 @@ export function renderListenMode(el, cards, advanceCb) {
 
   document.getElementById('lPlay').addEventListener('click', toggleListen);
   renderDlStatus();
-  document.getElementById('lPrev').addEventListener('click', () => { stopListen(); prevInList(); });
-  document.getElementById('lNext').addEventListener('click', () => { stopListen(); nextInList(); });
+  renderLockStatus();
+  document.getElementById('lPrev').addEventListener('click', () => { stopListen(); clearLockSession(); prevInList(); });
+  document.getElementById('lNext').addEventListener('click', () => { stopListen(); clearLockSession(); nextInList(); });
+  document.getElementById('listenPlaybackSeg')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-playback]');
+    if (!btn) return;
+    stopListen();
+    clearLockSession();
+    playbackMode = btn.dataset.playback === 'lock' ? 'lock' : 'normal';
+    localStorage.setItem('thai-review-listen-playback-mode', playbackMode);
+    onAdvance?.('rerender');
+  });
   document.getElementById('listenRateSeg')?.addEventListener('click', e => {
     const btn = e.target.closest('[data-rate]');
     if (!btn) return;
     state.settings.rate = Number(btn.dataset.rate);
+    clearLockSession();
     saveState();
     document.querySelectorAll('#listenRateSeg .listen-rate-btn').forEach(rateBtn => {
       rateBtn.classList.toggle('active', rateBtn === btn);
@@ -155,6 +183,7 @@ export function renderListenMode(el, cards, advanceCb) {
     const btn = e.target.closest('[data-gap]');
     if (!btn) return;
     state.settings.gap = btn.dataset.gap === 'auto' ? 'auto' : Number(btn.dataset.gap);
+    clearLockSession();
     saveState();
     document.querySelectorAll('#listenGapSeg .listen-rate-btn').forEach(gapBtn => {
       gapBtn.classList.toggle('active', gapBtn === btn);
@@ -170,6 +199,12 @@ export function toggleListen() {
 }
 
 export function startListen() {
+  if (playbackMode === 'lock') {
+    if (lockSession) startLockListen();
+    else void prepareLockSession();
+    return;
+  }
+
   const version = ++runVersion;
   state.listen.playing = true;
   state.listen.repeatCount = 0;
@@ -196,7 +231,22 @@ export function stopListen() {
   const barT = document.getElementById('barT'); if (barT) barT.style.width = '0';
   const barR = document.getElementById('barR'); if (barR) barR.style.width = '0';
   navigator.mediaSession && (navigator.mediaSession.playbackState = 'paused');
-  updatePlayBtn('▶', '播放');
+  updateMainButton();
+}
+
+function mainButtonLabel() {
+  if (state.listen.playing) return '❚❚';
+  if (playbackMode === 'lock') {
+    if (lockPreparing) return '…';
+    if (!lockSession) return '準備';
+  }
+  return '▶';
+}
+
+function mainButtonAria() {
+  if (state.listen.playing) return '暫停';
+  if (playbackMode === 'lock' && !lockSession) return '準備鎖屏長音檔';
+  return '播放';
 }
 
 function updatePlayBtn(label, aria) {
@@ -204,6 +254,82 @@ function updatePlayBtn(label, aria) {
   if (!btn) return;
   btn.textContent = label;
   btn.setAttribute('aria-label', aria);
+}
+
+function updateMainButton() {
+  updatePlayBtn(mainButtonLabel(), mainButtonAria());
+}
+
+function setLockStatus(text) {
+  lockStatus = text;
+  renderLockStatus();
+}
+
+function renderLockStatus() {
+  const el = document.getElementById('lockListenStatus');
+  if (el) el.textContent = lockStatus || '先按準備';
+}
+
+function clearLockSession() {
+  if (lockSession?.url) {
+    try { URL.revokeObjectURL(lockSession.url); } catch {}
+  }
+  lockSession = null;
+  lockPreparing = false;
+  lockStatus = '';
+  updateMainButton();
+  renderLockStatus();
+}
+
+async function prepareLockSession() {
+  if (lockPreparing) return;
+  lockPreparing = true;
+  setLockStatus('準備中…');
+  updateMainButton();
+  logListenEvent('lock-prepare');
+  try {
+    const cards = filteredCards();
+    const session = await prepareLockListenSession(cards, {
+      startIndex: state.cardIndex,
+      limit: Math.min(LOCK_CARD_LIMIT, cards.length),
+      repeat: state.settings.repeat,
+      gap: state.settings.gap,
+      rate: state.settings.rate,
+    });
+    lockSession = session;
+    logListenEvent(`lock-ready ${session.count} cards ${(session.totalMs / 60000).toFixed(1)}m`);
+    setLockStatus(`${session.count} 張 / ${(session.totalMs / 60000).toFixed(1)} 分鐘已備妥`);
+  } catch (e) {
+    logListenEvent(`lock-fail ${e?.message || e}`);
+    setLockStatus(`失敗：${e?.message || e}`);
+  } finally {
+    lockPreparing = false;
+    updateMainButton();
+  }
+}
+
+async function startLockListen() {
+  if (!lockSession) return;
+  const version = ++runVersion;
+  state.listen.playing = true;
+  state.listen.repeatCount = 0;
+  state.listen.phase = 'teacher';
+  registerMediaSessionHandlers();
+  navigator.mediaSession && (navigator.mediaSession.playbackState = 'playing');
+  logListenEvent('lock-play');
+  updateMainButton();
+  scheduleLockUi(lockSession);
+  const playedMs = await playUrlWithPromise(lockSession.url);
+  clearUiTimers();
+  if (!state.listen.playing || version !== runVersion) return;
+  state.listen.playing = false;
+  navigator.mediaSession && (navigator.mediaSession.playbackState = 'paused');
+  if (playedMs > 0) {
+    state.cardIndex = lockSession.nextIndex;
+    logListenEvent('lock-done');
+  }
+  clearLockSession();
+  onAdvance?.('rerender');
 }
 
 async function runListenStep(version) {
@@ -349,6 +475,30 @@ function scheduleCycleUi(timeline) {
         animateBar('barR', seg.durMs);
       }
     }, seg.startMs));
+  });
+}
+
+function scheduleLockUi(session) {
+  clearUiTimers();
+  session.entries.forEach(entry => {
+    uiTimers.push(setTimeout(() => {
+      if (!state.listen.playing) return;
+      state.cardIndex = entry.cardIndex;
+      state.listen.repeatCount = 0;
+      onAdvance?.('rerender');
+    }, entry.startMs));
+    entry.timeline.forEach(seg => {
+      uiTimers.push(setTimeout(() => {
+        if (!state.listen.playing) return;
+        if (state.cardIndex !== entry.cardIndex) {
+          state.cardIndex = entry.cardIndex;
+          onAdvance?.('rerender');
+        }
+        state.listen.phase = seg.phase;
+        if (typeof seg.rep === 'number') state.listen.repeatCount = seg.rep;
+        updateRepeatInfo();
+      }, seg.startMs + 30));
+    });
   });
 }
 
