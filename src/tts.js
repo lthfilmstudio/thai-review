@@ -450,13 +450,22 @@ async function buildListenCycleUncached(card, key) {
   const sampleRate = 24000; // 語音夠用，20 張快取省記憶體
   const ctx = new OfflineAudioContext(1, Math.ceil(totalMs / 1000 * sampleRate), sampleRate);
   timeline.forEach(seg => {
-    if (seg.phase === 'repeat') return; // 空白＝什麼都不排
+    if (seg.phase === 'repeat') return; // 空白＝不排語音，靠底線訊號保持「有聲」
     const src = ctx.createBufferSource();
     src.buffer = seg.phase === 'meaning' ? zhBuf : thaiBuf;
     if (seg.phase === 'teacher') src.playbackRate.value = rate;
     src.connect(ctx.destination);
     src.start(seg.startMs / 1000);
   });
+  // 全程墊一條 40Hz / -26dBFS 低頻底線：跟讀空白太長（>5 秒純靜音）時
+  // Chrome 會判定媒體「沒在出聲」而收回媒體身分、暫停播放（實測 c161 33.6s 卡死點）。
+  // 40Hz 手機喇叭與耳機都放不出來，人耳聽不到。
+  const keepAlive = ctx.createOscillator();
+  keepAlive.frequency.value = 40;
+  const keepAliveGain = ctx.createGain();
+  keepAliveGain.gain.value = 0.05;
+  keepAlive.connect(keepAliveGain).connect(ctx.destination);
+  keepAlive.start(0);
   const rendered = await ctx.startRendering();
   const cycle = { url: URL.createObjectURL(encodeWav(rendered)), totalMs, timeline };
   cycleCache.set(key, cycle);
@@ -523,9 +532,20 @@ export function playUrlWithPromise(url) {
     audio.defaultPlaybackRate = 1;
     audio.playbackRate = 1;
     let startedAt = Date.now();
+    let resumeTries = 0;
     currentPlayback = { generation, audio, resolve: finish };
     audio.onended = () => finish(Date.now() - startedAt);
     audio.onerror = () => { logListenEvent('cycle-media-error'); finish(0); };
+    // 播到一半被系統暫停（沒 ended 就 pause）→ 自救續播，最多 3 次
+    audio.onpause = () => {
+      if (settled || audio.ended || generation !== playbackGeneration) return;
+      logListenEvent(`cycle-paused @${Math.round(audio.currentTime)}s`);
+      if (resumeTries >= 3) { logListenEvent('cycle-resume-give-up'); return; }
+      resumeTries++;
+      audio.play()
+        .then(() => logListenEvent('cycle-resumed'))
+        .catch(err => logListenEvent(`cycle-resume-fail ${err?.name || err}`));
+    };
     startedAt = Date.now();
     audio.play().catch(err => { logListenEvent(`cycle-play-fail ${err?.name || err}`); finish(0); });
   });
