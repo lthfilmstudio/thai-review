@@ -113,7 +113,7 @@ const stateModule = await import('../src/state.js');
 const ttsModule = await import('../src/tts.js');
 const listenModule = await import('../src/listen.js');
 const { state, loadState, STORAGE_KEY } = stateModule;
-const { speakWithPromise, getSilenceUrl } = ttsModule;
+const { speakWithPromise, getSilenceUrl, computeCycleTimeline } = ttsModule;
 const { startListen, stopListen } = listenModule;
 stateRef = state;
 
@@ -255,6 +255,22 @@ test('a card plays Chinese once, then Thai for every repetition', async () => {
     'blob:test-3',
     'blob:test-3',
   ]);
+});
+
+test('cycle timeline embeds zh once and adaptive gaps per repeat', () => {
+  const { timeline, totalMs, gapMs } = computeCycleTimeline(2000, 2000, { rate: 1, gap: 'auto', repeat: 2 });
+
+  assert.equal(gapMs, 3600); // 2000 × 1.8
+  assert.deepEqual(timeline.map(seg => seg.phase), ['meaning', 'teacher', 'repeat', 'teacher', 'repeat']);
+  assert.equal(totalMs, 2000 + 2 * (2000 + 3600));
+});
+
+test('cycle timeline applies playback rate to teacher and gap only', () => {
+  const { timeline, gapMs, teacherEffMs } = computeCycleTimeline(3000, 2400, { rate: 1.2, gap: 'auto', repeat: 1 });
+
+  assert.equal(teacherEffMs, 2000);
+  assert.equal(gapMs, 3600);
+  assert.equal(timeline[0].durMs, 3000); // 中文不受語速影響
 });
 
 test('auto gap plays adaptive silence sized to teacher duration', async () => {

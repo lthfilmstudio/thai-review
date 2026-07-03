@@ -327,6 +327,160 @@ export function prefetchSpeech(text, voice) {
   if (trimmed) void fetchWorkerTtsBlob(trimmed, voice);
 }
 
+/* ===== 整卡循環組裝（背景播放的關鍵） =====
+   Chrome Android 只對「長度 ≥ 5 秒」的媒體請求完整 audio focus 與媒體通知
+   （web.dev/articles/media-session）；逐段播 2-3 秒短音會被當音效，
+   鎖屏後整頁被凍結。所以把「中文 + (泰文 + 跟讀空白) × N」離線拼成
+   一個十幾秒的 WAV 一次播，Chrome 才會給 podcast 等級的背景播放待遇。 */
+
+const cycleCache = new Map(); // key → { url, totalMs, timeline }
+let decodeCtx = null;
+
+export function supportsCycleAssembly() {
+  return typeof OfflineAudioContext !== 'undefined';
+}
+
+function getDecodeCtx() {
+  if (!decodeCtx) {
+    const Ctx = globalThis.AudioContext || globalThis.webkitAudioContext;
+    decodeCtx = new Ctx();
+  }
+  return decodeCtx;
+}
+
+async function fetchAudioBuffer(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`audio fetch ${res.status}`);
+  const bytes = await res.arrayBuffer();
+  return await getDecodeCtx().decodeAudioData(bytes);
+}
+
+async function resolveThaiAudioUrl(card) {
+  const usePrompt = pickVoiceProvider() === 'elevenlabs' && !card?._edited && card?.tts_prompt;
+  const text = ((usePrompt ? card.tts_prompt : card?.thai) || '').trim();
+  if (!text) throw new Error('no-thai-text');
+  if (pickVoiceProvider() === 'elevenlabs') {
+    const baked = await findBakedAudioUrl(text, 'th-TH');
+    if (baked) return baked;
+  }
+  const url = await fetchWorkerTtsBlob(text, pickVoice());
+  if (!url) throw new Error('no-thai-tts');
+  return url;
+}
+
+/* 純函式：算整卡時間軸。teacherMs 是原速長度，rate 只套在老師泰文上。 */
+export function computeCycleTimeline(zhMs, teacherMs, { rate = 1, gap = 'auto', repeat = 1 }) {
+  const teacherEffMs = teacherMs / rate;
+  const gapMs = gap === 'auto' ? Math.max(1500, teacherEffMs * 1.8) : Number(gap) * 1000;
+  const timeline = [];
+  let t = 0;
+  if (zhMs > 0) { timeline.push({ phase: 'meaning', startMs: 0, durMs: zhMs }); t = zhMs; }
+  for (let r = 0; r < repeat; r++) {
+    timeline.push({ phase: 'teacher', startMs: t, durMs: teacherEffMs, rep: r });
+    t += teacherEffMs;
+    timeline.push({ phase: 'repeat', startMs: t, durMs: gapMs, rep: r });
+    t += gapMs;
+  }
+  return { timeline, totalMs: t, gapMs, teacherEffMs };
+}
+
+function encodeWav(buffer) {
+  const data = buffer.getChannelData(0);
+  const dataSize = data.length * 2;
+  const out = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(out);
+  const writeStr = (off, str) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
+  };
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + dataSize, true); writeStr(8, 'WAVE');
+  writeStr(12, 'fmt '); view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, buffer.sampleRate, true); view.setUint32(28, buffer.sampleRate * 2, true);
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  writeStr(36, 'data'); view.setUint32(40, dataSize, true);
+  for (let i = 0; i < data.length; i++) {
+    const s = Math.max(-1, Math.min(1, data[i]));
+    view.setInt16(44 + i * 2, s < 0 ? s * 32768 : s * 32767, true);
+  }
+  return new Blob([out], { type: 'audio/wav' });
+}
+
+export async function buildListenCycle(card) {
+  const rate = pickRate();
+  const repeat = state.settings?.repeat || 1;
+  const gap = state.settings?.gap ?? 'auto';
+  const key = [
+    card?.thai, card?.tts_prompt || '', card?.zh || '',
+    pickVoiceProvider(), pickVoice(), rate, gap, repeat,
+  ].join('|');
+  if (cycleCache.has(key)) return cycleCache.get(key);
+
+  const thaiUrl = await resolveThaiAudioUrl(card);
+  const zhText = (card?.zh || '').trim();
+  const zhUrl = zhText ? await fetchWorkerTtsBlob(zhText, CHINESE_VOICE) : null;
+  const [thaiBuf, zhBuf] = await Promise.all([
+    fetchAudioBuffer(thaiUrl),
+    zhUrl ? fetchAudioBuffer(zhUrl) : Promise.resolve(null), // 中文抓不到就略過，不擋整卡
+  ]);
+
+  const { timeline, totalMs } = computeCycleTimeline(
+    (zhBuf?.duration || 0) * 1000,
+    thaiBuf.duration * 1000,
+    { rate, gap, repeat },
+  );
+  const sampleRate = 32000;
+  const ctx = new OfflineAudioContext(1, Math.ceil(totalMs / 1000 * sampleRate), sampleRate);
+  timeline.forEach(seg => {
+    if (seg.phase === 'repeat') return; // 空白＝什麼都不排
+    const src = ctx.createBufferSource();
+    src.buffer = seg.phase === 'meaning' ? zhBuf : thaiBuf;
+    if (seg.phase === 'teacher') src.playbackRate.value = rate;
+    src.connect(ctx.destination);
+    src.start(seg.startMs / 1000);
+  });
+  const rendered = await ctx.startRendering();
+  const cycle = { url: URL.createObjectURL(encodeWav(rendered)), totalMs, timeline };
+  cycleCache.set(key, cycle);
+  while (cycleCache.size > 8) {
+    const oldest = cycleCache.keys().next().value;
+    try { URL.revokeObjectURL(cycleCache.get(oldest).url); } catch {}
+    cycleCache.delete(oldest);
+  }
+  return cycle;
+}
+
+/* 播一整個組裝好的循環（rate 已內嵌，播放器固定 1×）。回傳實際播放毫秒數。 */
+export function playUrlWithPromise(url) {
+  cancelSpeech();
+  const generation = playbackGeneration;
+
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = ms => {
+      if (settled) return;
+      settled = true;
+      if (currentPlayback?.generation === generation) currentPlayback = null;
+      resolve(ms);
+    };
+
+    const audio = getSharedAudio();
+    audio.src = url;
+    audio.defaultPlaybackRate = 1;
+    audio.playbackRate = 1;
+    let startedAt = Date.now();
+    currentPlayback = { generation, audio, resolve: finish };
+    audio.onended = () => finish(Date.now() - startedAt);
+    audio.onerror = () => { logListenEvent('cycle-media-error'); finish(0); };
+    startedAt = Date.now();
+    audio.play().catch(err => { logListenEvent(`cycle-play-fail ${err?.name || err}`); finish(0); });
+  });
+}
+
+/* 頁面被凍結後回前景時，用這個判斷聲音鏈是不是卡死了。 */
+export function isPlaybackStalled() {
+  return !!(currentPlayback?.audio && currentPlayback.audio.paused);
+}
+
 /* 非阻塞播放（按鈕點擊用）。 */
 export function speakCard(card) {
   void speakWithPromise(card);

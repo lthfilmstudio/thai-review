@@ -5,13 +5,17 @@
 import { state, filteredCards, saveState } from './state.js';
 import {
   CHINESE_VOICE,
+  buildListenCycle,
   cancelSpeech,
   estimateTeacherMs,
+  isPlaybackStalled,
   logListenEvent,
   playSilenceWithPromise,
+  playUrlWithPromise,
   prefetchSpeech,
   speakTextWithPromise,
   speakWithPromise,
+  supportsCycleAssembly,
   unlockAudioPlayback,
 } from './tts.js';
 import { escapeHtml } from './ui.js';
@@ -127,6 +131,7 @@ export function stopListen() {
   cancelSpeech();
   cancelAnimationFrame(state.listen.rafId);
   clearTimeout(state.listen.timeoutId);
+  clearUiTimers();
   const barT = document.getElementById('barT'); if (barT) barT.style.width = '0';
   const barR = document.getElementById('barR'); if (barR) barR.style.width = '0';
   navigator.mediaSession && (navigator.mediaSession.playbackState = 'paused');
@@ -145,6 +150,35 @@ async function runListenStep(version) {
   const cards = filteredCards();
   if (!cards.length) { stopListen(); return; }
   const card = cards[state.cardIndex];
+
+  // 主路徑：整卡循環拼成一個 ≥5 秒的音檔一次播（Chrome 才給背景播放待遇）。
+  // 只在卡片開頭走這條；拼不出來（離線、TTS 失敗）就掉回逐段模式。
+  if (state.listen.repeatCount === 0 && supportsCycleAssembly()) {
+    let cycle = null;
+    try {
+      cycle = await buildListenCycle(card);
+    } catch (e) {
+      logListenEvent(`cycle-build-fail ${e?.name || e?.message || e}`);
+    }
+    if (!state.listen.playing || version !== runVersion) return;
+    if (cycle) {
+      logListenEvent(`c${state.cardIndex} cycle ${(cycle.totalMs / 1000).toFixed(1)}s`);
+      const nextCard = cards[(state.cardIndex + 1) % cards.length];
+      if (nextCard && nextCard !== card) void buildListenCycle(nextCard).catch(() => {}); // 預拼下一張
+      scheduleCycleUi(cycle.timeline);
+      const playedMs = await playUrlWithPromise(cycle.url);
+      clearUiTimers();
+      if (!state.listen.playing || version !== runVersion) return;
+      if (playedMs > 0) {
+        state.listen.repeatCount = 0;
+        state.cardIndex = (state.cardIndex + 1) % cards.length;
+        onAdvance?.('rerender');
+        void runListenStep(version);
+        return;
+      }
+      // 整卡播放失敗 → 往下掉回逐段模式播這張
+    }
+  }
 
   // Phase 1：每張卡只唸一次中文提示。
   if (state.listen.repeatCount === 0) {
@@ -207,6 +241,44 @@ function updateTeacherLabel(label) {
   if (el) el.textContent = label;
 }
 
+/* ===== 整卡循環的 UI 排程（純畫面用；背景中 timer 被凍結沒關係，聲音在同一個音檔裡） ===== */
+
+let uiTimers = [];
+
+function clearUiTimers() {
+  uiTimers.forEach(clearTimeout);
+  uiTimers = [];
+}
+
+function scheduleCycleUi(timeline) {
+  clearUiTimers();
+  timeline.forEach(seg => {
+    uiTimers.push(setTimeout(() => {
+      if (!state.listen.playing) return;
+      state.listen.phase = seg.phase;
+      if (typeof seg.rep === 'number') state.listen.repeatCount = seg.rep;
+      if (seg.phase === 'meaning') {
+        updateTeacherLabel('中文提示');
+        animateBar('barT', seg.durMs);
+      } else if (seg.phase === 'teacher') {
+        updateTeacherLabel('老師泰文');
+        animateBar('barT', seg.durMs);
+        const barR = document.getElementById('barR'); if (barR) barR.style.width = '0';
+        updateRepeatInfo();
+      } else if (seg.phase === 'repeat') {
+        animateBar('barR', seg.durMs);
+      }
+    }, seg.startMs));
+  });
+}
+
+function updateRepeatInfo() {
+  const el = document.querySelector('.listen-info');
+  if (!el) return;
+  const cards = filteredCards();
+  el.textContent = `第 ${state.cardIndex + 1} / ${cards.length} · 重複 ${Math.min(state.listen.repeatCount + 1, state.settings.repeat)}/${state.settings.repeat}`;
+}
+
 function animateBar(id, durationMs) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -240,6 +312,25 @@ function nextInList() {
   state.cardIndex = (state.cardIndex + 1) % cards.length;
   state.listen.repeatCount = 0;
   onAdvance?.('rerender');
+}
+
+/* ===== 回前景自救：頁面被凍結時聲音鏈可能卡死，偵測到就從當下這張卡重新開始 ===== */
+
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !state.listen.playing) return;
+    setTimeout(() => {
+      if (!state.listen.playing) return;
+      if (isPlaybackStalled()) {
+        logListenEvent('resume-after-freeze');
+        const version = ++runVersion;
+        cancelSpeech();
+        state.listen.repeatCount = 0;
+        onAdvance?.('rerender');
+        void runListenStep(version);
+      }
+    }, 600);
+  });
 }
 
 /* ===== Media Session（鎖屏顯示 + 控制鍵） ===== */
