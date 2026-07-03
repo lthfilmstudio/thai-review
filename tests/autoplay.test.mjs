@@ -91,6 +91,7 @@ class FakeAudio {
     this.src = src;
     this.duration = 2;
     this.playbackRate = 1;
+    this.defaultPlaybackRate = 1;
   }
 
   play() {
@@ -112,7 +113,7 @@ const stateModule = await import('../src/state.js');
 const ttsModule = await import('../src/tts.js');
 const listenModule = await import('../src/listen.js');
 const { state, loadState, STORAGE_KEY } = stateModule;
-const { speakWithPromise } = ttsModule;
+const { speakWithPromise, getSilenceUrl } = ttsModule;
 const { startListen, stopListen } = listenModule;
 stateRef = state;
 
@@ -237,10 +238,10 @@ test('a card plays Chinese once, then Thai for every repetition', async () => {
   }];
   state.currentLessonId = 'test';
   state.settings.repeat = 2;
-  stopAfterPlayCount = 3;
+  stopAfterPlayCount = 4; // 解鎖靜音 + 中文 + 泰文 ×2
 
   startListen();
-  for (let i = 0; i < 20 && playedUrls.length < 3; i++) {
+  for (let i = 0; i < 20 && playedUrls.length < 4; i++) {
     await new Promise(resolve => setTimeout(resolve, 0));
   }
 
@@ -248,5 +249,34 @@ test('a card plays Chinese once, then Thai for every repetition', async () => {
     ['你好', 'cmn-TW-Wavenet-A'],
     ['สวัสดี', 'th-TH-Neural2-C'],
   ]);
-  assert.deepEqual(playedUrls, ['blob:test-1', 'blob:test-2', 'blob:test-2']);
+  assert.deepEqual(playedUrls, [
+    getSilenceUrl(100),
+    'blob:test-2',
+    'blob:test-3',
+    'blob:test-3',
+  ]);
+});
+
+test('auto gap plays adaptive silence sized to teacher duration', async () => {
+  resetRuntime();
+  state.lessons = [{
+    id: 'test-auto',
+    title: 'TestAuto',
+    cards: [{ thai: 'เสียงอบแล้ว', karaoke: 'siang op laeo', zh: '烘焙測試' }],
+  }];
+  state.currentLessonId = 'test-auto';
+  state.settings.repeat = 1;
+  state.settings.gap = 'auto';
+  stopAfterPlayCount = 3; // 中文 + 泰文 + 跟讀靜音（已解鎖，不再播解鎖靜音）
+
+  startListen();
+  for (let i = 0; i < 20 && playedUrls.length < 3; i++) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  // 老師音檔 2 秒 → 跟讀空白 = 2000 × 1.5 = 3000ms 的真靜音
+  assert.equal(playedUrls.length, 3);
+  assert.equal(playedUrls[1], 'http://example.test/audio/jessica-v1/baked1.mp3');
+  assert.equal(playedUrls[2], getSilenceUrl(3000));
+  assert.notEqual(playedUrls[2], getSilenceUrl(1500));
 });

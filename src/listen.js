@@ -1,25 +1,26 @@
 /* 被動聽力模式：老師語音 → 跟讀空白 → 重複 N 次 → 下一張。
-   手機鎖屏背景播放靠 Media Session API + 一條極短的靜音 audio loop
-   （index.html 裡的 #silentLoop）保持 audio session active。 */
+   手機背景 / 鎖屏播放：全程用 tts.js 的共用 <audio> 串聲音鏈，
+   跟讀空白也是播真靜音音檔（不是 setTimeout），audio session 不會斷。 */
 
 import { state, filteredCards, saveState } from './state.js';
 import {
   CHINESE_VOICE,
   cancelSpeech,
   estimateTeacherMs,
+  playSilenceWithPromise,
   speakTextWithPromise,
   speakWithPromise,
+  unlockAudioPlayback,
 } from './tts.js';
 import { escapeHtml } from './ui.js';
 
 let onAdvance = null;   // 切卡後的 callback（由 app.js 注入，用來重繪 UI）
-let silentAudio = null;
 let runVersion = 0;
 const PLAYBACK_RATES = [0.6, 0.8, 1, 1.2];
+const GAP_OPTIONS = ['auto', 1, 2, 3, 4];
 
 export function renderListenMode(el, cards, advanceCb) {
   onAdvance = advanceCb;
-  silentAudio = silentAudio || document.getElementById('silentLoop');
 
   const i = state.cardIndex;
   const card = cards[i];
@@ -63,7 +64,11 @@ export function renderListenMode(el, cards, advanceCb) {
         </div>
         <div class="setting-row">
           <div class="setting-label">跟讀間隔</div>
-          <div style="font-size:12px;font-weight:500">${state.settings.gap === 'auto' ? '自動' : state.settings.gap + 's'}</div>
+          <div class="listen-rate-seg" id="listenGapSeg">
+            ${GAP_OPTIONS.map(gap => `
+              <button class="listen-rate-btn ${String(state.settings.gap) === String(gap) ? 'active' : ''}" data-gap="${gap}">${gap === 'auto' ? '自動' : gap + 's'}</button>
+            `).join('')}
+          </div>
         </div>
       </div>
     </div>
@@ -81,6 +86,15 @@ export function renderListenMode(el, cards, advanceCb) {
       rateBtn.classList.toggle('active', rateBtn === btn);
     });
   });
+  document.getElementById('listenGapSeg')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-gap]');
+    if (!btn) return;
+    state.settings.gap = btn.dataset.gap === 'auto' ? 'auto' : Number(btn.dataset.gap);
+    saveState();
+    document.querySelectorAll('#listenGapSeg .listen-rate-btn').forEach(gapBtn => {
+      gapBtn.classList.toggle('active', gapBtn === btn);
+    });
+  });
 
   updateMediaSessionMetadata(card);
 }
@@ -95,7 +109,7 @@ export function startListen() {
   state.listen.playing = true;
   state.listen.repeatCount = 0;
   state.listen.phase = 'meaning';
-  startSilentLoop();
+  unlockAudioPlayback();
   registerMediaSessionHandlers();
   navigator.mediaSession && (navigator.mediaSession.playbackState = 'playing');
   void runListenStep(version);
@@ -111,7 +125,6 @@ export function stopListen() {
   clearTimeout(state.listen.timeoutId);
   const barT = document.getElementById('barT'); if (barT) barT.style.width = '0';
   const barR = document.getElementById('barR'); if (barR) barR.style.width = '0';
-  stopSilentLoop();
   navigator.mediaSession && (navigator.mediaSession.playbackState = 'paused');
   updatePlayBtn('▶', '播放');
 }
@@ -151,14 +164,19 @@ async function runListenStep(version) {
   if (!state.listen.playing || version !== runVersion) return;
 
   // Phase 3：跟讀空白。短字至少留 1.5 秒，長句用老師時間的 1.5 倍。
+  // 播等長靜音而不是 setTimeout，背景 / 鎖屏中流程才不會被凍結。
   state.listen.phase = 'repeat';
   const teacherMs = playedTeacherMs > 0 ? playedTeacherMs : estimatedTeacherMs;
   const gapMs = state.settings.gap === 'auto'
     ? Math.max(1500, teacherMs * 1.5)
     : Number(state.settings.gap) * 1000;
-  animateBar('barR', gapMs);
-  await wait(gapMs);
-  if (!state.listen.playing || version !== runVersion) return;
+  if (gapMs > 0) {
+    animateBar('barR', gapMs);
+    const silentMs = await playSilenceWithPromise(gapMs);
+    if (!state.listen.playing || version !== runVersion) return;
+    if (silentMs <= 0) await wait(gapMs); // 靜音播放失敗才退回計時器
+    if (!state.listen.playing || version !== runVersion) return;
+  }
 
   state.listen.repeatCount++;
   resetBars();
@@ -213,20 +231,6 @@ function nextInList() {
   state.cardIndex = (state.cardIndex + 1) % cards.length;
   state.listen.repeatCount = 0;
   onAdvance?.('rerender');
-}
-
-/* ===== Silent audio loop（維持鎖屏 session） ===== */
-
-function startSilentLoop() {
-  if (!silentAudio) return;
-  silentAudio.volume = 0;
-  silentAudio.muted = true;
-  silentAudio.play().catch(e => console.warn('silent loop play blocked:', e));
-}
-
-function stopSilentLoop() {
-  if (!silentAudio) return;
-  try { silentAudio.pause(); } catch (e) {}
 }
 
 /* ===== Media Session（鎖屏顯示 + 控制鍵） ===== */

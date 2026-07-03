@@ -1,6 +1,8 @@
 /* 泰文／中文 TTS。
    泰文主路徑：靜態 MP3 manifest → thai-tts-proxy Worker → 瀏覽器 speechSynthesis。
-   中文提示繼續走 Worker → 瀏覽器 speechSynthesis。 */
+   中文提示繼續走 Worker → 瀏覽器 speechSynthesis。
+   所有雲端音檔共用一個常駐 <audio>（gesture 解鎖一次），
+   跟讀空白播真靜音 WAV 而不是 setTimeout —— 背景 / 鎖屏才不會被凍結。 */
 
 import { state } from './state.js';
 
@@ -16,6 +18,52 @@ const bakedAudioCache = new Map();
 let currentPlayback = null;
 let playbackGeneration = 0;
 let audioManifestPromise = null;
+let sharedAudio = null;
+let audioUnlocked = false;
+const silenceUrlCache = new Map();
+
+function getSharedAudio() {
+  if (!sharedAudio) sharedAudio = new Audio();
+  return sharedAudio;
+}
+
+/* 現場合成指定長度的靜音 WAV（16-bit mono 8kHz），依 100ms 取整做 cache。 */
+function silenceWavBuffer(ms) {
+  const sampleRate = 8000;
+  const samples = Math.max(1, Math.round(sampleRate * ms / 1000));
+  const dataSize = samples * 2;
+  const buf = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buf);
+  const writeStr = (off, str) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
+  };
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + dataSize, true); writeStr(8, 'WAVE');
+  writeStr(12, 'fmt '); view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  writeStr(36, 'data'); view.setUint32(40, dataSize, true);
+  return buf;
+}
+
+export function getSilenceUrl(ms) {
+  const key = Math.max(100, Math.round(ms / 100) * 100);
+  if (!silenceUrlCache.has(key)) {
+    const blob = new Blob([silenceWavBuffer(key)], { type: 'audio/wav' });
+    silenceUrlCache.set(key, URL.createObjectURL(blob));
+  }
+  return silenceUrlCache.get(key);
+}
+
+/* 在使用者手勢裡先播一小段靜音，之後背景中換音源續播才不會被擋。 */
+export function unlockAudioPlayback() {
+  if (audioUnlocked) return;
+  const audio = getSharedAudio();
+  try {
+    audio.src = getSilenceUrl(100);
+    audio.play().then(() => { audioUnlocked = true; }).catch(() => {});
+  } catch {}
+}
 
 function normalizeThaiAudioText(text) {
   return String(text || '').trim().replace(/\s+/g, '');
@@ -181,7 +229,10 @@ export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked 
       if (generation !== playbackGeneration) { finish(0); return; }
       if (!url) { onError(); return; }
 
-      const audio = new Audio(url);
+      const audio = getSharedAudio();
+      audio.src = url;
+      // 換 src 會把 playbackRate 重設成 defaultPlaybackRate，兩個都要設。
+      audio.defaultPlaybackRate = rate;
       audio.playbackRate = rate;
       let startedAt = Date.now();
       currentPlayback = { generation, audio, resolve: finish };
@@ -206,6 +257,38 @@ export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked 
     baked.then(url => {
       playAudio(url, playWorkerAudio);
     });
+  });
+}
+
+/* 跟讀空白：播一段等長靜音，讓 audio session 一直活著。回傳實際靜音毫秒數，失敗回 0。 */
+export function playSilenceWithPromise(ms) {
+  cancelSpeech();
+  const generation = playbackGeneration;
+
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = playedMs => {
+      if (settled) return;
+      settled = true;
+      if (currentPlayback?.generation === generation) currentPlayback = null;
+      resolve(playedMs);
+    };
+
+    if (!(ms > 0)) { finish(0); return; }
+
+    const audio = getSharedAudio();
+    try {
+      audio.src = getSilenceUrl(ms);
+    } catch {
+      finish(0);
+      return;
+    }
+    audio.defaultPlaybackRate = 1;
+    audio.playbackRate = 1;
+    currentPlayback = { generation, audio, resolve: finish };
+    audio.onended = () => finish(ms);
+    audio.onerror = () => finish(0);
+    audio.play().catch(() => finish(0));
   });
 }
 
