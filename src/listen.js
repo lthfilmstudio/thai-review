@@ -7,7 +7,9 @@ import {
   CHINESE_VOICE,
   cancelSpeech,
   estimateTeacherMs,
+  logListenEvent,
   playSilenceWithPromise,
+  prefetchSpeech,
   speakTextWithPromise,
   speakWithPromise,
   unlockAudioPlayback,
@@ -112,12 +114,14 @@ export function startListen() {
   unlockAudioPlayback();
   registerMediaSessionHandlers();
   navigator.mediaSession && (navigator.mediaSession.playbackState = 'playing');
+  logListenEvent('start');
   void runListenStep(version);
   updatePlayBtn('❚❚', '暫停');
 }
 
 export function stopListen() {
   runVersion++;
+  if (state.listen.playing) logListenEvent('stop');
   state.listen.playing = false;
   state.listen.phase = 'idle';
   cancelSpeech();
@@ -146,6 +150,7 @@ async function runListenStep(version) {
   if (state.listen.repeatCount === 0) {
     state.listen.phase = 'meaning';
     updateTeacherLabel('中文提示');
+    logListenEvent(`c${state.cardIndex} meaning`);
     await speakTextWithPromise({
       text: card.zh,
       voice: CHINESE_VOICE,
@@ -158,6 +163,9 @@ async function runListenStep(version) {
   // Phase 2：老師泰文。真實播放時間會拿來算跟讀長度。
   state.listen.phase = 'teacher';
   updateTeacherLabel('老師泰文');
+  logListenEvent(`c${state.cardIndex} r${state.listen.repeatCount} teacher`);
+  const nextCard = cards[(state.cardIndex + 1) % cards.length];
+  if (nextCard?.zh) prefetchSpeech(nextCard.zh, CHINESE_VOICE); // 先抓下一張的中文
   const estimatedTeacherMs = estimateTeacherMs(card);
   animateBar('barT', estimatedTeacherMs);
   const playedTeacherMs = await speakWithPromise(card);
@@ -171,6 +179,7 @@ async function runListenStep(version) {
     ? Math.max(1500, teacherMs * 1.8)
     : Number(state.settings.gap) * 1000;
   if (gapMs > 0) {
+    logListenEvent(`c${state.cardIndex} r${state.listen.repeatCount} gap ${Math.round(gapMs)}`);
     animateBar('barR', gapMs);
     const silentMs = await playSilenceWithPromise(gapMs);
     if (!state.listen.playing || version !== runVersion) return;

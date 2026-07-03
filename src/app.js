@@ -11,7 +11,7 @@ import {
 } from './state.js';
 import { loadLessons, loadTabsOnly, fetchLessonCards, loadFromBundledJson } from './data.js';
 import { initDailyLog, logReview } from './today.js';
-import { speakCard, warmupVoices } from './tts.js';
+import { getListenLog, speakCard, warmupVoices } from './tts.js';
 import { stopListen } from './listen.js';
 import {
   renderSidebar, renderTopbarTitle, renderStats, renderContent,
@@ -760,7 +760,7 @@ async function init() {
     });
   }
 
-  // 設定裡顯示目前 cache 版本，方便確認裝置跑的是不是新版
+  // 設定裡顯示目前 cache 版本，方便確認裝置跑的是不是新版；點版本號展開聽力鏈除錯紀錄
   if ('caches' in window) {
     caches.keys().then(keys => {
       const v = keys.find(k => k.startsWith('thai-review-'));
@@ -768,6 +768,13 @@ async function init() {
       if (el && v) el.textContent = `App 版本：${v.replace('thai-review-', '')}`;
     }).catch(() => {});
   }
+  document.getElementById('appVersionHint')?.addEventListener('click', () => {
+    const pre = document.getElementById('listenLogView');
+    if (!pre) return;
+    const show = pre.style.display === 'none';
+    if (show) pre.textContent = getListenLog().join('\n') || '（沒有紀錄）';
+    pre.style.display = show ? 'block' : 'none';
+  });
 }
 
 init();

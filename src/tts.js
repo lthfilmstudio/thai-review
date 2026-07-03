@@ -27,7 +27,27 @@ function getSharedAudio() {
   return sharedAudio;
 }
 
-/* 現場合成指定長度的靜音 WAV（16-bit mono 8kHz），依 100ms 取整做 cache。 */
+/* ===== 聽力鏈除錯紀錄（設定裡點 App 版本可展開） ===== */
+
+const LISTEN_LOG_KEY = 'thai-review-listen-log';
+
+export function logListenEvent(tag) {
+  try {
+    const log = JSON.parse(localStorage.getItem(LISTEN_LOG_KEY) || '[]');
+    log.push(`${new Date().toTimeString().slice(0, 8)} ${tag}`);
+    while (log.length > 40) log.shift();
+    localStorage.setItem(LISTEN_LOG_KEY, JSON.stringify(log));
+  } catch {}
+}
+
+export function getListenLog() {
+  try { return JSON.parse(localStorage.getItem(LISTEN_LOG_KEY) || '[]'); } catch { return []; }
+}
+
+/* 現場合成指定長度的「跟讀空白」WAV（16-bit mono 8kHz），依 100ms 取整做 cache。
+   不能是純數位靜音：Chrome 只在「有能量的聲音」播放時保持背景喚醒（audio wakelock），
+   純 0 訊號會被判定沒在出聲 → 鎖屏後整頁被凍結、聲音鏈卡死。
+   改埋一個 35Hz、約 -30dBFS 的極低頻訊號：能量偵測看得到、人耳與手機喇叭聽不到。 */
 function silenceWavBuffer(ms) {
   const sampleRate = 8000;
   const samples = Math.max(1, Math.round(sampleRate * ms / 1000));
@@ -43,6 +63,11 @@ function silenceWavBuffer(ms) {
   view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
   view.setUint16(32, 2, true); view.setUint16(34, 16, true);
   writeStr(36, 'data'); view.setUint32(40, dataSize, true);
+  const amp = 1000; // ≈ -30dBFS
+  const step = 2 * Math.PI * 35 / sampleRate;
+  for (let i = 0; i < samples; i++) {
+    view.setInt16(44 + i * 2, Math.round(Math.sin(i * step) * amp), true);
+  }
   return buf;
 }
 
@@ -246,9 +271,9 @@ export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked 
           : Date.now() - startedAt;
         finish(durationMs);
       };
-      audio.onerror = onError;
+      audio.onerror = () => { logListenEvent('media-error'); onError(); };
       startedAt = Date.now();
-      audio.play().catch(onError);
+      audio.play().catch(err => { logListenEvent(`play-fail ${err?.name || err}`); onError(); });
     };
 
     const playWorkerAudio = () => {
@@ -291,9 +316,15 @@ export function playSilenceWithPromise(ms) {
     audio.playbackRate = 1;
     currentPlayback = { generation, audio, resolve: finish };
     audio.onended = () => finish(ms);
-    audio.onerror = () => finish(0);
-    audio.play().catch(() => finish(0));
+    audio.onerror = () => { logListenEvent('gap-media-error'); finish(0); };
+    audio.play().catch(err => { logListenEvent(`gap-play-fail ${err?.name || err}`); finish(0); });
   });
+}
+
+/* 提前抓語音進 cache（換卡瞬間不用等網路，背景中更穩）。 */
+export function prefetchSpeech(text, voice) {
+  const trimmed = (text || '').trim();
+  if (trimmed) void fetchWorkerTtsBlob(trimmed, voice);
 }
 
 /* 非阻塞播放（按鈕點擊用）。 */
