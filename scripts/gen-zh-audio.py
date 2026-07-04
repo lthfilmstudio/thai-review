@@ -26,6 +26,7 @@ import shutil
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from urllib import error, request
@@ -358,15 +359,22 @@ def generate(report: dict, zh_manifest: dict, manifest_path: Path, out_dir: Path
     for n, lesson in enumerate(report["stale"], start=1):
         print(f"[{n}/{total}] {lesson['id']} ({lesson['title']}): {len(lesson['zh_list'])} segs, "
               f"{len(lesson['uncached'])} GCP calls")
+        def ensure_seg(zh: str) -> None:
+            seg_path = cache_dir / f"{seg_cache_key(zh)}.mp3"
+            if seg_path.is_file():
+                return
+            audio = call_gcp_tts(zh, api_key)
+            tmp = seg_path.with_suffix(".mp3.tmp")
+            tmp.write_bytes(audio)
+            tmp.replace(seg_path)
+
+        # 段落彼此獨立，8 路並行合成（遠低於 GCP 1,000 req/min 限額）
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(ensure_seg, lesson["zh_list"]))
+
         seg_pcm: dict[str, bytes] = {}
         for zh in lesson["zh_list"]:
-            seg_path = cache_dir / f"{seg_cache_key(zh)}.mp3"
-            if not seg_path.is_file():
-                audio = call_gcp_tts(zh, api_key)
-                tmp = seg_path.with_suffix(".mp3.tmp")
-                tmp.write_bytes(audio)
-                tmp.replace(seg_path)
-            seg_pcm[zh] = decode_to_pcm(ffmpeg, seg_path)
+            seg_pcm[zh] = decode_to_pcm(ffmpeg, cache_dir / f"{seg_cache_key(zh)}.mp3")
 
         entry = build_lesson_sprite(ffmpeg, lesson, seg_pcm, out_dir)
         removed = cleanup_orphans(out_dir, lesson["id"], lesson["hash"])
