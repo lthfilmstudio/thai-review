@@ -163,7 +163,7 @@ async function findBakedAudioUrl(text, lang) {
   return url;
 }
 
-async function fetchWorkerTtsBlob(text, voice) {
+export async function fetchWorkerTtsBlob(text, voice) {
   const trimmed = (text || '').trim();
   if (!trimmed) return null;
 
@@ -348,7 +348,7 @@ function getDecodeCtx() {
   return decodeCtx;
 }
 
-async function fetchAudioBuffer(url) {
+export async function fetchAudioBuffer(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`audio fetch ${res.status}`);
   const bytes = await res.arrayBuffer();
@@ -384,7 +384,7 @@ export function computeCycleTimeline(zhMs, teacherMs, { rate = 1, gap = 'auto', 
   return { timeline, totalMs: t, gapMs, teacherEffMs };
 }
 
-function encodeWav(buffer) {
+export function encodeWav(buffer) {
   const data = buffer.getChannelData(0);
   const dataSize = data.length * 2;
   const out = new ArrayBuffer(44 + dataSize);
@@ -513,8 +513,10 @@ export async function downloadLessonAudio(cards, onProgress) {
   return { done, total: list.length, failed };
 }
 
-/* 播一整個組裝好的循環（rate 已內嵌，播放器固定 1×）。回傳實際播放毫秒數。 */
-export function playUrlWithPromise(url) {
+/* 播一整個組裝好的循環（rate 已內嵌，播放器固定 1×）。回傳實際播放毫秒數。
+   startAtSec：從指定位置續播（鎖屏長音檔用）。
+   onStall(ms)：自救 3 次都失敗時回報斷點位置，promise 會 resolve(0) 不再掛死。 */
+export function playUrlWithPromise(url, { startAtSec = 0, onStall } = {}) {
   cancelSpeech();
   const generation = playbackGeneration;
 
@@ -540,15 +542,53 @@ export function playUrlWithPromise(url) {
     audio.onpause = () => {
       if (settled || audio.ended || generation !== playbackGeneration) return;
       logListenEvent(`cycle-paused @${Math.round(audio.currentTime)}s`);
-      if (resumeTries >= 3) { logListenEvent('cycle-resume-give-up'); return; }
+      if (resumeTries >= 3) {
+        logListenEvent('cycle-resume-give-up');
+        onStall?.(audio.currentTime * 1000);
+        finish(0);
+        return;
+      }
       resumeTries++;
       audio.play()
         .then(() => logListenEvent('cycle-resumed'))
         .catch(err => logListenEvent(`cycle-resume-fail ${err?.name || err}`));
     };
-    startedAt = Date.now();
-    audio.play().catch(err => { logListenEvent(`cycle-play-fail ${err?.name || err}`); finish(0); });
+    const begin = () => {
+      audio.onloadedmetadata = null; // 共用 audio，不留 handler 給下一次播放
+      startedAt = Date.now();
+      audio.play().catch(err => { logListenEvent(`cycle-play-fail ${err?.name || err}`); finish(0); });
+    };
+    if (startAtSec > 0) {
+      // blob WAV metadata 載入極快；等 loadedmetadata 設起點才不會被 load 重設回 0
+      audio.onloadedmetadata = () => {
+        try { audio.currentTime = startAtSec; } catch {}
+        begin();
+      };
+      audio.load();
+    } else {
+      audio.onloadedmetadata = null;
+      begin();
+    }
   });
+}
+
+/* 目前共用 audio 的播放位置（毫秒）；沒有進行中的播放回 -1。 */
+export function getPlaybackPositionMs() {
+  const audio = currentPlayback?.audio;
+  if (!audio || !audio.src) return -1;
+  return audio.currentTime * 1000;
+}
+
+/* 在目前播放的音檔內跳到指定位置（鎖屏長音檔跳卡用）。 */
+export function seekPlaybackTo(ms) {
+  const audio = currentPlayback?.audio;
+  if (!audio) return false;
+  try { audio.currentTime = Math.max(0, ms / 1000); return true; } catch { return false; }
+}
+
+/* 給 listen.js 掛 timeupdate listener 用。 */
+export function getSharedAudioElement() {
+  return getSharedAudio();
 }
 
 /* 頁面被凍結後回前景時，用這個判斷聲音鏈是不是卡死了。 */

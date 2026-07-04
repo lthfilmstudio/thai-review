@@ -1,31 +1,21 @@
+/* 鎖屏長音檔拼裝：把一批卡的「中文提示 + (泰文 + 跟讀空白) × N」
+   離線拼成一條十幾分鐘的 WAV 一次播，鎖屏中完全不換音檔。
+   泰文只用 baked ElevenLabs MP3；中文走 worker TTS（準備一定在前景，
+   大多命中 KV cache），抓不到就該卡略過中文、不擋整批。 */
+
 import {
   buildStaticAudioMap,
-  computeThaiOnlyTimeline,
+  computeLockTimeline,
   planLockListenSession,
 } from './listen-static.js';
+import {
+  CHINESE_VOICE,
+  encodeWav,
+  fetchAudioBuffer,
+  fetchWorkerTtsBlob,
+} from './tts.js';
 
 let audioMapPromise = null;
-
-function encodeWav(buffer) {
-  const data = buffer.getChannelData(0);
-  const dataSize = data.length * 2;
-  const out = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(out);
-  const writeStr = (off, str) => {
-    for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
-  };
-  writeStr(0, 'RIFF'); view.setUint32(4, 36 + dataSize, true); writeStr(8, 'WAVE');
-  writeStr(12, 'fmt '); view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); view.setUint16(22, 1, true);
-  view.setUint32(24, buffer.sampleRate, true); view.setUint32(28, buffer.sampleRate * 2, true);
-  view.setUint16(32, 2, true); view.setUint16(34, 16, true);
-  writeStr(36, 'data'); view.setUint32(40, dataSize, true);
-  for (let i = 0; i < data.length; i++) {
-    const s = Math.max(-1, Math.min(1, data[i]));
-    view.setInt16(44 + i * 2, s < 0 ? s * 32768 : s * 32767, true);
-  }
-  return new Blob([out], { type: 'audio/wav' });
-}
 
 async function loadStaticAudioMap() {
   if (!audioMapPromise) {
@@ -39,10 +29,18 @@ async function loadStaticAudioMap() {
   return audioMapPromise;
 }
 
-async function fetchAudioBuffer(ctx, url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`audio HTTP ${res.status}`);
-  return await ctx.decodeAudioData(await res.arrayBuffer());
+/* 抓一張卡的素材：泰文 MP3（必要）＋中文 worker TTS（可缺）。 */
+async function fetchCardBuffers(item) {
+  const thaiBuf = await fetchAudioBuffer(item.audioUrl);
+  let zhBuf = null;
+  const zhText = (item.card?.zh || '').trim();
+  if (zhText) {
+    try {
+      const zhUrl = await fetchWorkerTtsBlob(zhText, CHINESE_VOICE);
+      if (zhUrl) zhBuf = await fetchAudioBuffer(zhUrl);
+    } catch {} // 中文抓不到就略過，不擋整批
+  }
+  return { item, thaiBuf, zhBuf };
 }
 
 export async function prepareLockListenSession(cards, options) {
@@ -57,56 +55,65 @@ export async function prepareLockListenSession(cards, options) {
     throw new Error(`第 ${first.index + 1} 張找不到 ElevenLabs 靜態音檔`);
   }
 
-  const decodeCtx = new (window.AudioContext || window.webkitAudioContext)();
-  try {
-    const decoded = [];
-    for (const item of plan.items) {
-      decoded.push({ item, buffer: await fetchAudioBuffer(decodeCtx, item.audioUrl) });
-    }
-
-    let totalMs = 0;
-    const entries = decoded.map(({ item, buffer }) => {
-      const timeline = computeThaiOnlyTimeline(buffer.duration * 1000, options);
-      const startMs = totalMs;
-      totalMs += timeline.totalMs;
-      return {
-        cardIndex: item.index,
-        startMs,
-        totalMs: timeline.totalMs,
-        timeline: timeline.segments.map(seg => ({ ...seg, startMs: startMs + seg.startMs })),
-        buffer,
-      };
-    });
-
-    const sampleRate = 24000;
-    const offline = new OfflineAudioContext(1, Math.ceil(totalMs / 1000 * sampleRate), sampleRate);
-    entries.forEach(entry => {
-      entry.timeline.forEach(seg => {
-        if (seg.phase !== 'teacher') return;
-        const src = offline.createBufferSource();
-        src.buffer = entry.buffer;
-        src.playbackRate.value = options.rate;
-        src.connect(offline.destination);
-        src.start(seg.startMs / 1000);
-      });
-    });
-
-    const keepAlive = offline.createOscillator();
-    keepAlive.frequency.value = 40;
-    const keepAliveGain = offline.createGain();
-    keepAliveGain.gain.value = 0.05;
-    keepAlive.connect(keepAliveGain).connect(offline.destination);
-    keepAlive.start(0);
-
-    const rendered = await offline.startRendering();
-    return {
-      url: URL.createObjectURL(encodeWav(rendered)),
-      totalMs,
-      count: plan.items.length,
-      nextIndex: plan.nextIndex >= cards.length ? 0 : plan.nextIndex,
-      entries: entries.map(({ buffer, ...entry }) => entry),
-    };
-  } finally {
-    await decodeCtx.close().catch(() => {});
+  const decoded = new Array(plan.items.length);
+  let fetched = 0;
+  const CONCURRENCY = 3;
+  for (let i = 0; i < plan.items.length; i += CONCURRENCY) {
+    await Promise.all(plan.items.slice(i, i + CONCURRENCY).map(async (item, offset) => {
+      decoded[i + offset] = await fetchCardBuffers(item);
+      fetched++;
+      options.onProgress?.(fetched, plan.items.length);
+    }));
   }
+
+  let totalMs = 0;
+  const entries = decoded.map(({ item, thaiBuf, zhBuf }) => {
+    const timeline = computeLockTimeline(
+      (zhBuf?.duration || 0) * 1000,
+      thaiBuf.duration * 1000,
+      options,
+    );
+    const startMs = totalMs;
+    totalMs += timeline.totalMs;
+    return {
+      cardIndex: item.index,
+      startMs,
+      totalMs: timeline.totalMs,
+      timeline: timeline.segments.map(seg => ({ ...seg, startMs: startMs + seg.startMs })),
+      thaiBuf,
+      zhBuf,
+    };
+  });
+
+  const sampleRate = 24000;
+  const offline = new OfflineAudioContext(1, Math.ceil(totalMs / 1000 * sampleRate), sampleRate);
+  entries.forEach(entry => {
+    entry.timeline.forEach(seg => {
+      if (seg.phase === 'repeat') return; // 空白＝不排語音，靠底線訊號保持「有聲」
+      const src = offline.createBufferSource();
+      src.buffer = seg.phase === 'meaning' ? entry.zhBuf : entry.thaiBuf;
+      if (seg.phase === 'teacher') src.playbackRate.value = options.rate;
+      src.connect(offline.destination);
+      src.start(seg.startMs / 1000);
+    });
+  });
+
+  // 40Hz / -26dBFS 保命底線：連續 >5 秒純靜音會讓 Chrome 收回媒體身分（v54 實測）
+  const keepAlive = offline.createOscillator();
+  keepAlive.frequency.value = 40;
+  const keepAliveGain = offline.createGain();
+  keepAliveGain.gain.value = 0.05;
+  keepAlive.connect(keepAliveGain).connect(offline.destination);
+  keepAlive.start(0);
+
+  const rendered = await offline.startRendering();
+  return {
+    url: URL.createObjectURL(encodeWav(rendered)),
+    totalMs,
+    count: plan.items.length,
+    startIndex: plan.startIndex,
+    nextIndex: plan.nextIndex >= cards.length ? 0 : plan.nextIndex,
+    resumeMs: 0,
+    entries: entries.map(({ thaiBuf, zhBuf, ...entry }) => entry),
+  };
 }

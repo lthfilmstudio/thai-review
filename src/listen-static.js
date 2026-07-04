@@ -40,11 +40,17 @@ export function resolveStaticAudioUrl(card, audioMap) {
   return audioMap.get(text) || audioMap.get(normalizeThaiAudioText(text)) || null;
 }
 
-export function computeThaiOnlyTimeline(teacherMs, { repeat = 1, gap = 'auto', rate = 1 } = {}) {
+/* 單卡時間軸：中文提示（zhMs > 0 時，原速）→ (老師泰文 + 跟讀空白) × repeat。
+   公式與一般模式 tts.js computeCycleTimeline 一致。 */
+export function computeLockTimeline(zhMs, teacherMs, { repeat = 1, gap = 'auto', rate = 1 } = {}) {
   const teacherEffMs = teacherMs / rate;
   const gapMs = gap === 'auto' ? Math.max(1500, teacherEffMs * 1.8) : Number(gap) * 1000;
   const segments = [];
   let t = 0;
+  if (zhMs > 0) {
+    segments.push({ phase: 'meaning', startMs: 0, durMs: zhMs });
+    t = zhMs;
+  }
   for (let r = 0; r < repeat; r++) {
     segments.push({ phase: 'teacher', rep: r, startMs: t, durMs: teacherEffMs });
     t += teacherEffMs;
@@ -52,6 +58,24 @@ export function computeThaiOnlyTimeline(teacherMs, { repeat = 1, gap = 'auto', r
     t += gapMs;
   }
   return { segments, totalMs: t, gapMs, teacherEffMs };
+}
+
+/* 從播放位置（毫秒）找出目前在哪張卡的哪個 segment。
+   entries 的 startMs / timeline[].startMs 都是整條長音檔的絕對時間。 */
+export function findLockPosition(entries, ms) {
+  const list = Array.isArray(entries) ? entries : [];
+  if (!list.length) return null;
+  let entryIndex = 0;
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (ms >= list[i].startMs) { entryIndex = i; break; }
+  }
+  const entry = list[entryIndex];
+  const timeline = entry.timeline || [];
+  let segment = timeline[0] || null;
+  for (let i = timeline.length - 1; i >= 0; i--) {
+    if (ms >= timeline[i].startMs) { segment = timeline[i]; break; }
+  }
+  return { entryIndex, entry, segment };
 }
 
 export function planStaticListenBatch(cards, audioMap, { startIndex = 0, limit = 10 } = {}) {

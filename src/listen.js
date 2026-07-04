@@ -4,6 +4,7 @@
 
 import { state, filteredCards, saveState } from './state.js';
 import { prepareLockListenSession } from './listen-lock.js';
+import { findLockPosition } from './listen-static.js';
 import {
   CHINESE_VOICE,
   buildListenCycle,
@@ -11,12 +12,15 @@ import {
   downloadLessonAudio,
   estimateTeacherMs,
   getCachedCycle,
+  getPlaybackPositionMs,
+  getSharedAudioElement,
   getSilenceUrl,
   isPlaybackStalled,
   logListenEvent,
   playSilenceWithPromise,
   playUrlWithPromise,
   prefetchSpeech,
+  seekPlaybackTo,
   speakTextWithPromise,
   speakWithPromise,
   supportsCycleAssembly,
@@ -33,6 +37,9 @@ let playbackMode = localStorage.getItem('thai-review-listen-playback-mode') || '
 let lockSession = null;
 let lockPreparing = false;
 let lockStatus = '';
+let lockNextSession = null;    // 預拼好的下一批長音檔（自動接續用）
+let lockNextPreparing = false;
+let lockChainToken = 0;        // clearLockSession 時 +1，讓在途的預拼結果作廢
 const WARM_AHEAD = 20;  // 播放中預先拼好後面幾張卡（約 5 分鐘鎖屏糧倉）
 const LOCK_CARD_LIMIT = 40;
 const PLAYBACK_RATES = [0.6, 0.8, 1, 1.2];
@@ -158,8 +165,14 @@ export function renderListenMode(el, cards, advanceCb) {
   document.getElementById('lPlay').addEventListener('click', toggleListen);
   renderDlStatus();
   renderLockStatus();
-  document.getElementById('lPrev').addEventListener('click', () => { stopListen(); clearLockSession(); prevInList(); });
-  document.getElementById('lNext').addEventListener('click', () => { stopListen(); clearLockSession(); nextInList(); });
+  document.getElementById('lPrev').addEventListener('click', () => {
+    if (isLockPlaying()) { lockSeek(-1); return; } // 長音檔內跳到上一張卡
+    stopListen(); clearLockSession(); prevInList();
+  });
+  document.getElementById('lNext').addEventListener('click', () => {
+    if (isLockPlaying()) { lockSeek(1); return; } // 長音檔內跳到下一張卡
+    stopListen(); clearLockSession(); nextInList();
+  });
   document.getElementById('listenPlaybackSeg')?.addEventListener('click', e => {
     const btn = e.target.closest('[data-playback]');
     if (!btn) return;
@@ -173,6 +186,7 @@ export function renderListenMode(el, cards, advanceCb) {
     const btn = e.target.closest('[data-rate]');
     if (!btn) return;
     state.settings.rate = Number(btn.dataset.rate);
+    if (isLockPlaying()) stopListen(); // rate 已烘進長音檔，播放中改要停下重拼
     clearLockSession();
     saveState();
     document.querySelectorAll('#listenRateSeg .listen-rate-btn').forEach(rateBtn => {
@@ -183,6 +197,7 @@ export function renderListenMode(el, cards, advanceCb) {
     const btn = e.target.closest('[data-gap]');
     if (!btn) return;
     state.settings.gap = btn.dataset.gap === 'auto' ? 'auto' : Number(btn.dataset.gap);
+    if (isLockPlaying()) stopListen(); // gap 已烘進長音檔，播放中改要停下重拼
     clearLockSession();
     saveState();
     document.querySelectorAll('#listenGapSeg .listen-rate-btn').forEach(gapBtn => {
@@ -222,6 +237,15 @@ export function startListen() {
 export function stopListen() {
   runVersion++;
   if (state.listen.playing) logListenEvent('stop');
+  // 鎖屏播放中暫停：先記斷點，之後按播放從這裡續
+  if (playbackMode === 'lock' && lockSession && state.listen.playing) {
+    const pos = getPlaybackPositionMs();
+    if (pos > 0) {
+      lockSession.resumeMs = pos;
+      setLockStatus(`已播 ${(pos / 60000).toFixed(1)} / ${(lockSession.totalMs / 60000).toFixed(1)} 分鐘`);
+    }
+  }
+  detachLockTimeUpdate();
   state.listen.playing = false;
   state.listen.phase = 'idle';
   cancelSpeech();
@@ -270,15 +294,36 @@ function renderLockStatus() {
   if (el) el.textContent = lockStatus || '先按準備';
 }
 
-function clearLockSession() {
-  if (lockSession?.url) {
-    try { URL.revokeObjectURL(lockSession.url); } catch {}
+function isLockPlaying() {
+  return playbackMode === 'lock' && !!lockSession && state.listen.playing;
+}
+
+function releaseLockUrl(session) {
+  if (session?.url) {
+    try { URL.revokeObjectURL(session.url); } catch {}
   }
+}
+
+function clearLockSession() {
+  lockChainToken++; // 在途的預拼結果作廢
+  releaseLockUrl(lockSession);
   lockSession = null;
+  releaseLockUrl(lockNextSession);
+  lockNextSession = null;
+  lockNextPreparing = false;
   lockPreparing = false;
   lockStatus = '';
+  detachLockTimeUpdate();
   updateMainButton();
   renderLockStatus();
+}
+
+function lockSessionOptions() {
+  return {
+    repeat: state.settings.repeat,
+    gap: state.settings.gap,
+    rate: state.settings.rate,
+  };
 }
 
 async function prepareLockSession() {
@@ -290,11 +335,10 @@ async function prepareLockSession() {
   try {
     const cards = filteredCards();
     const session = await prepareLockListenSession(cards, {
+      ...lockSessionOptions(),
       startIndex: state.cardIndex,
       limit: Math.min(LOCK_CARD_LIMIT, cards.length),
-      repeat: state.settings.repeat,
-      gap: state.settings.gap,
-      rate: state.settings.rate,
+      onProgress: (done, total) => setLockStatus(`準備中 ${done}/${total}…`),
     });
     lockSession = session;
     logListenEvent(`lock-ready ${session.count} cards ${(session.totalMs / 60000).toFixed(1)}m`);
@@ -308,28 +352,102 @@ async function prepareLockSession() {
   }
 }
 
+/* 播放中趁前景把下一批長音檔拼好，播完無縫接續。 */
+function prepareNextLockSession() {
+  if (lockNextSession || lockNextPreparing || !lockSession) return;
+  const cards = filteredCards();
+  if (cards.length <= lockSession.count) return; // 一批涵蓋整堂課 → 播完直接重播同一條
+  const token = lockChainToken;
+  lockNextPreparing = true;
+  logListenEvent('lock-chain-prep');
+  prepareLockListenSession(cards, {
+    ...lockSessionOptions(),
+    startIndex: lockSession.nextIndex,
+    limit: Math.min(LOCK_CARD_LIMIT, cards.length),
+  }).then(session => {
+    if (token !== lockChainToken) { releaseLockUrl(session); return; }
+    lockNextSession = session;
+    logListenEvent(`lock-chain-ready ${session.count} cards`);
+  }).catch(e => {
+    logListenEvent(`lock-chain-fail ${e?.message || e}`);
+  }).finally(() => {
+    if (token === lockChainToken) lockNextPreparing = false;
+  });
+}
+
 async function startLockListen() {
-  if (!lockSession) return;
-  const version = ++runVersion;
-  state.listen.playing = true;
-  state.listen.repeatCount = 0;
-  state.listen.phase = 'teacher';
-  registerMediaSessionHandlers();
-  navigator.mediaSession && (navigator.mediaSession.playbackState = 'playing');
-  logListenEvent('lock-play');
-  updateMainButton();
-  scheduleLockUi(lockSession);
-  const playedMs = await playUrlWithPromise(lockSession.url);
-  clearUiTimers();
-  if (!state.listen.playing || version !== runVersion) return;
-  state.listen.playing = false;
-  navigator.mediaSession && (navigator.mediaSession.playbackState = 'paused');
-  if (playedMs > 0) {
-    state.cardIndex = lockSession.nextIndex;
+  while (lockSession) {
+    const session = lockSession;
+    const version = ++runVersion;
+    state.listen.playing = true;
+    registerMediaSessionHandlers();
+    navigator.mediaSession && (navigator.mediaSession.playbackState = 'playing');
+    const resumeMs = session.resumeMs || 0;
+    logListenEvent(resumeMs > 0 ? `lock-resume @${Math.round(resumeMs / 1000)}s` : 'lock-play');
+    setLockStatus(`播放中 ${session.count} 張 / ${(session.totalMs / 60000).toFixed(1)} 分鐘`);
+    updateMainButton();
+    attachLockTimeUpdate(session);
+    syncLockUi(session, resumeMs);
+    prepareNextLockSession();
+    const playedMs = await playUrlWithPromise(session.url, {
+      startAtSec: resumeMs / 1000,
+      onStall: ms => {
+        session.resumeMs = ms;
+        logListenEvent(`lock-stall @${Math.round(ms / 1000)}s`);
+      },
+    });
+    detachLockTimeUpdate();
+    if (version !== runVersion || lockSession !== session) return; // 被 stop / 清 session 取代
+    if (!state.listen.playing) return; // 使用者暫停：斷點已在 stopListen 記好
+
+    if (playedMs <= 0) {
+      // 播放死掉（自救失敗 / media error）：保留 session 與斷點，等下次按播放續
+      state.listen.playing = false;
+      navigator.mediaSession && (navigator.mediaSession.playbackState = 'paused');
+      setLockStatus(`中斷於 ${((session.resumeMs || 0) / 60000).toFixed(1)} 分鐘，按播放續播`);
+      updateMainButton();
+      onAdvance?.('rerender');
+      return;
+    }
+
+    // 自然播完 → 接下一批
+    session.resumeMs = 0;
+    state.cardIndex = session.nextIndex;
     logListenEvent('lock-done');
+    let next = null;
+    if (lockNextSession) {
+      next = lockNextSession;
+      lockNextSession = null;
+    } else if (filteredCards().length <= session.count) {
+      next = session; // 一批涵蓋整堂課 → 同一條從頭再播
+    }
+    if (!next) {
+      logListenEvent('lock-chain-miss');
+      state.listen.playing = false;
+      navigator.mediaSession && (navigator.mediaSession.playbackState = 'paused');
+      clearLockSession();
+      onAdvance?.('rerender');
+      return;
+    }
+    if (next !== session) releaseLockUrl(session);
+    lockSession = next;
+    logListenEvent('lock-chain-play');
+    onAdvance?.('rerender');
   }
-  clearLockSession();
-  onAdvance?.('rerender');
+}
+
+/* 鎖屏播放中的上/下一張：在長音檔內 seek，不中斷媒體工作階段。 */
+function lockSeek(delta) {
+  if (!lockSession) return;
+  const pos = getPlaybackPositionMs();
+  const found = findLockPosition(lockSession.entries, Math.max(0, pos));
+  if (!found) return;
+  const targetIndex = Math.max(0, Math.min(lockSession.entries.length - 1, found.entryIndex + delta));
+  const target = lockSession.entries[targetIndex];
+  if (seekPlaybackTo(target.startMs)) {
+    logListenEvent(`lock-seek c${target.cardIndex}`);
+    syncLockUi(lockSession, target.startMs);
+  }
 }
 
 async function runListenStep(version) {
@@ -478,28 +596,55 @@ function scheduleCycleUi(timeline) {
   });
 }
 
-function scheduleLockUi(session) {
-  clearUiTimers();
-  session.entries.forEach(entry => {
-    uiTimers.push(setTimeout(() => {
-      if (!state.listen.playing) return;
-      state.cardIndex = entry.cardIndex;
-      state.listen.repeatCount = 0;
-      onAdvance?.('rerender');
-    }, entry.startMs));
-    entry.timeline.forEach(seg => {
-      uiTimers.push(setTimeout(() => {
-        if (!state.listen.playing) return;
-        if (state.cardIndex !== entry.cardIndex) {
-          state.cardIndex = entry.cardIndex;
-          onAdvance?.('rerender');
-        }
-        state.listen.phase = seg.phase;
-        if (typeof seg.rep === 'number') state.listen.repeatCount = seg.rep;
-        updateRepeatInfo();
-      }, seg.startMs + 30));
-    });
-  });
+/* ===== 鎖屏長音檔的 UI 同步：聽 audio timeupdate（媒體播放中不會被凍結），
+   由播放位置反查目前卡片/段落，順便更新鎖屏媒體通知的卡片資訊。 ===== */
+
+let lockUiAudio = null;
+let lockUiHandler = null;
+let lockUiLast = { entryIndex: -1, segKey: '' };
+
+function attachLockTimeUpdate(session) {
+  detachLockTimeUpdate();
+  lockUiAudio = getSharedAudioElement();
+  lockUiLast = { entryIndex: -1, segKey: '' };
+  lockUiHandler = () => {
+    if (!state.listen.playing) return;
+    syncLockUi(session, lockUiAudio.currentTime * 1000);
+  };
+  lockUiAudio.addEventListener('timeupdate', lockUiHandler);
+}
+
+function detachLockTimeUpdate() {
+  if (lockUiAudio && lockUiHandler) lockUiAudio.removeEventListener('timeupdate', lockUiHandler);
+  lockUiAudio = null;
+  lockUiHandler = null;
+}
+
+function syncLockUi(session, ms) {
+  const found = findLockPosition(session.entries, ms);
+  if (!found) return;
+  const { entryIndex, entry, segment } = found;
+  if (entryIndex !== lockUiLast.entryIndex) {
+    lockUiLast.entryIndex = entryIndex;
+    lockUiLast.segKey = '';
+    state.cardIndex = entry.cardIndex;
+    state.listen.repeatCount = 0;
+    onAdvance?.('rerender'); // renderListenMode 會同步更新媒體通知 metadata
+  }
+  const segKey = `${segment?.phase || ''}|${segment?.rep ?? ''}`;
+  if (segKey !== lockUiLast.segKey) {
+    lockUiLast.segKey = segKey;
+    state.listen.phase = segment?.phase || 'teacher';
+    if (typeof segment?.rep === 'number') state.listen.repeatCount = segment.rep;
+    updateTeacherLabel(segment?.phase === 'meaning' ? '中文提示' : '老師泰文');
+    if (segment?.phase === 'repeat') {
+      animateBar('barR', segment.durMs);
+    } else if (segment) {
+      animateBar('barT', segment.durMs);
+      const barR = document.getElementById('barR'); if (barR) barR.style.width = '0';
+    }
+    updateRepeatInfo();
+  }
 }
 
 function updateRepeatInfo() {
@@ -553,6 +698,13 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
       if (!state.listen.playing) return;
       if (isPlaybackStalled()) {
         logListenEvent('resume-after-freeze');
+        // 鎖屏模式：從卡住的位置續播同一條長音檔，不能走一般模式的逐卡流程
+        if (playbackMode === 'lock' && lockSession) {
+          const pos = getPlaybackPositionMs();
+          if (pos > 0) lockSession.resumeMs = pos;
+          void startLockListen();
+          return;
+        }
         const version = ++runVersion;
         cancelSpeech();
         state.listen.repeatCount = 0;
@@ -569,8 +721,14 @@ function registerMediaSessionHandlers() {
   if (!navigator.mediaSession) return;
   navigator.mediaSession.setActionHandler('play', () => { if (!state.listen.playing) startListen(); });
   navigator.mediaSession.setActionHandler('pause', () => { if (state.listen.playing) stopListen(); });
-  navigator.mediaSession.setActionHandler('previoustrack', () => { stopListen(); prevInList(); });
-  navigator.mediaSession.setActionHandler('nexttrack', () => { stopListen(); nextInList(); });
+  navigator.mediaSession.setActionHandler('previoustrack', () => {
+    if (isLockPlaying()) { lockSeek(-1); return; } // 鎖屏中直接在長音檔內跳卡
+    stopListen(); prevInList();
+  });
+  navigator.mediaSession.setActionHandler('nexttrack', () => {
+    if (isLockPlaying()) { lockSeek(1); return; }
+    stopListen(); nextInList();
+  });
 }
 
 function updateMediaSessionMetadata(card) {
