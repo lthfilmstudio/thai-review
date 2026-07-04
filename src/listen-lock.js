@@ -13,6 +13,8 @@ import {
   encodeWav,
   fetchAudioBuffer,
   fetchWorkerTtsBlob,
+  getZhAudioBuffer,
+  zhLessonIdOf,
 } from './tts.js';
 
 let audioMapPromise = null;
@@ -29,12 +31,12 @@ async function loadStaticAudioMap() {
   return audioMapPromise;
 }
 
-/* 抓一張卡的素材：泰文 MP3（必要）＋中文 worker TTS（可缺）。 */
+/* 抓一張卡的素材：泰文 MP3（必要）＋中文 zh sprite → worker TTS（可缺）。 */
 async function fetchCardBuffers(item) {
   const thaiBuf = await fetchAudioBuffer(item.audioUrl);
-  let zhBuf = null;
   const zhText = (item.card?.zh || '').trim();
-  if (zhText) {
+  let zhBuf = zhText ? await getZhAudioBuffer(zhText, zhLessonIdOf(item.card)) : null;
+  if (zhText && !zhBuf) {
     try {
       const zhUrl = await fetchWorkerTtsBlob(zhText, CHINESE_VOICE);
       if (zhUrl) zhBuf = await fetchAudioBuffer(zhUrl);

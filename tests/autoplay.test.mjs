@@ -65,6 +65,9 @@ let audioManifest = {
   },
 };
 globalThis.fetch = async (url, init) => {
+  if (String(url).endsWith('zh-manifest.json')) {
+    return new Response('', { status: 404 }); // 無 sprite → 全走 Worker fallback
+  }
   if (String(url).endsWith('audio-manifest.json')) {
     if (!audioManifest) return new Response('', { status: 404 });
     return new Response(JSON.stringify(audioManifest), {

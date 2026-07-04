@@ -5,6 +5,7 @@
    跟讀空白播真靜音 WAV 而不是 setTimeout —— 背景 / 鎖屏才不會被凍結。 */
 
 import { state } from './state.js';
+import { buildZhLessonIndex, lookupZhSegment, sliceRange } from './zh-sprite.js';
 
 const WORKER_URL = 'https://thai-tts.lthfilmstudio.workers.dev/tts';
 const AUDIO_MANIFEST_URL = 'audio-manifest.json';
@@ -192,6 +193,102 @@ export async function fetchWorkerTtsBlob(text, voice) {
   }
 }
 
+/* ===== 中文合輯（zh sprite） =====
+   每堂課一個預烤中文合輯 MP3 + 時間表（scripts/gen-zh-audio.py 產出，
+   與 Worker 同 voice 參數），整檔 decode 後按 sample offset 切片，
+   取代逐卡 Worker 中文 TTS。任何一步缺料回 null，呼叫端 fallback 回 Worker。 */
+
+const ZH_MANIFEST_URL = 'zh-manifest.json';
+let zhManifestPromise = null;
+const zhTimingCache = new Map(); // lessonId → Promise<timing|null>
+const zhShardCache = new Map();  // part URL → Promise<AudioBuffer|null>（LRU 上限 2，~46MB）
+const zhUrlCache = new Map();    // lessonId|zhText → blob URL
+let zhSliceCtx = null;
+
+function getZhSliceCtx() {
+  // 24kHz 專用 decode context：記憶體減半，且與循環拼接的 24000 同 rate 零重採樣。
+  if (!zhSliceCtx) zhSliceCtx = new OfflineAudioContext(1, 1, 24000);
+  return zhSliceCtx;
+}
+
+function loadZhManifest() {
+  if (!zhManifestPromise) {
+    zhManifestPromise = fetch(ZH_MANIFEST_URL)
+      .then(res => (res.ok ? res.json() : null))
+      .then(buildZhLessonIndex)
+      .catch(() => new Map());
+  }
+  return zhManifestPromise;
+}
+
+function loadZhTiming(lessonId) {
+  if (!zhTimingCache.has(lessonId)) {
+    zhTimingCache.set(lessonId, loadZhManifest().then(index => {
+      const entry = index.get(lessonId);
+      if (!entry?.timing) return null;
+      return fetch(entry.timing).then(res => (res.ok ? res.json() : null)).catch(() => null);
+    }));
+  }
+  return zhTimingCache.get(lessonId);
+}
+
+function loadZhShard(url) {
+  if (zhShardCache.has(url)) {
+    const hit = zhShardCache.get(url);
+    zhShardCache.delete(url);
+    zhShardCache.set(url, hit); // LRU：重新插入刷新新鮮度
+    return hit;
+  }
+  const promise = fetch(url)
+    .then(res => {
+      if (!res.ok) throw new Error(`zh shard ${res.status}`);
+      return res.arrayBuffer();
+    })
+    .then(bytes => getZhSliceCtx().decodeAudioData(bytes))
+    .catch(() => null);
+  zhShardCache.set(url, promise);
+  while (zhShardCache.size > 2) {
+    zhShardCache.delete(zhShardCache.keys().next().value);
+  }
+  return promise;
+}
+
+/* 虛擬課（__ALL__ / __FAV__ / __SEARCH__）的卡帶 _lessonId，真課 fallback 到目前課程。 */
+export function zhLessonIdOf(card) {
+  return card?._lessonId || state.currentLessonId || null;
+}
+
+export async function getZhAudioBuffer(zhText, lessonId) {
+  const trimmed = (zhText || '').trim();
+  if (!trimmed || !lessonId || typeof OfflineAudioContext === 'undefined') return null;
+  try {
+    const timing = await loadZhTiming(lessonId);
+    const seg = lookupZhSegment(timing, trimmed);
+    if (!seg) return null;
+    const fileUrl = timing.files?.[seg.fileIdx];
+    if (!fileUrl) return null;
+    const shard = await loadZhShard(fileUrl);
+    if (!shard) return null;
+    const { offset, length } = sliceRange(seg.startMs, seg.durMs, shard.sampleRate, shard.length);
+    if (!length) return null;
+    const out = getZhSliceCtx().createBuffer(1, length, shard.sampleRate);
+    out.copyToChannel(shard.getChannelData(0).subarray(offset, offset + length), 0);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/* 切片再包成 WAV blob URL，給逐段播放模式的共用 <audio> 用。 */
+export async function getZhAudioUrl(zhText, lessonId) {
+  const key = `${lessonId}|${(zhText || '').trim()}`;
+  if (zhUrlCache.has(key)) return zhUrlCache.get(key);
+  const buf = await getZhAudioBuffer(zhText, lessonId);
+  const url = buf ? URL.createObjectURL(encodeWav(buf)) : null;
+  if (url) zhUrlCache.set(key, url);
+  return url;
+}
+
 function pickBrowserVoice(lang) {
   if (!('speechSynthesis' in window)) return null;
   const wanted = lang.toLowerCase();
@@ -213,7 +310,7 @@ export function cancelSpeech() {
   playback?.resolve?.(0);
 }
 
-export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked = true }) {
+export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked = true, presetUrl = null }) {
   cancelSpeech();
   const generation = playbackGeneration;
 
@@ -282,7 +379,9 @@ export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked 
       });
     };
 
-    const baked = preferBaked ? findBakedAudioUrl(trimmed, lang) : Promise.resolve(null);
+    const baked = presetUrl
+      ? Promise.resolve(presetUrl) // zh sprite 切片等已備妥的 URL；播失敗照走 Worker fallback 鏈
+      : (preferBaked ? findBakedAudioUrl(trimmed, lang) : Promise.resolve(null));
     baked.then(url => {
       playAudio(url, playWorkerAudio);
     });
@@ -436,11 +535,13 @@ async function buildListenCycleUncached(card, key) {
 
   const thaiUrl = await resolveThaiAudioUrl(card);
   const zhText = (card?.zh || '').trim();
-  const zhUrl = zhText ? await fetchWorkerTtsBlob(zhText, CHINESE_VOICE) : null;
-  const [thaiBuf, zhBuf] = await Promise.all([
-    fetchAudioBuffer(thaiUrl),
-    zhUrl ? fetchAudioBuffer(zhUrl) : Promise.resolve(null), // 中文抓不到就略過，不擋整卡
-  ]);
+  let zhBuf = zhText ? await getZhAudioBuffer(zhText, zhLessonIdOf(card)) : null;
+  if (zhText && !zhBuf) {
+    // sprite 缺料（新卡還沒重烤）→ 照舊 Worker；中文抓不到就略過，不擋整卡
+    const zhUrl = await fetchWorkerTtsBlob(zhText, CHINESE_VOICE);
+    if (zhUrl) zhBuf = await fetchAudioBuffer(zhUrl).catch(() => null);
+  }
+  const thaiBuf = await fetchAudioBuffer(thaiUrl);
 
   const { timeline, totalMs } = computeCycleTimeline(
     (zhBuf?.duration || 0) * 1000,
@@ -493,7 +594,11 @@ async function prepareCardAudio(card) {
     await res.arrayBuffer();
   }
   const zhText = (card?.zh || '').trim();
-  if (zhText) await fetchWorkerTtsBlob(zhText, CHINESE_VOICE);
+  if (zhText) {
+    // sprite 命中＝順便暖 timing + shard 的 SW cache；缺料才逐卡打 Worker
+    const zhBuf = await getZhAudioBuffer(zhText, zhLessonIdOf(card));
+    if (!zhBuf) await fetchWorkerTtsBlob(zhText, CHINESE_VOICE);
+  }
   preparedCards.add(key);
 }
 

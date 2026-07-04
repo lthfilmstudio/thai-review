@@ -136,6 +136,35 @@ else
   echo "Audio coverage is complete."
 fi
 
+echo
+echo "== Dry-run: GCP zh sprite audio =="
+read_zh_dry_run() {
+  zh_json="$(python3 scripts/gen-zh-audio.py --dry-run --json --out-dir "$out_dir")"
+  zh_stale="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["lessons_stale"])' <<<"$zh_json")"
+  zh_chars="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["api_chars"])' <<<"$zh_json")"
+  zh_usd="$(python3 -c 'import json,sys; print(format(json.load(sys.stdin)["estimated_usd"], ".2f"))' <<<"$zh_json")"
+}
+read_zh_dry_run
+echo "Stale zh lessons: $zh_stale"
+echo "API chars to synthesize: $zh_chars (est US\$$zh_usd)"
+
+if [[ "$zh_stale" != "0" && "$generate" -eq 1 ]]; then
+  echo
+  echo "== Generate zh sprites =="
+  # GCP key 由 gen-zh-audio.py 自己讀 env GCP_TTS_KEY 或 Keychain gcp-tts-thai-review
+  python3 scripts/gen-zh-audio.py \
+    --generate \
+    --confirm-paid-api \
+    --max-chars "$zh_chars" \
+    --out-dir "$out_dir"
+  read_zh_dry_run
+fi
+
+if [[ "$zh_stale" != "0" ]]; then
+  # zh 缺料不擋 deploy：前端會 fallback 回 Worker（Sheet 剛改還沒重烤是預期常態）
+  echo "WARNING: $zh_stale zh sprite lesson(s) stale; playback will fall back to the Worker for those."
+fi
+
 if [[ "$deploy" -eq 1 ]]; then
   if [[ "$missing_files" != "0" ]]; then
     echo "ERROR: refusing to deploy with $missing_files missing audio files." >&2
@@ -145,7 +174,7 @@ if [[ "$deploy" -eq 1 ]]; then
   if [[ "$skip_tests" -ne 1 ]]; then
     echo
     echo "== Tests =="
-    node --test tests/autoplay.test.mjs
+    node --test tests/autoplay.test.mjs tests/listen_lock.test.mjs tests/zh_sprite.test.mjs
   fi
 
   echo

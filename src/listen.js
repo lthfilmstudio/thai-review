@@ -13,6 +13,7 @@ import {
   estimateTeacherMs,
   getCachedCycle,
   getPlaybackPositionMs,
+  getZhAudioUrl,
   getSharedAudioElement,
   getSilenceUrl,
   isPlaybackStalled,
@@ -25,6 +26,7 @@ import {
   speakWithPromise,
   supportsCycleAssembly,
   unlockAudioPlayback,
+  zhLessonIdOf,
 } from './tts.js';
 import { escapeHtml } from './ui.js';
 
@@ -509,11 +511,13 @@ async function runListenStep(version) {
     state.listen.phase = 'meaning';
     updateTeacherLabel('中文提示');
     logListenEvent(`c${state.cardIndex} meaning`);
+    const zhSpriteUrl = await getZhAudioUrl(card.zh, zhLessonIdOf(card));
     await speakTextWithPromise({
       text: card.zh,
       voice: CHINESE_VOICE,
       lang: 'zh-TW',
       rate: 1,
+      presetUrl: zhSpriteUrl,
     });
     if (!state.listen.playing || version !== runVersion) return;
   }
@@ -523,7 +527,12 @@ async function runListenStep(version) {
   updateTeacherLabel('老師泰文');
   logListenEvent(`c${state.cardIndex} r${state.listen.repeatCount} teacher`);
   const nextCard = cards[(state.cardIndex + 1) % cards.length];
-  if (nextCard?.zh) prefetchSpeech(nextCard.zh, CHINESE_VOICE); // 先抓下一張的中文
+  if (nextCard?.zh) {
+    // 先備下一張的中文：sprite 命中就零網路，缺料才 prefetch Worker
+    void getZhAudioUrl(nextCard.zh, zhLessonIdOf(nextCard)).then(url => {
+      if (!url) prefetchSpeech(nextCard.zh, CHINESE_VOICE);
+    });
+  }
   const estimatedTeacherMs = estimateTeacherMs(card);
   animateBar('barT', estimatedTeacherMs);
   const playedTeacherMs = await speakWithPromise(card);
