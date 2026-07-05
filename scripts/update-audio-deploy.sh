@@ -35,6 +35,12 @@ max_chars=""
 manifest="out/site-preview/audio-manifest.json"
 out_dir="out/site-preview"
 keychain_service="elevenlabs-thai-review-sample"
+node_tests=(
+  tests/autoplay.test.mjs
+  tests/listen_lock.test.mjs
+  tests/zh_sprite.test.mjs
+  tests/service_worker.test.mjs
+)
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -84,6 +90,97 @@ read_dry_run() {
   missing_chars="$(json_field 'd["coverage"]["missing_chars_to_generate"]')"
   estimated_usd="$(json_field 'format(d["cost"]["estimated_usd"], ".2f")')"
   data_generated="$(json_field 'd["data_generated_at"]')"
+}
+
+sw_cache_name() {
+  python3 - <<'PY'
+import re
+from pathlib import Path
+text = Path("sw.js").read_text(encoding="utf-8")
+m = re.search(r"const CACHE = ['\"]([^'\"]+)['\"]", text)
+print(m.group(1) if m else "")
+PY
+}
+
+asset_sha() {
+  shasum "$1" | awk '{print $1}'
+}
+
+remote_sha() {
+  curl -fsSL "$1" | shasum | awk '{print $1}'
+}
+
+verify_deploy_asset() {
+  local deployment_url="$1"
+  local rel="$2"
+  local local_file="out/pages-deploy/$rel"
+  local local_hash
+  local remote_hash
+
+  local_hash="$(asset_sha "$local_file")"
+  remote_hash="$(remote_sha "${deployment_url%/}/$rel")"
+  if [[ "$local_hash" != "$remote_hash" ]]; then
+    echo "ERROR: deployed $rel hash mismatch." >&2
+    echo "  local:  $local_hash" >&2
+    echo "  remote: $remote_hash" >&2
+    return 1
+  fi
+  echo "OK $rel $remote_hash"
+}
+
+verify_deployment_readback() {
+  local deployment_url="$1"
+  echo
+  echo "== Verify deployed assets =="
+  verify_deploy_asset "$deployment_url" "sw.js"
+  verify_deploy_asset "$deployment_url" "data.json"
+  verify_deploy_asset "$deployment_url" "zh-manifest.json"
+  verify_deploy_asset "$deployment_url" "audio-manifest.json"
+  verify_deploy_asset "$deployment_url" "deploy-info.json"
+  echo "Deployment URL: $deployment_url"
+  echo "Source commit: $(git rev-parse --short HEAD)"
+  echo "Data generated: $data_generated"
+}
+
+write_deploy_info() {
+  local deploy_info="out/pages-deploy/deploy-info.json"
+  python3 - <<PY
+import json
+import subprocess
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+def sha(path):
+    return subprocess.check_output(["shasum", path], text=True).split()[0]
+
+info = {
+    "generated_at": datetime.now(ZoneInfo("Asia/Taipei")).isoformat(timespec="seconds"),
+    "source_commit": subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip(),
+    "source_branch": subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip(),
+    "sw_cache": "$(sw_cache_name)",
+    "data_generated": "$data_generated",
+    "assets": {
+        "sw.js": sha("out/pages-deploy/sw.js"),
+        "data.json": sha("out/pages-deploy/data.json"),
+        "zh-manifest.json": sha("out/pages-deploy/zh-manifest.json"),
+        "audio-manifest.json": sha("out/pages-deploy/audio-manifest.json"),
+    },
+}
+Path("$deploy_info").write_text(json.dumps(info, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+}
+
+print_deploy_summary_json() {
+  local deployment_url="$1"
+  python3 - <<PY
+import json
+from pathlib import Path
+
+info = json.loads(Path("out/pages-deploy/deploy-info.json").read_text(encoding="utf-8"))
+info["deployment_url"] = "$deployment_url"
+print("DEPLOY_SUMMARY_JSON=" + json.dumps(info, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+PY
 }
 
 ensure_preview_shell
@@ -174,7 +271,7 @@ if [[ "$deploy" -eq 1 ]]; then
   if [[ "$skip_tests" -ne 1 ]]; then
     echo
     echo "== Tests =="
-    node --test tests/autoplay.test.mjs tests/listen_lock.test.mjs tests/zh_sprite.test.mjs
+    node --test "${node_tests[@]}"
   fi
 
   echo
@@ -182,6 +279,7 @@ if [[ "$deploy" -eq 1 ]]; then
   rm -rf out/pages-deploy
   mkdir -p out/pages-deploy
   rsync -aL --delete "$out_dir/" out/pages-deploy/
+  write_deploy_info
 
   symlink_count="$(find out/pages-deploy -type l -print | wc -l | tr -d ' ')"
   if [[ "$symlink_count" != "0" ]]; then
@@ -191,5 +289,13 @@ if [[ "$deploy" -eq 1 ]]; then
 
   echo
   echo "== Deploy Cloudflare Pages =="
-  npx wrangler pages deploy out/pages-deploy --project-name thai-review --branch main
+  deploy_output="$(npx wrangler pages deploy out/pages-deploy --project-name thai-review --branch main 2>&1)"
+  echo "$deploy_output"
+  deployment_url="$(grep -Eo 'https://[0-9a-f]+\.thai-review\.pages\.dev' <<<"$deploy_output" | tail -n 1)"
+  if [[ -z "$deployment_url" ]]; then
+    echo "ERROR: could not find Cloudflare Pages deployment URL in wrangler output." >&2
+    exit 2
+  fi
+  verify_deployment_readback "$deployment_url"
+  print_deploy_summary_json "$deployment_url"
 fi

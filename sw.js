@@ -1,7 +1,7 @@
 /* Service Worker：app shell cache + runtime CSV cache。
    改檔後升 CACHE 版本號強制更新。 */
 
-const CACHE = 'thai-review-v61';
+const CACHE = 'thai-review-v62';
 
 const SHELL = [
   './',
@@ -70,11 +70,13 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // 同源 data.json / zh-manifest.json：network-first
+  // 同源 data.json / zh-manifest.json / deploy-info.json：network-first
   // （data.json 每 30 分鐘更新；zh-manifest 重烤 sprite 後要拿最新，
-  //   sprite 本體檔名帶 hash 走 cache-first 沒問題）
+  //   deploy-info 每次部署更新；sprite 本體檔名帶 hash 走 cache-first 沒問題）
   if (url.origin === location.origin &&
-      (url.pathname.endsWith('/data.json') || url.pathname.endsWith('/zh-manifest.json'))) {
+      (url.pathname.endsWith('/data.json') ||
+       url.pathname.endsWith('/zh-manifest.json') ||
+       url.pathname.endsWith('/deploy-info.json'))) {
     e.respondWith(networkFirst(e.request));
     return;
   }

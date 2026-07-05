@@ -375,6 +375,68 @@ function updateSyncHint() {
   el.textContent = `上次同步：${formatLastSync(getLastSync(url))}`;
 }
 
+async function fetchJsonMaybe(path) {
+  try {
+    const res = await fetch(`${path}?_=${Date.now()}`, { cache: 'no-store' });
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatTaipei(value) {
+  if (!value) return '';
+  const date = typeof value === 'number'
+    ? new Date(value * 1000)
+    : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat('zh-TW', {
+    timeZone: 'Asia/Taipei',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+}
+
+async function currentSwCacheName() {
+  if (!('caches' in window)) return '';
+  try {
+    const keys = await caches.keys();
+    return keys.filter(k => k.startsWith('thai-review-')).sort().at(-1) || '';
+  } catch {
+    return '';
+  }
+}
+
+async function updateRuntimeHint() {
+  const el = document.getElementById('appVersionHint');
+  if (!el) return;
+  el.textContent = '版本資訊：讀取中…';
+
+  const [cacheName, deployInfo, dataInfo, zhInfo] = await Promise.all([
+    currentSwCacheName(),
+    fetchJsonMaybe('deploy-info.json'),
+    fetchJsonMaybe('data.json'),
+    fetchJsonMaybe('zh-manifest.json'),
+  ]);
+
+  const lines = [];
+  if (cacheName) lines.push(`App cache：${cacheName.replace('thai-review-', '')}`);
+  if (deployInfo?.source_commit) {
+    const builtAt = formatTaipei(deployInfo.generated_at);
+    lines.push(`部署：${deployInfo.source_commit}${builtAt ? ` / ${builtAt}` : ''}`);
+  }
+  const dataAt = formatTaipei(dataInfo?.generated_at);
+  if (dataAt) lines.push(`資料：${dataAt}`);
+  const zhAt = formatTaipei(zhInfo?.generated_at);
+  if (zhAt) lines.push(`中文音檔：${zhAt}`);
+  if (!lines.length) lines.push('版本資訊：無法讀取');
+  lines.push('點這裡看聽力 log');
+  el.textContent = lines.join('\n');
+}
+
 function onFreshLessons(fresh) {
   // 舊版 eager cache revalidation callback
   const sameStructure = fresh.length === state.lessons.length
@@ -445,6 +507,7 @@ async function init() {
   document.getElementById('btnSettings').addEventListener('click', () => {
     openModal();
     updateSyncHint();
+    void updateRuntimeHint();
   });
   document.getElementById('btnSearch').addEventListener('click', async () => {
     openSearch();
@@ -760,14 +823,8 @@ async function init() {
     });
   }
 
-  // 設定裡顯示目前 cache 版本，方便確認裝置跑的是不是新版；點版本號展開聽力鏈除錯紀錄
-  if ('caches' in window) {
-    caches.keys().then(keys => {
-      const v = keys.find(k => k.startsWith('thai-review-'));
-      const el = document.getElementById('appVersionHint');
-      if (el && v) el.textContent = `App 版本：${v.replace('thai-review-', '')}`;
-    }).catch(() => {});
-  }
+  // 設定裡顯示目前 runtime 版本；點版本資訊展開聽力鏈除錯紀錄
+  void updateRuntimeHint();
   document.getElementById('appVersionHint')?.addEventListener('click', () => {
     const pre = document.getElementById('listenLogView');
     if (!pre) return;

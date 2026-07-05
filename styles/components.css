@@ -1184,6 +1184,12 @@
   line-height: 1.5;
 }
 
+.version-hint {
+  white-space: pre-wrap;
+  cursor: pointer;
+  user-select: text;
+}
+
 .btn-row {
   display: flex;
   gap: 8px;
