@@ -14,6 +14,63 @@ SPEC.loader.exec_module(gen_audio)
 
 
 class GenAudioTest(unittest.TestCase):
+    def test_dry_run_treats_zero_byte_manifest_audio_as_missing(self):
+        data = {
+            "generated_at": 0,
+            "source_url": "test",
+            "lessons": [{
+                "title": "中 1-2",
+                "cards": [
+                    {"thai": "ลาพักร้อนประจำปี", "zh": "特休／年假"},
+                ],
+            }],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest_path = tmp_path / "audio-manifest.json"
+            spec = gen_audio.AudioSpec(
+                voice_name="test",
+                voice_id="voice",
+                model_id="model",
+                language_code="th",
+                output_format="mp3",
+                audio_prefix="audio",
+            )
+            key = gen_audio.audio_key("ลาพักร้อนประจำปี", spec)
+            rel_path = gen_audio.audio_path(key, spec)
+            audio_file = tmp_path / rel_path
+            audio_file.parent.mkdir(parents=True)
+            audio_file.write_bytes(b"")
+            manifest_path.write_text(json.dumps({
+                "items": {
+                    key: {
+                        "thai": "ลาพักร้อนประจำปี",
+                        "path": rel_path,
+                    },
+                },
+            }, ensure_ascii=False), encoding="utf-8")
+
+            items, total_cards, total_chars, unique_chars = gen_audio.collect_unique_thai(data)
+            existing_keys, existing_normalized_thai = gen_audio.manifest_coverage(manifest_path)
+            dry_run = gen_audio.build_dry_run(
+                data_path=Path("data.json"),
+                manifest_path=manifest_path,
+                data=data,
+                spec=spec,
+                items=items,
+                total_cards=total_cards,
+                total_chars=total_chars,
+                unique_chars=unique_chars,
+                existing_keys=existing_keys,
+                existing_normalized_thai=existing_normalized_thai,
+                usd_per_1k_chars=0.10,
+                twd_rate=31.835,
+            )
+
+        self.assertEqual(dry_run["coverage"]["missing_audio_files"], 1)
+        self.assertEqual(dry_run["missing"][0]["key"], key)
+
     def test_dry_run_reuses_manifest_audio_when_only_whitespace_changed(self):
         data = {
             "generated_at": 0,
@@ -38,6 +95,9 @@ class GenAudioTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             manifest_path = Path(tmp) / "audio-manifest.json"
             manifest_path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+            audio_file = Path(tmp) / manifest["items"]["old-spaced-key"]["path"]
+            audio_file.parent.mkdir(parents=True)
+            audio_file.write_bytes(b"audio")
 
             spec = gen_audio.AudioSpec(
                 voice_name="test",

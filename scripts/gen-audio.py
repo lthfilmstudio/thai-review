@@ -85,6 +85,10 @@ def local_audio_path(key: str, spec: AudioSpec, out_dir: Path) -> Path:
     return out_dir / audio_path(key, spec)
 
 
+def is_usable_audio_file(path: Path) -> bool:
+    return path.is_file() and path.stat().st_size > 0
+
+
 def load_data(path: Path) -> dict:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -229,6 +233,10 @@ def manifest_coverage(path: Path) -> tuple[set[str], set[str]]:
     normalized_thai: set[str] = set()
 
     def add_entry(entry: object, fallback_key: object = None) -> None:
+        if isinstance(entry, dict):
+            rel_path = str(entry.get("path") or "").strip()
+            if rel_path and not is_usable_audio_file(path.parent / rel_path):
+                return
         if fallback_key:
             keys.add(str(fallback_key))
         if isinstance(entry, dict):
@@ -516,7 +524,7 @@ def generate_audio(dry_run: dict, spec: AudioSpec, args: argparse.Namespace) -> 
         item: ThaiItem = entry["item"]
         rel_path = entry["path"]
         file_path = local_audio_path(key, spec, args.out_dir)
-        if file_path.exists():
+        if is_usable_audio_file(file_path):
             print(f"[{index}/{len(selected)}] skip existing file {rel_path}")
         else:
             print(f"[{index}/{len(selected)}] generate {rel_path} ({entry['chars']} chars)")
