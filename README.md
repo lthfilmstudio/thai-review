@@ -1,6 +1,6 @@
 # 泰文複習 PWA
 
-純 HTML/CSS/JS（零 npm 依賴）的泰文學習 PWA。兩大模式：字卡、被動聽力。支援離線、鎖屏長音檔背景播放、響應式（手機 / iPad / 桌面）。
+純 HTML/CSS/JS（零建置工具、零 `npm install` — 唯一例外是 `src/vendor/soundtouch.js`，一支手動 vendor 進來的第三方 DSP 函式庫原始檔，用於保留音高的泰文變速播放，檔頭附授權與來源標示）的泰文學習 PWA。兩大模式：字卡、被動聽力。支援離線、鎖屏長音檔背景播放、響應式（手機 / iPad / 桌面）。
 
 資料源是 Google Sheets，用 publish-to-web 取 CSV；每個 worksheet 當一堂課。正式站部署在 Cloudflare Pages，Production 需要直接跑 `wrangler pages deploy`，`git push` 本身不會更新正式站。
 

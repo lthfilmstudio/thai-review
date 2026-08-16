@@ -16,6 +16,7 @@ import {
   getZhAudioBuffer,
   zhLessonIdOf,
 } from './tts.js';
+import { stretchAudioBuffer } from './audio-stretch.js';
 
 let audioMapPromise = null;
 
@@ -68,6 +69,7 @@ export async function prepareLockListenSession(cards, options) {
     }));
   }
 
+  const rate = options.rate || 1;
   let totalMs = 0;
   const entries = decoded.map(({ item, thaiBuf, zhBuf }) => {
     const timeline = computeLockTimeline(
@@ -77,12 +79,14 @@ export async function prepareLockListenSession(cards, options) {
     );
     const startMs = totalMs;
     totalMs += timeline.totalMs;
+    // 音高保留變速：只套泰文，rate===1 時跳過整個 stretch（一批最多 40 張卡）。
+    const thaiPlayBuf = rate === 1 ? thaiBuf : stretchAudioBuffer(thaiBuf, rate);
     return {
       cardIndex: item.index,
       startMs,
       totalMs: timeline.totalMs,
       timeline: timeline.segments.map(seg => ({ ...seg, startMs: startMs + seg.startMs })),
-      thaiBuf,
+      thaiBuf: thaiPlayBuf,
       zhBuf,
     };
   });
@@ -94,7 +98,6 @@ export async function prepareLockListenSession(cards, options) {
       if (seg.phase === 'repeat') return; // 空白＝不排語音，靠底線訊號保持「有聲」
       const src = offline.createBufferSource();
       src.buffer = seg.phase === 'meaning' ? entry.zhBuf : entry.thaiBuf;
-      if (seg.phase === 'teacher') src.playbackRate.value = options.rate;
       src.connect(offline.destination);
       src.start(seg.startMs / 1000);
     });

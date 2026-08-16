@@ -6,6 +6,7 @@
 
 import { state } from './state.js';
 import { buildZhLessonIndex, lookupZhSegment, sliceRange } from './zh-sprite.js';
+import { stretchAudioBuffer } from './audio-stretch.js';
 
 const WORKER_URL = 'https://thai-tts.lthfilmstudio.workers.dev/tts';
 const AUDIO_MANIFEST_URL = 'audio-manifest.json';
@@ -542,6 +543,9 @@ async function buildListenCycleUncached(card, key) {
     if (zhUrl) zhBuf = await fetchAudioBuffer(zhUrl).catch(() => null);
   }
   const thaiBuf = await fetchAudioBuffer(thaiUrl);
+  // 音高保留變速：只套泰文老師語音，中文 zhBuf 完全不動。
+  // rate===1 時直接沿用原始 buffer，整個 stretch 流程直接跳過（零額外成本）。
+  const thaiPlayBuf = rate === 1 ? thaiBuf : stretchAudioBuffer(thaiBuf, rate);
 
   const { timeline, totalMs } = computeCycleTimeline(
     (zhBuf?.duration || 0) * 1000,
@@ -553,8 +557,7 @@ async function buildListenCycleUncached(card, key) {
   timeline.forEach(seg => {
     if (seg.phase === 'repeat') return; // 空白＝不排語音，靠底線訊號保持「有聲」
     const src = ctx.createBufferSource();
-    src.buffer = seg.phase === 'meaning' ? zhBuf : thaiBuf;
-    if (seg.phase === 'teacher') src.playbackRate.value = rate;
+    src.buffer = seg.phase === 'meaning' ? zhBuf : thaiPlayBuf;
     src.connect(ctx.destination);
     src.start(seg.startMs / 1000);
   });
