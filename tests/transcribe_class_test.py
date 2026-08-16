@@ -352,7 +352,7 @@ class PaidGateTest(unittest.TestCase):
 
             self.assertEqual(len(calls), 1)
             self.assertEqual(job["segments"][0]["state"], "Complete")
-            self.assertEqual(job["state"], "transcription_complete")
+            self.assertEqual(job["state"], "needs_tsv_review")
             scribe_path = Path(job["segments"][0]["scribe_path"])
             self.assertEqual(os.stat(scribe_path).st_mode & 0o777, 0o600)
             for path in Path(job["job_root"]).rglob("*"):
@@ -449,7 +449,7 @@ class PaidGateTest(unittest.TestCase):
 
             self.assertEqual(calls, [])
             self.assertEqual(repaired["segments"][0]["state"], "Complete")
-            self.assertEqual(repaired["state"], "transcription_complete")
+            self.assertEqual(repaired["state"], "needs_tsv_review")
             self.assertEqual(
                 transcribe_class.load_json_object(state_path)["segments"][0]["state"],
                 "Complete",
@@ -478,6 +478,130 @@ class PaidGateTest(unittest.TestCase):
             self.assertEqual(recovered["segments"][0]["state"], "Unknown")
             persisted = transcribe_class.load_json_object(state_path)
             self.assertEqual(persisted["segments"][0]["state"], "Unknown")
+
+    def test_unknown_with_transcription_id_recovers_by_get_without_post(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, state_path = self.prepared_job(root)
+            key_path = root / "stt.env"
+            write_stt_secrets(key_path)
+
+            def timeout_runner(args, **kwargs):
+                raise subprocess.TimeoutExpired(args, 7200)
+
+            transcribe_class.execute_paid(
+                state_path, [source], confirm_paid_api=True,
+                secrets_path=key_path, http_runner=timeout_runner,
+            )
+            unknown = transcribe_class.load_json_object(state_path)
+            unknown["segments"][0]["attempts"][-1]["identifiers"] = {
+                "transcription_id": "transcript-test-1"
+            }
+            transcribe_class.atomic_write_json(state_path, unknown)
+            calls = []
+
+            def get_runner(args, **kwargs):
+                calls.append(args)
+                self.assertIn("GET", args)
+                self.assertNotIn("POST", args)
+                self.assertFalse(any(value == "--form" for value in args))
+                self.assertEqual(
+                    args[-1],
+                    "https://api.elevenlabs.io/v1/speech-to-text/transcripts/transcript-test-1",
+                )
+                header_path = Path(args[args.index("--dump-header") + 1])
+                body_path = Path(args[args.index("--output") + 1])
+                header_path.write_bytes(b"HTTP/1.1 200 OK\r\nrequest-id: recover-test\r\n\r\n")
+                body_path.write_text(
+                    json.dumps({
+                        "language_code": "th", "text": "กู้คืนแล้ว",
+                        "words": [{
+                            "text": "กู้คืนแล้ว", "start": 0.0, "end": 0.8,
+                            "speaker_id": "speaker_0", "type": "word",
+                        }],
+                    }, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                return subprocess.CompletedProcess(args, 0, stdout=b"200", stderr=b"")
+
+            recovered = transcribe_class.recover_unknown(
+                state_path, [source], secrets_path=key_path, http_runner=get_runner
+            )
+
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(recovered["segments"][0]["state"], "Complete")
+            self.assertEqual(recovered["state"], "needs_tsv_review")
+            self.assertTrue(Path(recovered["combined_transcript"]["path"]).is_file())
+
+
+@unittest.skipUnless(transcribe_class.tool_available("ffmpeg") and transcribe_class.tool_available("ffprobe"), "FFmpeg required")
+class CombinedTranscriptTest(unittest.TestCase):
+    def test_combined_transcript_preserves_verbatim_text_and_namespaces_timeline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sources = [root / "260814-1.mp4", root / "260814-2.mp4"]
+            for source in sources:
+                make_mp4(source, duration=1.0)
+            job = transcribe_class.prepare_job(sources, root / "out", data_path=None)
+            state_path = Path(job["job_root"]) / "job.json"
+            key_path = root / "stt.env"
+            write_stt_secrets(key_path)
+            responses = [
+                {
+                    "language_code": "th", "text": "สวัสดีครับ",
+                    "words": [
+                        {"text": "สวัสดี", "start": 0.0, "end": 0.4, "speaker_id": "speaker_0", "type": "word"},
+                        {"text": "ครับ", "start": 0.4, "end": 0.8, "speaker_id": "speaker_0", "type": "word"},
+                    ],
+                },
+                {
+                    "language_code": "zh", "text": "你好 世界",
+                    "words": [
+                        {"text": "你好", "start": 0.0, "end": 0.3, "speaker_id": "speaker_0", "type": "word"},
+                        {"text": " ", "start": 0.3, "end": 0.3, "speaker_id": "speaker_0", "type": "spacing"},
+                        {"text": "世界", "start": 0.3, "end": 0.7, "speaker_id": "speaker_1", "type": "word"},
+                    ],
+                },
+            ]
+            calls = []
+
+            def runner(args, **kwargs):
+                response = responses[len(calls)]
+                calls.append(args)
+                header_path = Path(args[args.index("--dump-header") + 1])
+                body_path = Path(args[args.index("--output") + 1])
+                header_path.write_bytes(b"HTTP/1.1 200 OK\r\nrequest-id: req\r\n\r\n")
+                body_path.write_text(json.dumps(response, ensure_ascii=False), encoding="utf-8")
+                return subprocess.CompletedProcess(args, 0, stdout=b"200", stderr=b"")
+
+            complete = transcribe_class.execute_paid(
+                state_path, sources, confirm_paid_api=True,
+                secrets_path=key_path, http_runner=runner,
+            )
+
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(complete["state"], "needs_tsv_review")
+            combined = Path(complete["combined_transcript"]["path"]).read_text(encoding="utf-8")
+            self.assertLess(combined.index("สวัสดีครับ"), combined.index("你好 世界"))
+            self.assertIn("part1:speaker_0", combined)
+            self.assertIn("part2:speaker_0", combined)
+            self.assertIn("part2:speaker_1", combined)
+            self.assertNotIn("ALIGNMENT WARNING", combined)
+
+    def test_combined_transcript_warns_without_rewriting_mismatched_text(self):
+        response = {
+            "language_code": "th", "text": "ข้อความ ต้นฉบับ",
+            "words": [{
+                "text": "คนละข้อความ", "start": 0.0, "end": 0.5,
+                "speaker_id": "speaker_0", "type": "word",
+            }],
+        }
+
+        text, warning = transcribe_class.render_part_transcript(1, "part.mp4", response, 0.0)
+
+        self.assertTrue(warning)
+        self.assertIn("ข้อความ ต้นฉบับ", text)
+        self.assertIn("ALIGNMENT WARNING", text)
 
 
 if __name__ == "__main__":
