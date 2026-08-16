@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -129,6 +130,96 @@ class DurableStateTest(unittest.TestCase):
             self.assertEqual(snapshot["card_count"], 3)
             self.assertEqual(snapshot["size_bytes"], len(raw))
             self.assertEqual(len(snapshot["sha256"]), 64)
+
+
+@unittest.skipUnless(transcribe_class.tool_available("ffmpeg") and transcribe_class.tool_available("ffprobe"), "FFmpeg required")
+class MediaPreparationTest(unittest.TestCase):
+    def make_mp4(self, path, audio_inputs=1, duration=1.0):
+        command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y"]
+        for frequency in range(audio_inputs):
+            command += ["-f", "lavfi", "-i", f"sine=frequency={440 + frequency * 110}:duration={duration}"]
+        command += ["-f", "lavfi", "-i", f"color=c=black:s=160x90:d={duration}"]
+        for index in range(audio_inputs):
+            command += ["-map", f"{index}:a"]
+        command += ["-map", f"{audio_inputs}:v", "-c:a", "aac", "-c:v", "mpeg4", "-shortest", str(path)]
+        subprocess.run(command, check=True, capture_output=True)
+
+    def test_valid_mp4_produces_verified_private_mp3_and_disclosure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "260814.mp4"
+            self.make_mp4(source)
+
+            job = transcribe_class.prepare_job([source], root / "out", data_path=None)
+
+            segment = job["segments"][0]
+            mp3 = Path(segment["mp3"]["path"])
+            self.assertEqual(job["state"], "awaiting_paid_approval")
+            self.assertEqual(job["next_action"], "review_paid_disclosure")
+            self.assertEqual(segment["state"], "Prepared")
+            self.assertTrue(mp3.is_file())
+            self.assertEqual(os.stat(mp3).st_mode & 0o777, 0o600)
+            self.assertEqual(segment["mp3"]["codec_name"], "mp3")
+            self.assertEqual(segment["mp3"]["sample_rate"], 16000)
+            self.assertEqual(segment["mp3"]["channels"], 1)
+            self.assertGreaterEqual(segment["mp3"]["bit_rate"], 50000)
+            self.assertLessEqual(segment["mp3"]["bit_rate"], 80000)
+            self.assertEqual(job["approval"]["destination"], "ElevenLabs Speech-to-Text API")
+            self.assertIn("standard logging", job["approval"]["retention_disclosure"].lower())
+            self.assertEqual(
+                job["approval_fingerprint"],
+                transcribe_class.paid_input_fingerprint(job["approval"]),
+            )
+
+    def test_rejects_no_audio_and_multiple_audio_streams(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            no_audio = root / "no-audio.mp4"
+            subprocess.run(
+                [
+                    "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                    "-f", "lavfi", "-i", "color=c=black:s=160x90:d=1",
+                    "-c:v", "mpeg4", no_audio,
+                ],
+                check=True,
+                capture_output=True,
+            )
+            with self.assertRaisesRegex(ValueError, "一個可用音軌"):
+                transcribe_class.prepare_job([no_audio], root / "out-no-audio", data_path=None)
+
+            multi = root / "multi.mp4"
+            self.make_mp4(multi, audio_inputs=2)
+            with self.assertRaisesRegex(ValueError, "一個可用音軌"):
+                transcribe_class.prepare_job([multi], root / "out-multi", data_path=None)
+
+    def test_rejects_insufficient_disk_before_conversion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "260814.mp4"
+            self.make_mp4(source)
+
+            with self.assertRaisesRegex(ValueError, "磁碟空間"):
+                transcribe_class.prepare_job(
+                    [source], root / "out", data_path=None, available_bytes=0
+                )
+            self.assertFalse((root / "out" / "260814" / "audio" / "260814.mp3").exists())
+
+    def test_second_run_reuses_matching_mp3_but_source_mutation_stops(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "260814.mp4"
+            self.make_mp4(source)
+            first = transcribe_class.prepare_job([source], root / "out", data_path=None)
+            mp3 = Path(first["segments"][0]["mp3"]["path"])
+            first_mtime = mp3.stat().st_mtime_ns
+
+            second = transcribe_class.prepare_job([source], root / "out", data_path=None)
+            self.assertEqual(mp3.stat().st_mtime_ns, first_mtime)
+            self.assertEqual(second["segments"][0]["mp3"]["sha256"], first["segments"][0]["mp3"]["sha256"])
+
+            source.write_bytes(source.read_bytes() + b"changed")
+            with self.assertRaisesRegex(ValueError, "來源內容已變更"):
+                transcribe_class.prepare_job([source], root / "out", data_path=None)
 
 
 if __name__ == "__main__":

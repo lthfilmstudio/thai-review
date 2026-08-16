@@ -3,13 +3,17 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import math
 import os
 import re
 import secrets
+import shutil
+import subprocess
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -21,6 +25,15 @@ MAX_BUFFERED_USD = Decimal("0.50")
 SCRIBE_USD_PER_HOUR = Decimal("0.22")
 ESTIMATE_BUFFER = Decimal("1.10")
 RATE_CHECKED_ON = "2026-08-16"
+DEFAULT_OUTPUT_ROOT = Path("out/class-transcriptions")
+MP3_SAMPLE_RATE = 16000
+MP3_CHANNELS = 1
+MP3_BITRATE = 64000
+MIN_FREE_HEADROOM = 64 * 1024 * 1024
+
+
+def tool_available(name: str) -> bool:
+    return shutil.which(name) is not None
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -104,6 +117,8 @@ def ensure_private_dir(path: Path) -> None:
         raise ValueError(f"目錄不可為 symlink：{path}")
     path.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(path, 0o700)
+    if hasattr(os, "geteuid") and path.stat().st_uid != os.geteuid():
+        raise ValueError(f"目錄擁有者不是目前使用者：{path}")
 
 
 def _fsync_directory(path: Path) -> None:
@@ -215,5 +230,412 @@ def capture_data_snapshot(path: Path) -> dict:
     }
 
 
+def now_utc() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def run_process(
+    args: list[str],
+    *,
+    input_bytes: bytes | None = None,
+    timeout: float | None = None,
+) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        args,
+        input=input_bytes,
+        capture_output=True,
+        check=False,
+        timeout=timeout,
+    )
+
+
+def _limited_error(completed: subprocess.CompletedProcess, limit: int = 2000) -> str:
+    raw = completed.stderr or completed.stdout or b""
+    if isinstance(raw, bytes):
+        text = raw.decode("utf-8", errors="replace")
+    else:
+        text = str(raw)
+    return text.replace("\x00", "").strip()[:limit]
+
+
+def ffprobe_json(
+    path: Path,
+    runner: Callable[..., subprocess.CompletedProcess] = run_process,
+) -> dict:
+    completed = runner(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_streams",
+            "-show_format",
+            "-of",
+            "json",
+            str(path),
+        ]
+    )
+    if completed.returncode != 0:
+        raise ValueError(f"ffprobe 無法讀取 {path.name}：{_limited_error(completed)}")
+    try:
+        payload = json.loads(completed.stdout.decode("utf-8"))
+    except (AttributeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"ffprobe 回傳無效 JSON：{path.name}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"ffprobe 回傳格式錯誤：{path.name}")
+    return payload
+
+
+def inspect_single_audio(
+    path: Path,
+    runner: Callable[..., subprocess.CompletedProcess] = run_process,
+) -> dict:
+    payload = ffprobe_json(path, runner)
+    streams = payload.get("streams") if isinstance(payload.get("streams"), list) else []
+    audio_streams = [stream for stream in streams if isinstance(stream, dict) and stream.get("codec_type") == "audio"]
+    if len(audio_streams) != 1:
+        raise ValueError(f"{path.name} 必須有且只有一個可用音軌，目前為 {len(audio_streams)} 個")
+    stream = audio_streams[0]
+    duration_value = stream.get("duration") or (payload.get("format") or {}).get("duration")
+    try:
+        duration = float(duration_value)
+        stream_index = int(stream["index"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"{path.name} 缺少有效音軌時長或 index") from exc
+    if not math.isfinite(duration) or duration <= 0:
+        raise ValueError(f"{path.name} 音軌時長無效")
+    return {
+        "stream_index": stream_index,
+        "duration_seconds": duration,
+        "codec_name": str(stream.get("codec_name") or ""),
+        "sample_rate": int(stream.get("sample_rate") or 0),
+        "channels": int(stream.get("channels") or 0),
+        "bit_rate": int(stream.get("bit_rate") or (payload.get("format") or {}).get("bit_rate") or 0),
+    }
+
+
+def _validate_mp3(
+    path: Path,
+    source_duration: float,
+    runner: Callable[..., subprocess.CompletedProcess] = run_process,
+) -> dict:
+    if not path.is_file() or path.stat().st_size <= 0:
+        raise ValueError(f"MP3 為空或不存在：{path}")
+    details = inspect_single_audio(path, runner)
+    if details["codec_name"] != "mp3":
+        raise ValueError(f"MP3 codec 不符：{details['codec_name']}")
+    if details["sample_rate"] != MP3_SAMPLE_RATE or details["channels"] != MP3_CHANNELS:
+        raise ValueError("MP3 必須是 16 kHz mono")
+    if not 50000 <= details["bit_rate"] <= 80000:
+        raise ValueError(f"MP3 bitrate 不在約 64 kbps 範圍：{details['bit_rate']}")
+    tolerance = max(1.0, source_duration * 0.02)
+    if abs(details["duration_seconds"] - source_duration) > tolerance:
+        raise ValueError("MP3 與來源時長差異超出容許範圍")
+
+    decoded = runner(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(path),
+            "-map",
+            "0:a:0",
+            "-f",
+            "null",
+            "-",
+        ]
+    )
+    if decoded.returncode != 0:
+        raise ValueError(f"MP3 無法完整解碼：{_limited_error(decoded)}")
+    return {
+        **details,
+        "size_bytes": path.stat().st_size,
+        "sha256": sha256_file(path),
+    }
+
+
+def _convert_mp3_atomic(
+    source: Path,
+    stream_index: int,
+    source_duration: float,
+    source_sha256: str,
+    target: Path,
+    runner: Callable[..., subprocess.CompletedProcess] = run_process,
+) -> dict:
+    ensure_private_dir(target.parent)
+    if target.exists() or target.is_symlink():
+        raise ValueError(f"MP3 輸出已存在且無法證明可重用：{target}")
+    temp = target.parent / f".{target.name}.tmp-{os.getpid()}-{secrets.token_hex(6)}"
+    descriptor = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    os.close(descriptor)
+    try:
+        completed = runner(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(source),
+                "-map",
+                f"0:{stream_index}",
+                "-vn",
+                "-codec:a",
+                "libmp3lame",
+                "-ar",
+                str(MP3_SAMPLE_RATE),
+                "-ac",
+                str(MP3_CHANNELS),
+                "-b:a",
+                "64k",
+                "-f",
+                "mp3",
+                str(temp),
+            ]
+        )
+        if completed.returncode != 0:
+            raise ValueError(f"FFmpeg 轉檔失敗：{_limited_error(completed)}")
+        os.chmod(temp, 0o600)
+        details = _validate_mp3(temp, source_duration, runner)
+        if sha256_file(source) != source_sha256:
+            raise ValueError("來源內容已在轉檔期間變更")
+        with temp.open("rb") as handle:
+            os.fsync(handle.fileno())
+        os.replace(temp, target)
+        _fsync_directory(target.parent)
+        details["path"] = str(target.resolve())
+        return details
+    finally:
+        try:
+            if temp.exists() or temp.is_symlink():
+                temp.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _approval_summary(segments: list[dict]) -> dict:
+    estimate = estimate_paid_usage(segment["mp3"]["duration_seconds"] for segment in segments)
+    return {
+        "version": 1,
+        "destination": "ElevenLabs Speech-to-Text API",
+        "endpoint": "https://api.elevenlabs.io/v1/speech-to-text",
+        "retention_disclosure": (
+            "ElevenLabs standard logging may retain uploaded STT audio and text; "
+            "Zero Retention is Enterprise-only and is not assumed for this run."
+        ),
+        "request": {
+            "model_id": "scribe_v2",
+            "language_code": None,
+            "diarize": True,
+            "timestamps_granularity": "word",
+            "tag_audio_events": False,
+            "multi_channel": False,
+            "no_verbatim": False,
+            "speaker_roles": False,
+            "speaker_library": False,
+            "keyterms": False,
+            "entity_detection": False,
+        },
+        "segments": [
+            {
+                "index": segment["index"],
+                "source_name": segment["source"]["name"],
+                "source_sha256": segment["source"]["sha256"],
+                "mp3_name": Path(segment["mp3"]["path"]).name,
+                "mp3_sha256": segment["mp3"]["sha256"],
+                "duration_seconds": segment["mp3"]["duration_seconds"],
+                "size_bytes": segment["mp3"]["size_bytes"],
+            }
+            for segment in segments
+            if segment["state"] != "Complete"
+        ],
+        "estimate": estimate,
+    }
+
+
+def _check_source(path: Path) -> None:
+    if path.suffix.lower() != ".mp4":
+        raise ValueError(f"只接受 MP4：{path}")
+    if path.is_symlink():
+        raise ValueError(f"來源不可為 symlink：{path}")
+    if not path.is_file() or path.stat().st_size <= 0:
+        raise ValueError(f"來源不存在或為空：{path}")
+
+
+def prepare_job(
+    sources: Iterable[Path],
+    output_root: Path = DEFAULT_OUTPUT_ROOT,
+    *,
+    job_id: str | None = None,
+    data_path: Path | None = Path("data.json"),
+    available_bytes: int | None = None,
+    runner: Callable[..., subprocess.CompletedProcess] = run_process,
+) -> dict:
+    if not tool_available("ffmpeg") or not tool_available("ffprobe"):
+        raise ValueError("需要先安裝 ffmpeg 與 ffprobe")
+    ordered, derived_job_id = order_sources(sources)
+    selected_job_id = job_id or derived_job_id
+    job_root = safe_job_root(Path(output_root), selected_job_id)
+    if len({path.stem for path in ordered}) != len(ordered):
+        raise ValueError("來源檔名 stem 重複，無法建立唯一 MP3")
+
+    inspected: list[dict] = []
+    for source in ordered:
+        _check_source(source)
+        resolved = source.resolve(strict=True)
+        media = inspect_single_audio(resolved, runner)
+        inspected.append(
+            {
+                "path": resolved,
+                "name": source.name,
+                "size_bytes": resolved.stat().st_size,
+                "sha256": sha256_file(resolved),
+                **media,
+            }
+        )
+
+    ensure_private_dir(job_root)
+    audio_dir = job_root / "audio"
+    scribe_dir = job_root / "scribe"
+    ensure_private_dir(audio_dir)
+    ensure_private_dir(scribe_dir)
+    state_path = job_root / "job.json"
+    existing = load_json_object(state_path) if state_path.exists() else None
+    existing_segments = (existing or {}).get("segments") or []
+    if existing and existing.get("job_id") != selected_job_id:
+        raise ValueError("既有 job ID 與目前輸入不符")
+    if existing and len(existing_segments) != len(inspected):
+        raise ValueError("既有 job 的來源數量已變更")
+
+    projected_bytes = MIN_FREE_HEADROOM + math.ceil(
+        sum(item["duration_seconds"] for item in inspected) * (MP3_BITRATE / 8) * 2
+    )
+    free_bytes = available_bytes
+    if free_bytes is None:
+        free_bytes = shutil.disk_usage(job_root).free
+    if free_bytes < projected_bytes:
+        raise ValueError(f"磁碟空間不足，需要至少 {projected_bytes:,} bytes")
+
+    segments: list[dict] = []
+    for index, source in enumerate(inspected, start=1):
+        prior = existing_segments[index - 1] if index <= len(existing_segments) else None
+        if prior:
+            prior_source = prior.get("source") or {}
+            if (
+                prior_source.get("name") != source["name"]
+                or prior_source.get("sha256") != source["sha256"]
+                or prior_source.get("path") != str(source["path"])
+            ):
+                raise ValueError(f"來源內容已變更：{source['name']}")
+
+        mp3_path = audio_dir / f"{Path(source['name']).stem}.mp3"
+        mp3_details: dict
+        if mp3_path.exists():
+            prior_mp3 = (prior or {}).get("mp3") or {}
+            current_sha = sha256_file(mp3_path)
+            if prior_mp3.get("sha256") != current_sha:
+                raise ValueError(f"既有 MP3 內容與 job evidence 不符：{mp3_path.name}")
+            mp3_details = _validate_mp3(mp3_path, source["duration_seconds"], runner)
+            mp3_details["path"] = str(mp3_path.resolve())
+        else:
+            mp3_details = _convert_mp3_atomic(
+                source["path"],
+                source["stream_index"],
+                source["duration_seconds"],
+                source["sha256"],
+                mp3_path,
+                runner,
+            )
+        segments.append(
+            {
+                "index": index,
+                "state": (prior or {}).get("state", "Prepared"),
+                "next_action": (prior or {}).get("next_action", "await_paid_approval"),
+                "source": {
+                    "path": str(source["path"]),
+                    "name": source["name"],
+                    "size_bytes": source["size_bytes"],
+                    "sha256": source["sha256"],
+                    "duration_seconds": source["duration_seconds"],
+                    "audio_stream_index": source["stream_index"],
+                },
+                "mp3": mp3_details,
+                "scribe_path": str((scribe_dir / f"{Path(source['name']).stem}.json").resolve()),
+                "attempts": list((prior or {}).get("attempts") or []),
+            }
+        )
+
+    approval = _approval_summary(segments)
+    if not within_paid_caps(approval["estimate"]):
+        raise ValueError("待上傳音訊超出 120 分鐘或 USD 0.50 付費硬上限")
+    timestamp = now_utc()
+    job = {
+        "schema_version": STATE_VERSION,
+        "job_id": selected_job_id,
+        "job_root": str(job_root.resolve()),
+        "created_at": (existing or {}).get("created_at", timestamp),
+        "updated_at": timestamp,
+        "state": "awaiting_paid_approval",
+        "next_action": "review_paid_disclosure",
+        "segments": segments,
+        "approval": approval,
+        "approval_fingerprint": paid_input_fingerprint(approval),
+        "data_snapshot": (existing or {}).get("data_snapshot"),
+        "combined_transcript": (existing or {}).get("combined_transcript"),
+        "tsv": (existing or {}).get("tsv"),
+    }
+    if data_path is not None and Path(data_path).exists() and job["data_snapshot"] is None:
+        job["data_snapshot_preparation"] = capture_data_snapshot(Path(data_path))
+    atomic_write_json(state_path, job)
+    return job
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Prepare explicit Thai class MP4 files for guarded ElevenLabs Scribe v2 transcription."
+    )
+    parser.add_argument("sources", nargs="+", type=Path, help="Explicit MP4 files in class order")
+    parser.add_argument("--job-id", help="Safe output job ID; defaults to the source prefix")
+    parser.add_argument("--out-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument("--data", type=Path, default=Path("data.json"))
+    parser.add_argument(
+        "--confirm-paid-api",
+        action="store_true",
+        help="Confirm only the currently saved matching paid disclosure (requires a separate user approval)",
+    )
+    parser.add_argument(
+        "--force-paid-retry",
+        action="store_true",
+        help="Allow a separately approved Unknown retry together with --confirm-paid-api",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    if args.force_paid_retry and not args.confirm_paid_api:
+        raise SystemExit("--force-paid-retry 必須與 --confirm-paid-api 一起使用")
+    if args.confirm_paid_api:
+        raise SystemExit("付費路徑尚未啟用；本次不會連線 ElevenLabs")
+    try:
+        job = prepare_job(
+            args.sources,
+            args.out_root,
+            job_id=args.job_id,
+            data_path=args.data,
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(json.dumps({
+        "job_id": job["job_id"],
+        "state": job["state"],
+        "approval_fingerprint": job["approval_fingerprint"],
+        "approval": job["approval"],
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
 if __name__ == "__main__":
-    raise SystemExit("CLI 尚未啟用；請先完成免費預檢單元。")
+    raise SystemExit(main())
