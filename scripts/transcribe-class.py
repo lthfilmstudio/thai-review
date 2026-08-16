@@ -26,10 +26,15 @@ SCRIBE_USD_PER_HOUR = Decimal("0.22")
 ESTIMATE_BUFFER = Decimal("1.10")
 RATE_CHECKED_ON = "2026-08-16"
 DEFAULT_OUTPUT_ROOT = Path("out/class-transcriptions")
+DEFAULT_STT_SECRETS_PATH = Path.home() / ".secrets" / "elevenlabs-stt.env"
+SCRIBE_ENDPOINT = "https://api.elevenlabs.io/v1/speech-to-text"
 MP3_SAMPLE_RATE = 16000
 MP3_CHANNELS = 1
 MP3_BITRATE = 64000
 MIN_FREE_HEADROOM = 64 * 1024 * 1024
+MAX_RESPONSE_BYTES = 128 * 1024 * 1024
+MAX_HEADER_BYTES = 64 * 1024
+SCRIBE_TIMEOUT_SECONDS = 7200
 
 
 def tool_available(name: str) -> bool:
@@ -239,6 +244,7 @@ def run_process(
     *,
     input_bytes: bytes | None = None,
     timeout: float | None = None,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess:
     return subprocess.run(
         args,
@@ -246,6 +252,7 @@ def run_process(
         capture_output=True,
         check=False,
         timeout=timeout,
+        env=env,
     )
 
 
@@ -420,7 +427,7 @@ def _approval_summary(segments: list[dict]) -> dict:
     return {
         "version": 1,
         "destination": "ElevenLabs Speech-to-Text API",
-        "endpoint": "https://api.elevenlabs.io/v1/speech-to-text",
+        "endpoint": SCRIBE_ENDPOINT,
         "retention_disclosure": (
             "ElevenLabs standard logging may retain uploaded STT audio and text; "
             "Zero Retention is Enterprise-only and is not assumed for this run."
@@ -431,7 +438,7 @@ def _approval_summary(segments: list[dict]) -> dict:
             "diarize": True,
             "timestamps_granularity": "word",
             "tag_audio_events": False,
-            "multi_channel": False,
+            "use_multi_channel": False,
             "no_verbatim": False,
             "speaker_roles": False,
             "speaker_library": False,
@@ -592,6 +599,365 @@ def prepare_job(
     return job
 
 
+def _sanitize_identifier(value: object) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    cleaned = re.sub(r"[^A-Za-z0-9._:-]", "", text)[:128]
+    return cleaned or None
+
+
+def _response_identifiers(header_bytes: bytes) -> dict:
+    result: dict[str, str] = {}
+    for raw_line in header_bytes.decode("utf-8", errors="replace").splitlines():
+        if ":" not in raw_line:
+            continue
+        name, value = raw_line.split(":", 1)
+        normalized = name.strip().lower()
+        if normalized in {"request-id", "x-request-id", "x-trace-id", "transcription-id"}:
+            safe = _sanitize_identifier(value)
+            if safe:
+                result[normalized.replace("-", "_")] = safe
+    return result
+
+
+def _validate_scribe_response(value: object) -> dict:
+    if not isinstance(value, dict):
+        raise ValueError("Scribe response 最上層不是 object")
+    if not isinstance(value.get("text"), str):
+        raise ValueError("Scribe response 缺少 text")
+    words = value.get("words")
+    if not isinstance(words, list):
+        raise ValueError("Scribe response 缺少 words")
+    for index, word in enumerate(words):
+        if not isinstance(word, dict):
+            raise ValueError(f"Scribe word {index} 不是 object")
+        if "start" in word and not isinstance(word["start"], (int, float)):
+            raise ValueError(f"Scribe word {index} start 無效")
+        if "end" in word and not isinstance(word["end"], (int, float)):
+            raise ValueError(f"Scribe word {index} end 無效")
+    return value
+
+
+def load_stt_secrets(path: Path) -> dict[str, str]:
+    path = Path(path)
+    if not path.is_file() or path.is_symlink():
+        raise ValueError(f"找不到獨立 STT secrets file：{path}")
+    stat = path.stat()
+    if stat.st_mode & 0o777 != 0o600:
+        raise ValueError("STT secrets file 權限必須是 0600")
+    if hasattr(os, "geteuid") and stat.st_uid != os.geteuid():
+        raise ValueError("STT secrets file 擁有者不是目前使用者")
+    repo_root = Path(__file__).resolve().parents[1]
+    resolved = path.resolve(strict=True)
+    if resolved == repo_root or repo_root in resolved.parents:
+        raise ValueError("STT secrets file 必須位於 repo 外")
+
+    values: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        name, value = stripped.split("=", 1)
+        values[name.strip()] = value.strip().strip("'\"")
+    key = values.get("ELEVENLABS_STT_API_KEY", "")
+    if not re.fullmatch(r"[A-Za-z0-9._-]{8,}", key):
+        raise ValueError("secrets file 缺少有效 ELEVENLABS_STT_API_KEY；不接受 TTS key fallback")
+    if values.get("ELEVENLABS_STT_KEY_SCOPE") != "speech_to_text":
+        raise ValueError("STT key checklist 必須明列 scope=speech_to_text")
+    try:
+        quota = Decimal(values["ELEVENLABS_STT_CREDIT_QUOTA"])
+    except (KeyError, ValueError) as exc:
+        raise ValueError("STT key checklist 缺少明確 credit quota") from exc
+    if quota <= 0:
+        raise ValueError("STT credit quota 必須大於 0")
+    return {
+        "api_key": key,
+        "scope": "speech_to_text",
+        "credit_quota": str(quota),
+    }
+
+
+def _exclusive_transport_temp(parent: Path, label: str) -> Path:
+    path = parent / f".{label}.tmp-{os.getpid()}-{secrets.token_hex(6)}"
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    os.close(descriptor)
+    return path
+
+
+def run_scribe_curl(
+    mp3_path: Path,
+    api_key: str,
+    temp_parent: Path,
+    *,
+    runner: Callable[..., subprocess.CompletedProcess] = run_process,
+) -> dict:
+    if any(ord(character) < 33 or ord(character) == 127 for character in api_key):
+        raise ValueError("STT API key 格式無效")
+    header_path = _exclusive_transport_temp(temp_parent, "scribe-headers")
+    body_path = _exclusive_transport_temp(temp_parent, "scribe-body")
+    args = [
+        "curl",
+        "-q",
+        "--config",
+        "-",
+        "--silent",
+        "--show-error",
+        "--request",
+        "POST",
+        "--proto",
+        "=https",
+        "--proto-redir",
+        "=https",
+        "--retry",
+        "0",
+        "--max-redirs",
+        "0",
+        "--connect-timeout",
+        "30",
+        "--max-time",
+        str(SCRIBE_TIMEOUT_SECONDS),
+        "--max-filesize",
+        str(MAX_RESPONSE_BYTES),
+        "--dump-header",
+        str(header_path),
+        "--output",
+        str(body_path),
+        "--write-out",
+        "%{http_code}",
+        "--form",
+        f"file=@{mp3_path};type=audio/mpeg",
+        "--form",
+        "model_id=scribe_v2",
+        "--form",
+        "diarize=true",
+        "--form",
+        "timestamps_granularity=word",
+        "--form",
+        "tag_audio_events=false",
+        "--form",
+        "use_multi_channel=false",
+        "--form",
+        "no_verbatim=false",
+        SCRIBE_ENDPOINT,
+    ]
+    child_env = {
+        name: value
+        for name, value in os.environ.items()
+        if not name.upper().startswith("ELEVENLABS")
+    }
+    config = f'header = "xi-api-key: {api_key}"\n'.encode("utf-8")
+    try:
+        completed = runner(
+            args,
+            input_bytes=config,
+            timeout=SCRIBE_TIMEOUT_SECONDS + 30,
+            env=child_env,
+        )
+        if header_path.stat().st_size > MAX_HEADER_BYTES:
+            raise ValueError("Scribe response headers 超過大小上限")
+        if body_path.stat().st_size > MAX_RESPONSE_BYTES:
+            raise ValueError("Scribe response body 超過大小上限")
+        headers = header_path.read_bytes()
+        body = body_path.read_bytes()
+        stdout = completed.stdout.decode("ascii", errors="ignore").strip()
+        http_status = int(stdout[-3:]) if len(stdout) >= 3 and stdout[-3:].isdigit() else None
+        return {
+            "returncode": completed.returncode,
+            "http_status": http_status,
+            "identifiers": _response_identifiers(headers),
+            "body": body,
+            "error": _limited_error(completed),
+        }
+    finally:
+        for path in (header_path, body_path):
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def _revalidated_segments(
+    job: dict,
+    sources: Iterable[Path],
+    runner: Callable[..., subprocess.CompletedProcess] = run_process,
+) -> list[dict]:
+    ordered, derived_job_id = order_sources(sources)
+    if job.get("job_id") not in {derived_job_id, job.get("job_id")}:
+        raise ValueError("job ID 與來源不符")
+    segments = job.get("segments")
+    if not isinstance(segments, list) or len(segments) != len(ordered):
+        raise ValueError("job 來源數量與本次輸入不符")
+    refreshed: list[dict] = []
+    for segment, source in zip(segments, ordered):
+        source_path = source.resolve(strict=True)
+        saved_source = segment.get("source") or {}
+        if (
+            saved_source.get("path") != str(source_path)
+            or saved_source.get("name") != source.name
+            or saved_source.get("sha256") != sha256_file(source_path)
+        ):
+            raise ValueError(f"來源內容已變更：{source.name}")
+        next_segment = json.loads(json.dumps(segment))
+        mp3_path = Path((segment.get("mp3") or {}).get("path", ""))
+        details = _validate_mp3(mp3_path, float(saved_source["duration_seconds"]), runner)
+        if details["sha256"] != (segment.get("mp3") or {}).get("sha256"):
+            raise ValueError(f"MP3 內容已變更：{mp3_path.name}")
+        details["path"] = str(mp3_path.resolve())
+        next_segment["mp3"] = details
+        if next_segment.get("state") == "Uploading":
+            next_segment["state"] = "Unknown"
+            next_segment["next_action"] = "manual_provider_lookup"
+        refreshed.append(next_segment)
+    return refreshed
+
+
+def _save_job(state_path: Path, job: dict) -> None:
+    job["updated_at"] = now_utc()
+    atomic_write_json(state_path, job)
+
+
+def _mark_unknown(
+    state_path: Path,
+    job: dict,
+    segment: dict,
+    attempt: dict,
+    reason: str,
+    outcome: dict | None = None,
+) -> dict:
+    segment["state"] = "Unknown"
+    segment["next_action"] = "manual_provider_lookup_then_new_dual_approval"
+    attempt["status"] = "Unknown"
+    attempt["finished_at"] = now_utc()
+    attempt["reason"] = reason[:240]
+    if outcome:
+        attempt["http_status"] = outcome.get("http_status")
+        attempt["identifiers"] = outcome.get("identifiers") or {}
+    job["state"] = "unknown"
+    job["next_action"] = "manual_provider_lookup_then_new_dual_approval"
+    _save_job(state_path, job)
+    return job
+
+
+def execute_paid(
+    state_path: Path,
+    sources: Iterable[Path],
+    *,
+    confirm_paid_api: bool,
+    force_paid_retry: bool = False,
+    secrets_path: Path = DEFAULT_STT_SECRETS_PATH,
+    media_runner: Callable[..., subprocess.CompletedProcess] = run_process,
+    http_runner: Callable[..., subprocess.CompletedProcess] = run_process,
+) -> dict:
+    state_path = Path(state_path)
+    job = load_json_object(state_path)
+    job["segments"] = _revalidated_segments(job, sources, media_runner)
+    if all(segment.get("state") == "Complete" for segment in job["segments"]):
+        return job
+
+    current_approval = _approval_summary(job["segments"])
+    current_fingerprint = paid_input_fingerprint(current_approval)
+    if (
+        job.get("approval_fingerprint") != current_fingerprint
+        or job.get("approval") != current_approval
+    ):
+        job["approval"] = current_approval
+        job["approval_fingerprint"] = current_fingerprint
+        job["state"] = "awaiting_paid_approval"
+        job["next_action"] = "review_updated_paid_disclosure"
+        _save_job(state_path, job)
+        return job
+    if not within_paid_caps(current_approval["estimate"]):
+        raise ValueError("本次批准摘要超出付費硬上限")
+    if not confirm_paid_api:
+        return job
+
+    unknown = [segment for segment in job["segments"] if segment.get("state") == "Unknown"]
+    if unknown and not force_paid_retry:
+        job["state"] = "unknown"
+        job["next_action"] = "manual_provider_lookup_then_new_dual_approval"
+        _save_job(state_path, job)
+        return job
+    if force_paid_retry and not unknown:
+        raise ValueError("--force-paid-retry 只適用於 Unknown 分段")
+
+    secret = load_stt_secrets(secrets_path)
+    for segment in job["segments"]:
+        if segment.get("state") == "Complete":
+            continue
+        request_fingerprint = paid_input_fingerprint({
+            "approval_fingerprint": current_fingerprint,
+            "segment_index": segment["index"],
+            "mp3_sha256": segment["mp3"]["sha256"],
+        })
+        attempt = {
+            "attempt": len(segment.get("attempts") or []) + 1,
+            "started_at": now_utc(),
+            "status": "Uploading",
+            "request_fingerprint": request_fingerprint,
+            "mp3_sha256": segment["mp3"]["sha256"],
+        }
+        segment.setdefault("attempts", []).append(attempt)
+        segment["state"] = "Uploading"
+        segment["next_action"] = "do_not_retry_while_request_in_flight"
+        job["state"] = "transcribing"
+        job["next_action"] = "wait_for_current_segment"
+        _save_job(state_path, job)
+
+        try:
+            outcome = run_scribe_curl(
+                Path(segment["mp3"]["path"]),
+                secret["api_key"],
+                Path(job["job_root"]),
+                runner=http_runner,
+            )
+        except FileNotFoundError as exc:
+            segment["state"] = "Prepared"
+            segment["next_action"] = "fix_local_curl_before_paid_retry"
+            attempt["status"] = "PrelaunchFailure"
+            attempt["finished_at"] = now_utc()
+            attempt["reason"] = str(exc)[:240]
+            job["state"] = "awaiting_paid_approval"
+            job["next_action"] = "fix_local_curl_before_paid_retry"
+            _save_job(state_path, job)
+            return job
+        except BaseException as exc:
+            return _mark_unknown(state_path, job, segment, attempt, type(exc).__name__)
+
+        if outcome["returncode"] != 0 or outcome["http_status"] != 200:
+            reason = f"curl={outcome['returncode']} http={outcome['http_status']}"
+            return _mark_unknown(state_path, job, segment, attempt, reason, outcome)
+        try:
+            response = json.loads(outcome["body"].decode("utf-8"))
+            response = _validate_scribe_response(response)
+            if "__thai_review_workflow" in response:
+                raise ValueError("Scribe response 使用了保留欄位")
+            response["__thai_review_workflow"] = {
+                "version": 1,
+                "request_fingerprint": request_fingerprint,
+                "mp3_sha256": segment["mp3"]["sha256"],
+                "saved_at": now_utc(),
+            }
+            scribe_path = Path(segment["scribe_path"])
+            atomic_write_json(scribe_path, response)
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError, OSError) as exc:
+            return _mark_unknown(state_path, job, segment, attempt, type(exc).__name__, outcome)
+
+        segment["state"] = "Complete"
+        segment["next_action"] = "none"
+        segment["scribe_sha256"] = sha256_file(Path(segment["scribe_path"]))
+        attempt["status"] = "Complete"
+        attempt["finished_at"] = now_utc()
+        attempt["http_status"] = 200
+        attempt["identifiers"] = outcome["identifiers"]
+        _save_job(state_path, job)
+
+    job["state"] = "transcription_complete"
+    job["next_action"] = "build_combined_transcript"
+    _save_job(state_path, job)
+    return job
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Prepare explicit Thai class MP4 files for guarded ElevenLabs Scribe v2 transcription."
@@ -600,6 +966,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--job-id", help="Safe output job ID; defaults to the source prefix")
     parser.add_argument("--out-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--data", type=Path, default=Path("data.json"))
+    parser.add_argument(
+        "--secrets-file",
+        type=Path,
+        default=DEFAULT_STT_SECRETS_PATH,
+        help="Repo-external mode 0600 file containing only the restricted STT key checklist",
+    )
     parser.add_argument(
         "--confirm-paid-api",
         action="store_true",
@@ -617,15 +989,25 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.force_paid_retry and not args.confirm_paid_api:
         raise SystemExit("--force-paid-retry 必須與 --confirm-paid-api 一起使用")
-    if args.confirm_paid_api:
-        raise SystemExit("付費路徑尚未啟用；本次不會連線 ElevenLabs")
     try:
-        job = prepare_job(
-            args.sources,
-            args.out_root,
-            job_id=args.job_id,
-            data_path=args.data,
-        )
+        if args.confirm_paid_api:
+            ordered, derived_job_id = order_sources(args.sources)
+            selected_job_id = args.job_id or derived_job_id
+            state_path = safe_job_root(args.out_root, selected_job_id) / "job.json"
+            job = execute_paid(
+                state_path,
+                ordered,
+                confirm_paid_api=True,
+                force_paid_retry=args.force_paid_retry,
+                secrets_path=args.secrets_file,
+            )
+        else:
+            job = prepare_job(
+                args.sources,
+                args.out_root,
+                job_id=args.job_id,
+                data_path=args.data,
+            )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps({
