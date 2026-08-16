@@ -277,16 +277,29 @@ def load_stt_secrets(path: Path) -> dict[str, str]:
         raise ValueError("secrets file 缺少有效 ELEVENLABS_STT_API_KEY；不接受 TTS key fallback")
     if values.get("ELEVENLABS_STT_KEY_SCOPE") != "speech_to_text":
         raise ValueError("STT key checklist 必須明列 scope=speech_to_text")
-    try:
-        quota = Decimal(values["ELEVENLABS_STT_CREDIT_QUOTA"])
-    except (KeyError, ValueError) as exc:
-        raise ValueError("STT key checklist 缺少明確 credit quota") from exc
-    if quota <= 0:
-        raise ValueError("STT credit quota 必須大於 0")
+    quota_text = values.get("ELEVENLABS_STT_CREDIT_QUOTA")
+    provider_guard = values.get("ELEVENLABS_STT_PROVIDER_GUARD")
+    if quota_text and provider_guard:
+        raise ValueError("STT key checklist 只能設定一種 provider 付費防呆")
+    if quota_text:
+        try:
+            quota = Decimal(quota_text)
+        except ValueError as exc:
+            raise ValueError("STT credit quota 格式無效") from exc
+        if quota <= 0:
+            raise ValueError("STT credit quota 必須大於 0")
+        return {
+            "api_key": key,
+            "scope": "speech_to_text",
+            "provider_guard": "credit_quota",
+            "credit_quota": str(quota),
+        }
+    if provider_guard != "ip_allowlist":
+        raise ValueError("STT key checklist 必須明列 credit quota 或 provider guard=ip_allowlist")
     return {
         "api_key": key,
         "scope": "speech_to_text",
-        "credit_quota": str(quota),
+        "provider_guard": "ip_allowlist",
     }
 
 

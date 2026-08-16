@@ -44,13 +44,15 @@ python3 scripts/transcribe-class.py \
 
 ## 2. STT 專用 key
 
-不要沿用網站泰文 TTS key。到 ElevenLabs 建立獨立 key，只開 `speech_to_text`，設定明確 credit quota，並開啟 provider 提供的 leak protection。把 key 放在 repo 外的專用檔，權限必須是 `0600`：
+不要沿用網站泰文 TTS key。到 ElevenLabs 建立獨立 key，只開 `speech_to_text`，並開啟 provider 提供的 leak protection。若介面能設定 credit quota，使用明確額度；若帳號介面把額度鎖在「無限」，則必須改開 public IP allowlist。兩種 provider 防呆擇一，不能兩者都沒有。把 key 放在 repo 外的專用檔，權限必須是 `0600`：
 
 ```text
 ELEVENLABS_STT_API_KEY=<restricted STT key>
 ELEVENLABS_STT_KEY_SCOPE=speech_to_text
-ELEVENLABS_STT_CREDIT_QUOTA=<provider 中設定的 quota 數字>
+ELEVENLABS_STT_PROVIDER_GUARD=ip_allowlist
 ```
+
+若 dashboard 可設定 quota，最後一行可改成 `ELEVENLABS_STT_CREDIT_QUOTA=<provider 中設定的 quota 數字>`。IP allowlist 只接受公開 IP；換網路後若收到 `403`，先更新 dashboard 中的允許 IP，不要放寬 endpoint 或自動重送。
 
 建議位置是 `~/.secrets/elevenlabs-stt.env`。確認權限：
 

@@ -35,11 +35,18 @@ def make_mp4(path, audio_inputs=1, duration=1.0, default_audio=0):
     subprocess.run(command, check=True, capture_output=True)
 
 
-def write_stt_secrets(path, key="fake-stt-key", scope="speech_to_text", quota="10"):
+def write_stt_secrets(
+    path, key="fake-stt-key", scope="speech_to_text", quota=None,
+    provider_guard="ip_allowlist",
+):
+    guard = (
+        f"ELEVENLABS_STT_CREDIT_QUOTA={quota}\n" if quota is not None
+        else f"ELEVENLABS_STT_PROVIDER_GUARD={provider_guard}\n"
+    )
     path.write_text(
         f"ELEVENLABS_STT_API_KEY={key}\n"
         f"ELEVENLABS_STT_KEY_SCOPE={scope}\n"
-        f"ELEVENLABS_STT_CREDIT_QUOTA={quota}\n",
+        f"{guard}",
         encoding="utf-8",
     )
     os.chmod(path, 0o600)
@@ -421,7 +428,7 @@ class PaidGateTest(unittest.TestCase):
 
             self.assertEqual(calls, [])
 
-    def test_secret_file_scope_quota_and_mode_are_checked_before_request(self):
+    def test_secret_file_scope_provider_guard_and_mode_are_checked_before_request(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             source, state_path = self.prepared_job(root)
@@ -431,7 +438,8 @@ class PaidGateTest(unittest.TestCase):
                 ("missing.env", None),
                 ("tts-only.env", "ELEVENLABS_API_KEY=tts-key\n"),
                 ("wrong-scope.env", "ELEVENLABS_STT_API_KEY=x\nELEVENLABS_STT_KEY_SCOPE=text_to_speech\nELEVENLABS_STT_CREDIT_QUOTA=10\n"),
-                ("missing-quota.env", "ELEVENLABS_STT_API_KEY=x\nELEVENLABS_STT_KEY_SCOPE=speech_to_text\n"),
+                ("missing-guard.env", "ELEVENLABS_STT_API_KEY=x\nELEVENLABS_STT_KEY_SCOPE=speech_to_text\n"),
+                ("wrong-guard.env", "ELEVENLABS_STT_API_KEY=x\nELEVENLABS_STT_KEY_SCOPE=speech_to_text\nELEVENLABS_STT_PROVIDER_GUARD=none\n"),
             ]
             for name, contents in cases:
                 path = root / name
@@ -454,6 +462,12 @@ class PaidGateTest(unittest.TestCase):
                     secrets_path=wrong_mode, http_runner=self.success_runner(calls, key="x"),
                 )
             self.assertEqual(calls, [])
+
+            quota_path = root / "quota.env"
+            write_stt_secrets(quota_path, key="quota-key", quota="1000")
+            loaded = transcribe_class.load_stt_secrets(quota_path)
+            self.assertEqual(loaded["provider_guard"], "credit_quota")
+            self.assertEqual(loaded["credit_quota"], "1000")
 
     def test_success_uses_fixed_contract_and_never_persists_key(self):
         with tempfile.TemporaryDirectory() as tmp:
