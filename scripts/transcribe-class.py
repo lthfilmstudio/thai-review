@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import hashlib
 import json
 import math
@@ -13,7 +15,7 @@ import secrets
 import shutil
 import subprocess
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -24,6 +26,7 @@ MAX_BUFFERED_USD = Decimal("0.50")
 SCRIBE_USD_PER_HOUR = Decimal("0.22")
 ESTIMATE_BUFFER = Decimal("1.10")
 RATE_CHECKED_ON = "2026-08-16"
+RATE_MAX_AGE_DAYS = 30
 DEFAULT_OUTPUT_ROOT = Path("out/class-transcriptions")
 DEFAULT_STT_SECRETS_PATH = Path.home() / ".secrets" / "elevenlabs-stt.env"
 SCRIBE_ENDPOINT = "https://api.elevenlabs.io/v1/speech-to-text"
@@ -38,6 +41,17 @@ SCRIBE_TIMEOUT_SECONDS = 7200
 
 def tool_available(name: str) -> bool:
     return shutil.which(name) is not None
+
+
+def rate_check_is_fresh(today: date | None = None) -> bool:
+    try:
+        checked = date.fromisoformat(RATE_CHECKED_ON)
+    except ValueError:
+        return False
+    taipei = timezone(timedelta(hours=8))
+    current = today or datetime.now(taipei).date()
+    age = (current - checked).days
+    return 0 <= age <= RATE_MAX_AGE_DAYS
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -892,7 +906,104 @@ def _mark_unknown(
     return job
 
 
+@contextlib.contextmanager
+def paid_execution_lock(state_path: Path):
+    output_root = Path(state_path).resolve(strict=False).parent.parent
+    ensure_private_dir(output_root)
+    lock_path = output_root / ".paid-api.lock"
+    descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    os.chmod(lock_path, 0o600)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise ValueError("另一個本機付費轉錄流程正在執行；本次 0 requests") from exc
+        yield
+    finally:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
+
+
+def _content_request_fingerprint(segment: dict, request_contract: dict) -> str:
+    return paid_input_fingerprint({
+        "mp3_sha256": (segment.get("mp3") or {}).get("sha256"),
+        "request": request_contract,
+        "endpoint": SCRIBE_ENDPOINT,
+    })
+
+
+def _find_local_paid_evidence(
+    state_path: Path,
+    segment: dict,
+    request_contract: dict,
+) -> tuple[str, dict | None, str | None]:
+    output_root = Path(state_path).resolve(strict=False).parent.parent
+    target_fingerprint = _content_request_fingerprint(segment, request_contract)
+    for other_state_path in output_root.glob("*/job.json"):
+        if other_state_path.is_symlink() or other_state_path.resolve(strict=False) == Path(state_path).resolve(strict=False):
+            continue
+        try:
+            other_job = load_json_object(other_state_path)
+        except (OSError, ValueError):
+            continue
+        other_request = (other_job.get("approval") or {}).get("request")
+        for other_segment in other_job.get("segments") or []:
+            if (other_segment.get("mp3") or {}).get("sha256") != (segment.get("mp3") or {}).get("sha256"):
+                continue
+            fingerprints = {
+                attempt.get("content_request_fingerprint")
+                for attempt in other_segment.get("attempts") or []
+                if attempt.get("content_request_fingerprint")
+            }
+            contract_matches = target_fingerprint in fingerprints or other_request == request_contract
+            if not contract_matches:
+                continue
+            if other_segment.get("state") == "Complete":
+                try:
+                    response, _ = _load_matching_scribe_artifact(other_segment)
+                except (OSError, ValueError):
+                    return "Unknown", None, str(other_state_path)
+                return "Complete", response, str(other_state_path)
+            if other_segment.get("state") in {"Uploading", "Unknown"}:
+                return "Unknown", None, str(other_state_path)
+    return "None", None, None
+
+
 def execute_paid(
+    state_path: Path,
+    sources: Iterable[Path],
+    *,
+    confirm_paid_api: bool,
+    force_paid_retry: bool = False,
+    secrets_path: Path = DEFAULT_STT_SECRETS_PATH,
+    media_runner: Callable[..., subprocess.CompletedProcess] = run_process,
+    http_runner: Callable[..., subprocess.CompletedProcess] = run_process,
+) -> dict:
+    if not confirm_paid_api:
+        return _execute_paid_inner(
+            state_path,
+            sources,
+            confirm_paid_api=False,
+            force_paid_retry=force_paid_retry,
+            secrets_path=secrets_path,
+            media_runner=media_runner,
+            http_runner=http_runner,
+        )
+    with paid_execution_lock(Path(state_path)):
+        return _execute_paid_inner(
+            state_path,
+            sources,
+            confirm_paid_api=True,
+            force_paid_retry=force_paid_retry,
+            secrets_path=secrets_path,
+            media_runner=media_runner,
+            http_runner=http_runner,
+        )
+
+
+def _execute_paid_inner(
     state_path: Path,
     sources: Iterable[Path],
     *,
@@ -907,6 +1018,11 @@ def execute_paid(
     job["segments"], recovery_changed = _revalidated_segments(job, sources, media_runner)
     if all(segment.get("state") == "Complete" for segment in job["segments"]):
         return build_combined_transcript(state_path, job)
+    if not rate_check_is_fresh():
+        job["state"] = "awaiting_paid_approval"
+        job["next_action"] = "refresh_official_rate_then_rerun_free_preflight"
+        _save_job(state_path, job)
+        return job
 
     current_approval = _approval_summary(job["segments"])
     current_fingerprint = paid_input_fingerprint(current_approval)
@@ -938,20 +1054,73 @@ def execute_paid(
     if force_paid_retry and not unknown:
         raise ValueError("--force-paid-retry 只適用於 Unknown 分段")
 
-    secret = load_stt_secrets(secrets_path)
+    secret: dict[str, str] | None = None
     for segment in job["segments"]:
         if segment.get("state") == "Complete":
             continue
+        evidence_state, evidence_response, evidence_path = _find_local_paid_evidence(
+            state_path,
+            segment,
+            current_approval["request"],
+        )
+        if evidence_state == "Unknown":
+            segment["state"] = "Unknown"
+            segment["next_action"] = "inspect_matching_local_paid_evidence"
+            segment.setdefault("attempts", []).append({
+                "attempt": len(segment.get("attempts") or []) + 1,
+                "started_at": now_utc(),
+                "finished_at": now_utc(),
+                "status": "Unknown",
+                "reason": "matching_local_uploading_or_unknown",
+                "matching_job_state": evidence_path,
+                "content_request_fingerprint": _content_request_fingerprint(
+                    segment, current_approval["request"]
+                ),
+            })
+            job["state"] = "unknown"
+            job["next_action"] = "inspect_matching_local_paid_evidence"
+            _save_job(state_path, job)
+            return job
         request_fingerprint = paid_input_fingerprint({
             "approval_fingerprint": current_fingerprint,
             "segment_index": segment["index"],
             "mp3_sha256": segment["mp3"]["sha256"],
         })
+        content_request_fingerprint = _content_request_fingerprint(
+            segment, current_approval["request"]
+        )
+        if evidence_state == "Complete" and evidence_response is not None:
+            response = json.loads(json.dumps(evidence_response))
+            response["__thai_review_workflow"] = {
+                "version": 1,
+                "request_fingerprint": request_fingerprint,
+                "mp3_sha256": segment["mp3"]["sha256"],
+                "saved_at": now_utc(),
+                "reused_from": evidence_path,
+            }
+            segment["scribe_sha256"] = atomic_write_json(Path(segment["scribe_path"]), response)
+            segment["state"] = "Complete"
+            segment["next_action"] = "none"
+            segment.setdefault("attempts", []).append({
+                "attempt": len(segment.get("attempts") or []) + 1,
+                "started_at": now_utc(),
+                "finished_at": now_utc(),
+                "status": "Complete",
+                "method": "reused_local_complete",
+                "request_fingerprint": request_fingerprint,
+                "content_request_fingerprint": content_request_fingerprint,
+                "matching_job_state": evidence_path,
+            })
+            _save_job(state_path, job)
+            continue
+        if secret is None:
+            secret = load_stt_secrets(secrets_path)
         attempt = {
             "attempt": len(segment.get("attempts") or []) + 1,
             "started_at": now_utc(),
             "status": "Uploading",
             "request_fingerprint": request_fingerprint,
+            "content_request_fingerprint": content_request_fingerprint,
             "mp3_sha256": segment["mp3"]["sha256"],
         }
         segment.setdefault("attempts", []).append(attempt)
@@ -1165,6 +1334,24 @@ def run_scribe_get(
 
 
 def recover_unknown(
+    state_path: Path,
+    sources: Iterable[Path],
+    *,
+    secrets_path: Path = DEFAULT_STT_SECRETS_PATH,
+    media_runner: Callable[..., subprocess.CompletedProcess] = run_process,
+    http_runner: Callable[..., subprocess.CompletedProcess] = run_process,
+) -> dict:
+    with paid_execution_lock(Path(state_path)):
+        return _recover_unknown_inner(
+            state_path,
+            sources,
+            secrets_path=secrets_path,
+            media_runner=media_runner,
+            http_runner=http_runner,
+        )
+
+
+def _recover_unknown_inner(
     state_path: Path,
     sources: Iterable[Path],
     *,

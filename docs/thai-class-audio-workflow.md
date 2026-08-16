@@ -72,7 +72,7 @@ ls -l ~/.secrets/elevenlabs-stt.env
 - 單價查核日、逐段向上取整分鐘的原始估價、加 10% 緩衝估價；
 - 音訊與文字會受 ElevenLabs standard logging 處理；一般帳號不能把 Enterprise-only Zero Retention 當成保障。
 
-硬上限固定為總音訊 120 分鐘，以及含緩衝估價 USD 0.50，不能用參數調高。程式目前的 Scribe v2 基價是 2026-08-16 查核的 USD 0.22／小時；任何真實上傳前都要重新查看 ElevenLabs 官方 pricing／API 文件。若費率已變，要先更新程式中的單價與查核日、重跑免費準備，再取得新批准，不能拿舊估價硬送。
+硬上限固定為總音訊 120 分鐘，以及含緩衝估價 USD 0.50，不能用參數調高。程式目前的 Scribe v2 基價是 2026-08-16 查核的 USD 0.22／小時；查核超過 30 天就會封鎖付費路徑。任何真實上傳前都要重新查看 ElevenLabs 官方 pricing／API 文件。若費率已變或查核已過期，要先更新程式中的單價與查核日、重跑免費準備，再取得新批准，不能拿舊估價硬送。
 
 只有 Nalin 看過目前這份揭露並明確批准這批檔案後，才執行：
 
@@ -86,6 +86,8 @@ python3 scripts/transcribe-class.py \
 `--confirm-paid-api` 只授權這次 invocation 與當下完全相符的 approval fingerprint。MP4、MP3、待傳範圍、模型參數或費率一變，腳本會更新摘要並停止，請重新呈現摘要與取得批准。
 
 付費 POST 固定依序執行，不會 retry；每段在 curl 啟動前先耐久記為 `Uploading`。只有完整 Scribe JSON 已原子保存並驗證，才會成為 `Complete`。
+
+所有本機付費／recovery 流程共用 `out/class-transcriptions/.paid-api.lock`，同一時間只允許一個程序。鎖內也會搜尋其他 job 的相同 MP3 SHA-256＋request contract：找到完整本機結果就重用且不讀 key、不 POST；找到相符的 `Uploading` 或 `Unknown` 就封鎖本次上傳，避免換 job ID 造成重複計費。
 
 ## 4. `Unknown` 恢復
 

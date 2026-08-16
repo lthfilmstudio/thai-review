@@ -4,6 +4,7 @@ import os
 import subprocess
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 
 
@@ -152,6 +153,10 @@ class DurableStateTest(unittest.TestCase):
             self.assertEqual(snapshot["size_bytes"], len(raw))
             self.assertEqual(len(snapshot["sha256"]), 64)
 
+    def test_rate_freshness_has_a_fixed_thirty_day_boundary(self):
+        self.assertTrue(transcribe_class.rate_check_is_fresh(date(2026, 9, 15)))
+        self.assertFalse(transcribe_class.rate_check_is_fresh(date(2026, 9, 16)))
+
 
 @unittest.skipUnless(transcribe_class.tool_available("ffmpeg") and transcribe_class.tool_available("ffprobe"), "FFmpeg required")
 class MediaPreparationTest(unittest.TestCase):
@@ -250,6 +255,7 @@ class PaidGateTest(unittest.TestCase):
             self.assertEqual(args[args.index("--retry") + 1], "0")
             self.assertNotIn("--location", args)
             self.assertFalse(any(key in arg for arg in args))
+            self.assertFalse(any(name.upper().startswith("ELEVENLABS") for name in kwargs.get("env", {})))
             self.assertFalse(any(key in str(value) for value in kwargs.get("env", {}).values()))
             self.assertIn(key.encode(), kwargs["input_bytes"])
             forms = [args[index + 1] for index, value in enumerate(args) if value == "--form"]
@@ -532,6 +538,211 @@ class PaidGateTest(unittest.TestCase):
             self.assertEqual(recovered["segments"][0]["state"], "Complete")
             self.assertEqual(recovered["state"], "needs_tsv_review")
             self.assertTrue(Path(recovered["combined_transcript"]["path"]).is_file())
+
+    def test_partial_success_requires_updated_approval_and_only_resends_incomplete_part(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sources = [root / "260814-1.mp4", root / "260814-2.mp4"]
+            for source in sources:
+                make_mp4(source)
+            job = transcribe_class.prepare_job(sources, root / "out", data_path=None)
+            state_path = Path(job["job_root"]) / "job.json"
+            key_path = root / "stt.env"
+            write_stt_secrets(key_path)
+            first_calls = []
+            success = self.success_runner(first_calls)
+
+            def mixed_runner(args, **kwargs):
+                if not first_calls:
+                    return success(args, **kwargs)
+                first_calls.append((args, kwargs))
+                raise subprocess.TimeoutExpired(args, 7200)
+
+            partial = transcribe_class.execute_paid(
+                state_path, sources, confirm_paid_api=True,
+                secrets_path=key_path, http_runner=mixed_runner,
+            )
+            self.assertEqual(len(first_calls), 2)
+            self.assertEqual([segment["state"] for segment in partial["segments"]], ["Complete", "Unknown"])
+
+            stale_calls = []
+            refreshed = transcribe_class.execute_paid(
+                state_path, sources, confirm_paid_api=True, force_paid_retry=True,
+                secrets_path=key_path, http_runner=self.success_runner(stale_calls),
+            )
+            self.assertEqual(stale_calls, [])
+            self.assertEqual(refreshed["next_action"], "review_updated_paid_disclosure")
+            self.assertEqual(len(refreshed["approval"]["segments"]), 1)
+
+            retry_calls = []
+            complete = transcribe_class.execute_paid(
+                state_path, sources, confirm_paid_api=True, force_paid_retry=True,
+                secrets_path=key_path, http_runner=self.success_runner(retry_calls),
+            )
+            self.assertEqual(len(retry_calls), 1)
+            self.assertEqual(complete["state"], "needs_tsv_review")
+
+    def test_durable_uploading_sync_failure_prevents_runner_start(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, state_path = self.prepared_job(root)
+            key_path = root / "stt.env"
+            write_stt_secrets(key_path)
+            calls = []
+            original_sync = transcribe_class._fsync_directory
+
+            def fail_sync(path):
+                raise OSError("simulated directory sync failure")
+
+            transcribe_class._fsync_directory = fail_sync
+            try:
+                with self.assertRaises(OSError):
+                    transcribe_class.execute_paid(
+                        state_path, [source], confirm_paid_api=True,
+                        secrets_path=key_path, http_runner=self.success_runner(calls),
+                    )
+            finally:
+                transcribe_class._fsync_directory = original_sync
+            self.assertEqual(calls, [])
+
+    def test_scribe_persistence_failure_after_launch_becomes_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, state_path = self.prepared_job(root)
+            key_path = root / "stt.env"
+            write_stt_secrets(key_path)
+            calls = []
+            original_write = transcribe_class.atomic_write_json
+
+            def fail_scribe_only(path, value):
+                if Path(path).parent.name == "scribe":
+                    raise OSError("simulated scribe disk failure")
+                return original_write(path, value)
+
+            transcribe_class.atomic_write_json = fail_scribe_only
+            try:
+                unknown = transcribe_class.execute_paid(
+                    state_path, [source], confirm_paid_api=True,
+                    secrets_path=key_path, http_runner=self.success_runner(calls),
+                )
+            finally:
+                transcribe_class.atomic_write_json = original_write
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(unknown["segments"][0]["state"], "Unknown")
+
+    def test_completed_job_never_posts_again(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, state_path = self.prepared_job(root)
+            key_path = root / "stt.env"
+            write_stt_secrets(key_path)
+            first_calls = []
+            transcribe_class.execute_paid(
+                state_path, [source], confirm_paid_api=True,
+                secrets_path=key_path, http_runner=self.success_runner(first_calls),
+            )
+            repeat_calls = []
+            repeated = transcribe_class.execute_paid(
+                state_path, [source], confirm_paid_api=True,
+                secrets_path=key_path, http_runner=self.success_runner(repeat_calls),
+            )
+            self.assertEqual(repeat_calls, [])
+            self.assertEqual(repeated["segments"][0]["state"], "Complete")
+
+    def test_expired_rate_check_stops_before_secret_read_or_request(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, state_path = self.prepared_job(root)
+            calls = []
+            original_date = transcribe_class.RATE_CHECKED_ON
+            transcribe_class.RATE_CHECKED_ON = "2026-01-01"
+            try:
+                blocked = transcribe_class.execute_paid(
+                    state_path, [source], confirm_paid_api=True,
+                    secrets_path=root / "missing.env",
+                    http_runner=self.success_runner(calls),
+                )
+            finally:
+                transcribe_class.RATE_CHECKED_ON = original_date
+            self.assertEqual(calls, [])
+            self.assertEqual(blocked["next_action"], "refresh_official_rate_then_rerun_free_preflight")
+
+    def test_matching_complete_in_another_job_is_reused_without_key_or_post(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "class.mp4"
+            make_mp4(source)
+            first = transcribe_class.prepare_job(
+                [source], root / "out", job_id="job-a", data_path=None
+            )
+            second = transcribe_class.prepare_job(
+                [source], root / "out", job_id="job-b", data_path=None
+            )
+            key_path = root / "stt.env"
+            write_stt_secrets(key_path)
+            first_calls = []
+            transcribe_class.execute_paid(
+                Path(first["job_root"]) / "job.json", [source], confirm_paid_api=True,
+                secrets_path=key_path, http_runner=self.success_runner(first_calls),
+            )
+            self.assertEqual(len(first_calls), 1)
+            reused_calls = []
+
+            reused = transcribe_class.execute_paid(
+                Path(second["job_root"]) / "job.json", [source], confirm_paid_api=True,
+                secrets_path=root / "missing.env", http_runner=self.success_runner(reused_calls),
+            )
+
+            self.assertEqual(reused_calls, [])
+            self.assertEqual(reused["state"], "needs_tsv_review")
+            self.assertEqual(reused["segments"][0]["attempts"][-1]["method"], "reused_local_complete")
+
+    def test_matching_unknown_in_another_job_blocks_without_key_or_post(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "class.mp4"
+            make_mp4(source)
+            first = transcribe_class.prepare_job(
+                [source], root / "out", job_id="job-a", data_path=None
+            )
+            second = transcribe_class.prepare_job(
+                [source], root / "out", job_id="job-b", data_path=None
+            )
+            key_path = root / "stt.env"
+            write_stt_secrets(key_path)
+
+            def timeout_runner(args, **kwargs):
+                raise subprocess.TimeoutExpired(args, 7200)
+
+            transcribe_class.execute_paid(
+                Path(first["job_root"]) / "job.json", [source], confirm_paid_api=True,
+                secrets_path=key_path, http_runner=timeout_runner,
+            )
+            calls = []
+            blocked = transcribe_class.execute_paid(
+                Path(second["job_root"]) / "job.json", [source], confirm_paid_api=True,
+                secrets_path=root / "missing.env", http_runner=self.success_runner(calls),
+            )
+
+            self.assertEqual(calls, [])
+            self.assertEqual(blocked["segments"][0]["state"], "Unknown")
+            self.assertEqual(blocked["next_action"], "inspect_matching_local_paid_evidence")
+
+    def test_global_paid_lock_blocks_a_second_local_invocation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, state_path = self.prepared_job(root)
+            key_path = root / "stt.env"
+            write_stt_secrets(key_path)
+            calls = []
+
+            with transcribe_class.paid_execution_lock(state_path):
+                with self.assertRaisesRegex(ValueError, "另一個本機付費"):
+                    transcribe_class.execute_paid(
+                        state_path, [source], confirm_paid_api=True,
+                        secrets_path=key_path, http_runner=self.success_runner(calls),
+                    )
+            self.assertEqual(calls, [])
 
 
 @unittest.skipUnless(transcribe_class.tool_available("ffmpeg") and transcribe_class.tool_available("ffprobe"), "FFmpeg required")
