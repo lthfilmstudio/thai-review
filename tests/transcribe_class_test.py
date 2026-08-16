@@ -422,6 +422,63 @@ class PaidGateTest(unittest.TestCase):
                 self.assertEqual(len(calls), 1)
                 self.assertEqual(job["segments"][0]["state"], "Unknown")
 
+    def test_durable_response_repairs_uploading_without_another_request(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, state_path = self.prepared_job(root)
+            key_path = root / "stt.env"
+            write_stt_secrets(key_path)
+            first_calls = []
+            transcribe_class.execute_paid(
+                state_path, [source], confirm_paid_api=True,
+                secrets_path=key_path, http_runner=self.success_runner(first_calls),
+            )
+            crashed = transcribe_class.load_json_object(state_path)
+            crashed["segments"][0]["state"] = "Uploading"
+            crashed["segments"][0]["next_action"] = "do_not_retry_while_request_in_flight"
+            crashed["segments"][0].pop("scribe_sha256")
+            crashed["segments"][0]["attempts"][-1]["status"] = "Uploading"
+            crashed["state"] = "transcribing"
+            transcribe_class.atomic_write_json(state_path, crashed)
+            calls = []
+
+            repaired = transcribe_class.execute_paid(
+                state_path, [source], confirm_paid_api=False,
+                secrets_path=key_path, http_runner=self.success_runner(calls),
+            )
+
+            self.assertEqual(calls, [])
+            self.assertEqual(repaired["segments"][0]["state"], "Complete")
+            self.assertEqual(repaired["state"], "transcription_complete")
+            self.assertEqual(
+                transcribe_class.load_json_object(state_path)["segments"][0]["state"],
+                "Complete",
+            )
+
+    def test_complete_with_corrupt_artifact_is_persisted_as_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, state_path = self.prepared_job(root)
+            key_path = root / "stt.env"
+            write_stt_secrets(key_path)
+            first_calls = []
+            complete = transcribe_class.execute_paid(
+                state_path, [source], confirm_paid_api=True,
+                secrets_path=key_path, http_runner=self.success_runner(first_calls),
+            )
+            Path(complete["segments"][0]["scribe_path"]).write_text("{}", encoding="utf-8")
+            calls = []
+
+            recovered = transcribe_class.execute_paid(
+                state_path, [source], confirm_paid_api=False,
+                secrets_path=key_path, http_runner=self.success_runner(calls),
+            )
+
+            self.assertEqual(calls, [])
+            self.assertEqual(recovered["segments"][0]["state"], "Unknown")
+            persisted = transcribe_class.load_json_object(state_path)
+            self.assertEqual(persisted["segments"][0]["state"], "Unknown")
+
 
 if __name__ == "__main__":
     unittest.main()

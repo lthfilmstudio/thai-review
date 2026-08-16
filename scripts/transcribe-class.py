@@ -19,7 +19,6 @@ from typing import Callable, Iterable
 
 
 STATE_VERSION = 1
-MAX_JOB_ID_LENGTH = 80
 MAX_TOTAL_SECONDS = Decimal("7200")
 MAX_BUFFERED_USD = Decimal("0.50")
 SCRIBE_USD_PER_HOUR = Decimal("0.22")
@@ -100,8 +99,6 @@ def order_sources(paths: Iterable[Path]) -> tuple[list[Path], str]:
 def safe_job_root(output_root: Path, job_id: str) -> Path:
     if not isinstance(job_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}", job_id):
         raise ValueError("job ID 必須是 1 至 80 字的安全單一路徑片段")
-    if job_id in {".", ".."} or len(job_id) > MAX_JOB_ID_LENGTH:
-        raise ValueError("job ID 不安全")
 
     root = Path(output_root)
     if root.exists() and root.is_symlink():
@@ -178,11 +175,13 @@ def load_json_object(path: Path) -> dict:
     return value
 
 
-def atomic_write_json(path: Path, value: dict) -> None:
+def atomic_write_json(path: Path, value: dict) -> str:
     if not isinstance(value, dict):
         raise ValueError("只允許寫入 JSON object")
     payload = json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
-    atomic_write_bytes(path, payload.encode("utf-8"), lambda candidate: load_json_object(candidate))
+    payload_bytes = payload.encode("utf-8")
+    atomic_write_bytes(path, payload_bytes, lambda candidate: load_json_object(candidate))
+    return sha256_bytes(payload_bytes)
 
 
 def estimate_paid_usage(durations_seconds: Iterable[float]) -> dict:
@@ -373,9 +372,7 @@ def _convert_mp3_atomic(
     ensure_private_dir(target.parent)
     if target.exists() or target.is_symlink():
         raise ValueError(f"MP3 輸出已存在且無法證明可重用：{target}")
-    temp = target.parent / f".{target.name}.tmp-{os.getpid()}-{secrets.token_hex(6)}"
-    descriptor = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    os.close(descriptor)
+    temp = _exclusive_transport_temp(target.parent, target.name)
     try:
         completed = runner(
             [
@@ -541,10 +538,9 @@ def prepare_job(
         mp3_details: dict
         if mp3_path.exists():
             prior_mp3 = (prior or {}).get("mp3") or {}
-            current_sha = sha256_file(mp3_path)
-            if prior_mp3.get("sha256") != current_sha:
-                raise ValueError(f"既有 MP3 內容與 job evidence 不符：{mp3_path.name}")
             mp3_details = _validate_mp3(mp3_path, source["duration_seconds"], runner)
+            if prior_mp3.get("sha256") != mp3_details["sha256"]:
+                raise ValueError(f"既有 MP3 內容與 job evidence 不符：{mp3_path.name}")
             mp3_details["path"] = str(mp3_path.resolve())
         else:
             mp3_details = _convert_mp3_atomic(
@@ -626,16 +622,28 @@ def _validate_scribe_response(value: object) -> dict:
         raise ValueError("Scribe response 最上層不是 object")
     if not isinstance(value.get("text"), str):
         raise ValueError("Scribe response 缺少 text")
+    if not isinstance(value.get("language_code"), str) or not value["language_code"].strip():
+        raise ValueError("Scribe response 缺少 language_code")
     words = value.get("words")
     if not isinstance(words, list):
         raise ValueError("Scribe response 缺少 words")
+    if value["text"].strip() and not words:
+        raise ValueError("Scribe response 有正文但沒有 word timestamps")
     for index, word in enumerate(words):
         if not isinstance(word, dict):
             raise ValueError(f"Scribe word {index} 不是 object")
-        if "start" in word and not isinstance(word["start"], (int, float)):
+        if not isinstance(word.get("text"), str):
+            raise ValueError(f"Scribe word {index} text 無效")
+        if not isinstance(word.get("type"), str):
+            raise ValueError(f"Scribe word {index} type 無效")
+        if not isinstance(word.get("speaker_id"), str) or not word["speaker_id"].strip():
+            raise ValueError(f"Scribe word {index} speaker_id 無效")
+        if not isinstance(word.get("start"), (int, float)) or not math.isfinite(word["start"]):
             raise ValueError(f"Scribe word {index} start 無效")
-        if "end" in word and not isinstance(word["end"], (int, float)):
+        if not isinstance(word.get("end"), (int, float)) or not math.isfinite(word["end"]):
             raise ValueError(f"Scribe word {index} end 無效")
+        if word["start"] < 0 or word["end"] < word["start"]:
+            raise ValueError(f"Scribe word {index} 時間範圍無效")
     return value
 
 
@@ -777,18 +785,45 @@ def run_scribe_curl(
                 pass
 
 
+def _load_matching_scribe_artifact(segment: dict) -> tuple[dict, str]:
+    scribe_path = Path(segment.get("scribe_path") or "")
+    response = _validate_scribe_response(load_json_object(scribe_path))
+    workflow = response.get("__thai_review_workflow")
+    if not isinstance(workflow, dict):
+        raise ValueError("Scribe artifact 缺少 workflow evidence")
+    if workflow.get("version") != 1:
+        raise ValueError("Scribe artifact workflow version 不支援")
+    if workflow.get("mp3_sha256") != (segment.get("mp3") or {}).get("sha256"):
+        raise ValueError("Scribe artifact 的 MP3 fingerprint 不符")
+    attempt_fingerprints = {
+        attempt.get("request_fingerprint")
+        for attempt in segment.get("attempts") or []
+        if attempt.get("status") in {"Uploading", "Complete"}
+        and re.fullmatch(r"[0-9a-f]{64}", str(attempt.get("request_fingerprint") or ""))
+    }
+    if (
+        not re.fullmatch(r"[0-9a-f]{64}", str(workflow.get("request_fingerprint") or ""))
+        or workflow.get("request_fingerprint") not in attempt_fingerprints
+    ):
+        raise ValueError("Scribe artifact 的 request fingerprint 不符")
+    artifact_sha256 = sha256_file(scribe_path)
+    saved_sha256 = segment.get("scribe_sha256")
+    if saved_sha256 and saved_sha256 != artifact_sha256:
+        raise ValueError("Scribe artifact hash 與 job evidence 不符")
+    return response, artifact_sha256
+
+
 def _revalidated_segments(
     job: dict,
     sources: Iterable[Path],
     runner: Callable[..., subprocess.CompletedProcess] = run_process,
-) -> list[dict]:
-    ordered, derived_job_id = order_sources(sources)
-    if job.get("job_id") not in {derived_job_id, job.get("job_id")}:
-        raise ValueError("job ID 與來源不符")
+) -> tuple[list[dict], bool]:
+    ordered, _ = order_sources(sources)
     segments = job.get("segments")
     if not isinstance(segments, list) or len(segments) != len(ordered):
         raise ValueError("job 來源數量與本次輸入不符")
     refreshed: list[dict] = []
+    recovery_changed = False
     for segment, source in zip(segments, ordered):
         source_path = source.resolve(strict=True)
         saved_source = segment.get("source") or {}
@@ -805,11 +840,20 @@ def _revalidated_segments(
             raise ValueError(f"MP3 內容已變更：{mp3_path.name}")
         details["path"] = str(mp3_path.resolve())
         next_segment["mp3"] = details
-        if next_segment.get("state") == "Uploading":
-            next_segment["state"] = "Unknown"
-            next_segment["next_action"] = "manual_provider_lookup"
+        if next_segment.get("state") in {"Uploading", "Complete"}:
+            try:
+                _, artifact_sha256 = _load_matching_scribe_artifact(next_segment)
+                next_segment["state"] = "Complete"
+                next_segment["next_action"] = "none"
+                next_segment["scribe_sha256"] = artifact_sha256
+                if next_segment.get("attempts"):
+                    next_segment["attempts"][-1]["status"] = "Complete"
+            except (OSError, ValueError):
+                next_segment["state"] = "Unknown"
+                next_segment["next_action"] = "manual_provider_lookup_then_new_dual_approval"
+            recovery_changed = recovery_changed or next_segment != segment
         refreshed.append(next_segment)
-    return refreshed
+    return refreshed, recovery_changed
 
 
 def _save_job(state_path: Path, job: dict) -> None:
@@ -851,8 +895,12 @@ def execute_paid(
 ) -> dict:
     state_path = Path(state_path)
     job = load_json_object(state_path)
-    job["segments"] = _revalidated_segments(job, sources, media_runner)
+    job["segments"], recovery_changed = _revalidated_segments(job, sources, media_runner)
     if all(segment.get("state") == "Complete" for segment in job["segments"]):
+        if recovery_changed or job.get("state") != "transcription_complete":
+            job["state"] = "transcription_complete"
+            job["next_action"] = "build_combined_transcript"
+            _save_job(state_path, job)
         return job
 
     current_approval = _approval_summary(job["segments"])
@@ -870,6 +918,10 @@ def execute_paid(
     if not within_paid_caps(current_approval["estimate"]):
         raise ValueError("本次批准摘要超出付費硬上限")
     if not confirm_paid_api:
+        if recovery_changed:
+            job["state"] = "unknown"
+            job["next_action"] = "manual_provider_lookup_then_new_dual_approval"
+            _save_job(state_path, job)
         return job
 
     unknown = [segment for segment in job["segments"] if segment.get("state") == "Unknown"]
@@ -939,13 +991,13 @@ def execute_paid(
                 "saved_at": now_utc(),
             }
             scribe_path = Path(segment["scribe_path"])
-            atomic_write_json(scribe_path, response)
+            scribe_sha256 = atomic_write_json(scribe_path, response)
         except (UnicodeDecodeError, json.JSONDecodeError, ValueError, OSError) as exc:
             return _mark_unknown(state_path, job, segment, attempt, type(exc).__name__, outcome)
 
         segment["state"] = "Complete"
         segment["next_action"] = "none"
-        segment["scribe_sha256"] = sha256_file(Path(segment["scribe_path"]))
+        segment["scribe_sha256"] = scribe_sha256
         attempt["status"] = "Complete"
         attempt["finished_at"] = now_utc()
         attempt["http_status"] = 200
