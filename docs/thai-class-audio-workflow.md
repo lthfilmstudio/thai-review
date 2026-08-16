@@ -16,7 +16,7 @@ python3 scripts/transcribe-class.py \
 
 不加 `--confirm-paid-api` 時，流程只會在本機：
 
-1. 用 `ffprobe` 檢查每支 MP4 只有一個可用音軌、順序、時長與磁碟空間。
+1. 用 `ffprobe` 檢查 MP4 順序、音軌、時長與磁碟空間。單音軌直接採用；多音軌只會在恰好一條標為 `default` 時自動採用，否則停止，避免挑錯聲音。
 2. 用 `ffmpeg` 產生 16 kHz、mono、約 64 kbps MP3，再驗證 codec、時長、解碼與 SHA-256。
 3. 建立 `job.json` 和本次付費揭露，停在 `awaiting_paid_approval`。
 4. ElevenLabs POST 次數維持 0。
@@ -38,9 +38,8 @@ out/class-transcriptions/<job-id>/
 
 ```bash
 python3 scripts/transcribe-class.py \
-  /absolute/path/260814-1.mp4 \
-  /absolute/path/260814-2.mp4 \
-  --status
+  --status \
+  --job-id 260814
 ```
 
 ## 2. STT 專用 key
@@ -77,13 +76,15 @@ ls -l ~/.secrets/elevenlabs-stt.env
 只有 Nalin 看過目前這份揭露並明確批准這批檔案後，才執行：
 
 ```bash
+APPROVAL_FINGERPRINT='把 job.json 當次完整 64 位值貼在這裡'
 python3 scripts/transcribe-class.py \
   /absolute/path/260814-1.mp4 \
   /absolute/path/260814-2.mp4 \
-  --confirm-paid-api
+  --confirm-paid-api \
+  --approval-fingerprint "$APPROVAL_FINGERPRINT"
 ```
 
-`--confirm-paid-api` 只授權這次 invocation 與當下完全相符的 approval fingerprint。MP4、MP3、待傳範圍、模型參數或費率一變，腳本會更新摘要並停止，請重新呈現摘要與取得批准。
+`--confirm-paid-api` 必須同時回填剛呈現並獲准的完整 `approval_fingerprint`，少填、截短或不符都會在讀 key／POST 前停止。MP4、MP3、待傳範圍、模型參數或費率一變，腳本會更新摘要並停止，請重新呈現摘要與取得批准。
 
 付費 POST 固定依序執行，不會 retry；每段在 curl 啟動前先耐久記為 `Uploading`。只有完整 Scribe JSON 已原子保存並驗證，才會成為 `Complete`。
 
@@ -105,10 +106,12 @@ python3 scripts/transcribe-class.py \
 查不到時，到 ElevenLabs 使用紀錄人工核對 request／transcription ID、時間與用量。確認沒有可回收的結果後，重新產生並呈現只含未完成分段的新揭露；Nalin 再次明確批准，才可雙旗標重送：
 
 ```bash
+APPROVAL_FINGERPRINT='把重新揭露後的完整 64 位值貼在這裡'
 python3 scripts/transcribe-class.py \
   /absolute/path/260814-1.mp4 \
   /absolute/path/260814-2.mp4 \
   --confirm-paid-api \
+  --approval-fingerprint "$APPROVAL_FINGERPRINT" \
   --force-paid-retry
 ```
 
@@ -158,6 +161,7 @@ validator 會擋缺欄／多欄、表頭、編號、Karaoke hyphen、完全重�
 |---|---|---|
 | `awaiting_paid_approval` | MP3 與揭露完成，尚未授權上傳 | 呈現目前揭露，等待新批准 |
 | `transcribing`／`Uploading` | 付費請求正在處理 | 不要開第二個流程 |
+| `blocked_by_local_evidence` | 另一個 job 有相同音訊的已啟動不確定請求；本 job 尚未送出 | 先處理原 job，不要重送 |
 | `unknown`／`Unknown` | 請求可能已送達但沒有完整證據 | 先 GET／人工查紀錄，不得直接重送 |
 | `needs_tsv_review` | Scribe 與 combined transcript 完成 | 跑 handoff、整理 draft、validator |
 | `complete` | 五欄 TSV 已通過 validator | 人工審閱並貼入 Sheet |
