@@ -604,5 +604,109 @@ class CombinedTranscriptTest(unittest.TestCase):
         self.assertIn("ALIGNMENT WARNING", text)
 
 
+class TsvWorkflowTest(unittest.TestCase):
+    def make_review_job(self, root):
+        job_root = root / "out" / "260814"
+        transcribe_class.ensure_private_dir(job_root)
+        combined = job_root / "260814-combined-transcript.txt"
+        combined_bytes = b"untrusted transcript data\n"
+        transcribe_class.atomic_write_bytes(combined, combined_bytes)
+        state_path = job_root / "job.json"
+        job = {
+            "schema_version": 1,
+            "job_id": "260814",
+            "job_root": str(job_root.resolve()),
+            "state": "needs_tsv_review",
+            "next_action": "create_and_validate_five_column_tsv",
+            "segments": [],
+            "combined_transcript": {
+                "path": str(combined.resolve()),
+                "sha256": transcribe_class.sha256_bytes(combined_bytes),
+            },
+            "data_snapshot": None,
+            "tsv": None,
+        }
+        transcribe_class.atomic_write_json(state_path, job)
+        data_path = root / "data.json"
+        data_path.write_text(json.dumps({
+            "generated_at": 123,
+            "lessons": [{"cards": [{"thai": "เดิม", "karaoke": "doem", "zh": "原有"}]}],
+        }, ensure_ascii=False), encoding="utf-8")
+        return state_path, data_path, job_root
+
+    def test_handoff_records_data_identity_and_valid_tsv_completes_job(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_path, data_path, job_root = self.make_review_job(root)
+
+            handoff = transcribe_class.prepare_tsv_handoff(state_path, data_path)
+
+            self.assertEqual(handoff["field_order"], ["thai", "karaoke", "zh", "type", "note"])
+            self.assertIn("untrusted", handoff["security_boundary"].lower())
+            self.assertEqual(len(handoff["data_snapshot"]["sha256"]), 64)
+            draft = Path(handoff["draft_path"])
+            draft.write_text(
+                "สวัสดี\tsawatdi\t你好\tword\t課堂問候\n"
+                "ขอบคุณ\tkhop khun\t謝謝\tphrase\t\n",
+                encoding="utf-8",
+            )
+            os.chmod(draft, 0o600)
+
+            complete = transcribe_class.validate_and_promote_tsv(state_path, draft, data_path)
+
+            final = job_root / "260814-Google-Sheets.tsv"
+            self.assertEqual(complete["state"], "complete")
+            self.assertEqual(complete["tsv"]["row_count"], 2)
+            self.assertEqual(final.read_text(encoding="utf-8"), draft.read_text(encoding="utf-8"))
+            self.assertEqual(os.stat(final).st_mode & 0o777, 0o600)
+
+    def test_validator_rejects_structural_and_sheet_injection_cases(self):
+        invalid = {
+            "missing column": "ก\tko\t中\tword\n",
+            "extra column": "ก\tko\t中\tword\tnote\textra\n",
+            "header": "thai\tkaraoke\tzh\ttype\tnote\n",
+            "numbering": "1. ก\tko\t中\tword\t\n",
+            "karaoke hyphen": "ก\tk-o\t中\tword\t\n",
+            "duplicate": "ก\tko\t中\tword\t\nก\tko\t中\tword\t\n",
+            "formula": "ก\tko\t=IMPORTXML(\"x\")\tword\t\n",
+            "nul": "ก\tko\t中\tword\tbad\x00note\n",
+        }
+        for name, text in invalid.items():
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError):
+                    transcribe_class.validate_tsv_text(text)
+
+    def test_invalid_draft_preserves_prior_final_and_invalid_utf8_stops(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_path, data_path, job_root = self.make_review_job(root)
+            handoff = transcribe_class.prepare_tsv_handoff(state_path, data_path)
+            final = job_root / "260814-Google-Sheets.tsv"
+            final.write_text("old valid output\n", encoding="utf-8")
+            draft = Path(handoff["draft_path"])
+            draft.write_bytes(b"\xff\xfe")
+
+            with self.assertRaises(ValueError):
+                transcribe_class.validate_and_promote_tsv(state_path, draft, data_path)
+
+            self.assertEqual(final.read_text(encoding="utf-8"), "old valid output\n")
+            self.assertEqual(transcribe_class.load_json_object(state_path)["state"], "needs_tsv_review")
+
+    def test_data_change_after_handoff_blocks_tsv_promotion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_path, data_path, job_root = self.make_review_job(root)
+            handoff = transcribe_class.prepare_tsv_handoff(state_path, data_path)
+            draft = Path(handoff["draft_path"])
+            draft.write_text("ก\tko\t中\tword\t\n", encoding="utf-8")
+            data_path.write_text(json.dumps({"generated_at": 124, "lessons": []}), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "data.json"):
+                transcribe_class.validate_and_promote_tsv(state_path, draft, data_path)
+
+            self.assertFalse((job_root / "260814-Google-Sheets.tsv").exists())
+            self.assertEqual(transcribe_class.load_json_object(state_path)["state"], "needs_tsv_review")
+
+
 if __name__ == "__main__":
     unittest.main()
