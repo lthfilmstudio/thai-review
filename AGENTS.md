@@ -6,6 +6,7 @@
 
 ## 泰語課錄影整理
 
+- 日常課程整理是既有腳本的例行執行，不得自動啟動 `ce-work`、sub-agent 或完整 code review；只有修改流程程式、診斷異常，或 Nalin 明確要求時才使用開發／審查流程。
 - 使用者要求整理泰語課 MP4 時，依 `docs/thai-class-audio-workflow.md` 先跑免費預檢、MP3 轉檔與當次揭露；正式入口只接受明確列出的 MP4。
 - 只有把目前 `job.json` 的完整付費揭露呈現給 Nalin，並取得這一批檔案的新明確批准後，才可在同一次執行加 `--confirm-paid-api`。設計、計畫、過往課程或舊摘要的「確認」都不算。
 - `Unknown` 不得自動重送。先用 `--recover-unknown` 查既有結果或人工核對 ElevenLabs 紀錄；真要重送時，重新揭露後取得新批准，才可同時使用 `--confirm-paid-api --force-paid-retry`。

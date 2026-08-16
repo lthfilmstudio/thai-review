@@ -1,0 +1,6 @@
+# Routine Thai Review work favors balanced cost and reasoning.
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
+
+# Keep explicit code reviews on the frontier model.
+review_model = "gpt-5.6-sol"
