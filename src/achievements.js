@@ -1,7 +1,6 @@
 /* 遊戲化：一次性布林成就徽章（不做 XP 數值）。
    純判定清單 + 獨立 localStorage key，跟主 STORAGE_KEY 分開；ctx 由呼叫端組裝餵入，
-   這裡保持 stateless，不碰 DOM／state.js。目前只收「不依賴其他方向」的 5 條，
-   課程全通關 / 一週正確率 90%+ 要等 SRS 四檔評分（方向 2）與複習數據呈現（方向 3）落地後再補。 */
+   這裡保持 stateless，不碰 DOM／state.js。 */
 
 const KEY = 'thai-review-achievements-v1';
 
@@ -9,6 +8,7 @@ export const ACHIEVEMENT_DEFS = [
   { id: 'streak7', icon: '🔥', label: '連續 7 天', check: ctx => ctx.streak >= 7 },
   { id: 'streak30', icon: '🔥', label: '連續 30 天', check: ctx => ctx.streak >= 30 },
   { id: 'daily50', icon: '📅', label: '單日複習 50 張', check: ctx => ctx.maxDailyReviewed >= 50 },
+  { id: 'lessonMastered', icon: '🎓', label: '課程全通關', check: ctx => ctx.hasFullyMatureLesson },
   {
     id: 'allGraded',
     icon: '📚',
@@ -16,6 +16,12 @@ export const ACHIEVEMENT_DEFS = [
     check: ctx => ctx.totalCards > 0 && ctx.gradedCards >= ctx.totalCards,
   },
   { id: 'cumulative1000', icon: '🌟', label: '千張複習', check: ctx => ctx.totalReviewed >= 1000 },
+  {
+    id: 'weeklyAccuracy90',
+    icon: '🎯',
+    label: '一週正確率 90%+',
+    check: ctx => ctx.weeklyAccuracy !== null && ctx.weeklyAccuracy >= 90,
+  },
 ];
 
 export function loadUnlocked() {

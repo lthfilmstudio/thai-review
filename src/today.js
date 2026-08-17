@@ -1,8 +1,11 @@
 /* 今日 mode：今日複習計劃（跨課程 due 彙整 + streak）+ 月曆（歷史熱度 + 未來到期預測）。
    每日複習日誌存獨立 localStorage key，不動主 STORAGE_KEY schema。 */
 
-import { state, allCardsWithLessonId, cardKey, getDueCount } from './state.js';
+import { state, allCardsWithLessonId, cardKey, getDueCount, localDateKey } from './state.js';
+import { cardStatus } from './srs.js';
 import { ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel } from './achievements.js';
+import { accuracyTrend, averageAccuracy, weakLessons, weakestCards } from './stats.js';
+import { escapeHtml } from './ui.js';
 
 export const DAILY_KEY = 'thai-review-daily-v1';
 
@@ -11,12 +14,6 @@ const SVG_CHEV_R = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" 
 const SVG_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 
 /* ===== 每日日誌 ===== */
-
-/* 本地時區（台北）的 YYYY-MM-DD。不能用 toISOString()（UTC 會在早上 8 點前算成前一天）。 */
-export function localDateKey(ts = Date.now()) {
-  const d = new Date(ts);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 export function loadDailyLog() {
   try {
@@ -112,6 +109,19 @@ export function heatLevel(n) {
 
 /* ===== 成就 ===== */
 
+/* 是否有某堂課全部卡片都到 mature（cardStatus，方向 2）。 */
+function hasFullyMatureLesson() {
+  for (const lesson of state.lessons) {
+    if (!lesson.cards.length) continue;
+    const allMature = lesson.cards.every(card => {
+      const entry = state.progress[cardKey(card, lesson.id)];
+      return cardStatus(entry) === 'mature';
+    });
+    if (allMature) return true;
+  }
+  return false;
+}
+
 /* 組裝成就判定要的 ctx。呼叫端（評分後、進今日 tab 時）各自帶目前的 log 呼叫。 */
 export function buildAchievementCtx(log = loadDailyLog()) {
   let maxDailyReviewed = 0;
@@ -129,6 +139,8 @@ export function buildAchievementCtx(log = loadDailyLog()) {
     totalReviewed,
     totalCards: cards.length,
     gradedCards,
+    hasFullyMatureLesson: hasFullyMatureLesson(),
+    weeklyAccuracy: averageAccuracy(accuracyTrend(log.days, 7)),
   };
 }
 
@@ -161,6 +173,70 @@ function renderAchievementsHtml(ctx) {
       ${badges}
       <span class="achv-count">已解鎖 ${Object.keys(unlocked).length}/${ACHIEVEMENT_DEFS.length}</span>
     </div>`;
+}
+
+/* ===== 數據 tab（趨勢 + 弱課次 + 卡住的字） ===== */
+
+let statsTab = 'plan';     // 'plan' | 'stats'，module-local，不持久化
+let trendWindow = 7;       // 7 | 30
+
+function renderTrendChart(trend) {
+  const bars = trend.map(d => {
+    const has = d.pct !== null;
+    const h = has ? Math.max(4, Math.round((d.pct / 100) * 52)) : 3;
+    const cls = !has ? 'empty' : d.pct >= 80 ? 'good' : d.pct >= 50 ? 'mid' : 'low';
+    const label = has ? `${d.key}：${d.pct}%（${d.reviewed} 張）` : `${d.key}：沒有複習紀錄`;
+    return `<div class="trend-bar" title="${escapeHtml(label)}"><div class="trend-bar-fill ${cls}" style="height:${h}px"></div></div>`;
+  }).join('');
+  return `<div class="trend-chart">${bars}</div>`;
+}
+
+function renderWeakLessonsHtml(rows) {
+  if (!rows.length) return `<div class="stats-empty">還沒有明顯偏弱的課次。</div>`;
+  return `<div class="weak-list">${rows.map(r => `
+    <div class="weak-row">
+      <span class="weak-title">${escapeHtml(r.title)}</span>
+      <span class="weak-rate">${Math.round(r.badRate * 100)}%</span>
+    </div>`).join('')}</div>`;
+}
+
+function renderWeakCardsHtml(rows) {
+  if (!rows.length) return `<div class="stats-empty">目前沒有卡在「重來 / 有點難」的字。</div>`;
+  return `<div class="weak-list">${rows.map(r => `
+    <div class="weak-row">
+      <span class="weak-thai">${escapeHtml(r.thai)}</span>
+      <span class="weak-zh">${escapeHtml(r.zh)}</span>
+      <span class="weak-badge ${r.grade}">${r.grade === 'again' ? '重來' : '有點難'}</span>
+    </div>`).join('')}</div>`;
+}
+
+function renderStatsHtml() {
+  const log = loadDailyLog();
+  const trend = accuracyTrend(log.days, trendWindow);
+  const avg = averageAccuracy(trend);
+  const weakL = weakLessons(state.progress, state.lessons);
+  const weakC = weakestCards(state.progress, state.lessons, 20);
+
+  return `
+    <div class="stats-section">
+      <div class="stats-head">
+        <div class="stats-title">正確率趨勢${avg !== null ? `<span class="stats-avg">平均 ${avg}%</span>` : ''}</div>
+        <div class="stats-window-toggle">
+          <button class="stats-window-btn${trendWindow === 7 ? ' active' : ''}" data-trend-window="7">7 天</button>
+          <button class="stats-window-btn${trendWindow === 30 ? ' active' : ''}" data-trend-window="30">30 天</button>
+        </div>
+      </div>
+      ${renderTrendChart(trend)}
+    </div>
+    <div class="stats-section">
+      <div class="stats-title">最弱課次</div>
+      ${renderWeakLessonsHtml(weakL)}
+    </div>
+    <div class="stats-section">
+      <div class="stats-title">卡住的字</div>
+      ${renderWeakCardsHtml(weakC)}
+    </div>
+  `;
 }
 
 /* ===== Render ===== */
@@ -236,8 +312,15 @@ export function renderTodayMode(el) {
        <button class="review-start-btn" data-start-review-all>開始複習</button>`
     : `<div class="today-due done"><span class="today-due-icon">${SVG_CHECK}</span><span class="today-due-label">今天沒有到期卡片</span></div>`;
 
-  el.innerHTML = `
-    <div class="today-wrap">
+  const tabsHtml = `
+    <div class="today-tabs" role="tablist">
+      <button class="today-tab${statsTab === 'plan' ? ' active' : ''}" data-today-tab="plan" role="tab" aria-selected="${statsTab === 'plan'}">複習規劃</button>
+      <button class="today-tab${statsTab === 'stats' ? ' active' : ''}" data-today-tab="stats" role="tab" aria-selected="${statsTab === 'stats'}">數據</button>
+    </div>`;
+
+  const bodyHtml = statsTab === 'stats'
+    ? renderStatsHtml()
+    : `
       <div class="today-plan">
         ${planHtml}
         <div class="today-meta">
@@ -247,9 +330,28 @@ export function renderTodayMode(el) {
       </div>
       ${renderCalendarHtml(log)}
       ${renderAchievementsHtml(achvCtx)}
+    `;
+
+  el.innerHTML = `
+    <div class="today-wrap">
+      ${tabsHtml}
+      ${bodyHtml}
     </div>`;
 
-  // 月份切換自包含，不經 app.js 委派
+  el.querySelectorAll('[data-today-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      statsTab = btn.dataset.todayTab;
+      renderTodayMode(el);
+    });
+  });
+  el.querySelectorAll('[data-trend-window]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      trendWindow = Number(btn.dataset.trendWindow);
+      renderTodayMode(el);
+    });
+  });
+
+  // 月份切換自包含，不經 app.js 委派（只在 plan tab 存在，stats tab 這兩個 querySelector 會是 null）
   el.querySelector('[data-cal-prev]')?.addEventListener('click', () => {
     viewMonth -= 1;
     if (viewMonth < 0) { viewMonth = 11; viewYear -= 1; }

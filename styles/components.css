@@ -1913,6 +1913,119 @@
   transform: translateX(-50%) translateY(0);
 }
 
+/* 今日 tab 內的子分頁（複習規劃 / 數據） */
+.today-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.today-tab {
+  flex: 1;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--surface-hover);
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+.today-tab.active { background: var(--gold-soft); color: var(--gold); }
+
+/* 數據 tab */
+.stats-section {
+  padding: 14px 16px;
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+.stats-section + .stats-section { margin-top: 12px; }
+
+.stats-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.stats-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.stats-avg { margin-left: 8px; color: var(--gold); font-weight: 600; font-size: 12px; }
+
+.stats-window-toggle { display: flex; gap: 4px; }
+.stats-window-btn {
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: var(--surface-hover);
+  color: var(--text-mute);
+  font-size: 11px;
+}
+.stats-window-btn.active { background: var(--gold-soft); color: var(--gold); }
+
+.stats-empty {
+  color: var(--text-mute);
+  font-size: 12px;
+  padding: 8px 0;
+}
+
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 56px;
+}
+
+.trend-bar {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+
+.trend-bar-fill {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  background: var(--hair);
+}
+.trend-bar-fill.good { background: var(--gold); }
+.trend-bar-fill.mid { background: var(--warn); }
+.trend-bar-fill.low { background: var(--danger); }
+.trend-bar-fill.empty { background: var(--hair); opacity: 0.5; }
+
+.weak-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.weak-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.weak-title {
+  flex: 1;
+  color: var(--text-soft);
+}
+.weak-rate { color: var(--danger); font-weight: 600; font-size: 12px; }
+
+.weak-thai { color: var(--text); font-weight: 500; }
+.weak-zh { flex: 1; color: var(--text-mute); }
+
+.weak-badge {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 500;
+}
+.weak-badge.again { background: var(--danger-soft); color: var(--danger); }
+.weak-badge.hard { background: var(--warn-soft); color: var(--warn); }
+
 @media (max-width: 640px) {
   .today-wrap { padding: 10px 12px 20px; gap: 12px; }
   .cal-grid { gap: 3px; }
