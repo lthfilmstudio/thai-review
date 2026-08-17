@@ -2,6 +2,7 @@
    每日複習日誌存獨立 localStorage key，不動主 STORAGE_KEY schema。 */
 
 import { state, allCardsWithLessonId, cardKey, getDueCount } from './state.js';
+import { ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel } from './achievements.js';
 
 export const DAILY_KEY = 'thai-review-daily-v1';
 
@@ -107,6 +108,59 @@ export function heatLevel(n) {
   return 0;
 }
 
+/* ===== 成就 ===== */
+
+/* 組裝成就判定要的 ctx。呼叫端（評分後、進今日 tab 時）各自帶目前的 log 呼叫。 */
+export function buildAchievementCtx(log = loadDailyLog()) {
+  let maxDailyReviewed = 0;
+  let totalReviewed = 0;
+  for (const k in log.days) {
+    const r = log.days[k]?.reviewed || 0;
+    totalReviewed += r;
+    if (r > maxDailyReviewed) maxDailyReviewed = r;
+  }
+  const cards = allCardsWithLessonId();
+  const gradedCards = cards.filter(c => !!state.progress[c._cardKey]).length;
+  return {
+    streak: streakDays(log.days),
+    maxDailyReviewed,
+    totalReviewed,
+    totalCards: cards.length,
+    gradedCards,
+  };
+}
+
+let achvToastTimer = null;
+
+/* 新解鎖成就的浮動提示；沒有新解鎖時不做事。 */
+export function notifyAchievements(justUnlocked, ctx) {
+  if (!justUnlocked.length) return;
+  let el = document.getElementById('achvToast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'achvToast';
+    el.className = 'achv-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = justUnlocked.map(d => `${d.icon} 解鎖成就：${achievementLabel(d, ctx)}`).join('\n');
+  el.classList.add('show');
+  clearTimeout(achvToastTimer);
+  achvToastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+function renderAchievementsHtml(ctx) {
+  const unlocked = loadUnlocked();
+  const badges = ACHIEVEMENT_DEFS.map(def => {
+    const on = !!unlocked[def.id];
+    return `<span class="achv-badge${on ? ' on' : ''}" title="${achievementLabel(def, ctx)}">${def.icon}</span>`;
+  }).join('');
+  return `
+    <div class="achv-row">
+      ${badges}
+      <span class="achv-count">已解鎖 ${Object.keys(unlocked).length}/${ACHIEVEMENT_DEFS.length}</span>
+    </div>`;
+}
+
 /* ===== Render ===== */
 
 /* 顯示中的月份（module-local，不持久化；跨 re-render 保留，重開 app 回到當月） */
@@ -172,6 +226,9 @@ export function renderTodayMode(el) {
     ? `<span class="today-checkin done">${SVG_CHECK}今天已複習 ${reviewedToday} 張</span>`
     : `<span class="today-checkin">今天還沒複習</span>`;
 
+  const achvCtx = buildAchievementCtx(log);
+  notifyAchievements(checkAndUnlock(achvCtx), achvCtx);
+
   const planHtml = dueCount > 0
     ? `<div class="today-due"><span class="today-due-num">${dueCount}</span><span class="today-due-label">張到期</span></div>
        <button class="review-start-btn" data-start-review-all>開始複習</button>`
@@ -187,6 +244,7 @@ export function renderTodayMode(el) {
         </div>
       </div>
       ${renderCalendarHtml(log)}
+      ${renderAchievementsHtml(achvCtx)}
     </div>`;
 
   // 月份切換自包含，不經 app.js 委派

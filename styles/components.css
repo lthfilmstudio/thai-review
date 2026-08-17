@@ -1851,6 +1851,62 @@
   font-size: 10px;
 }
 
+/* 成就徽章列 */
+.achv-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.achv-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 16px;
+  filter: grayscale(1);
+  opacity: 0.35;
+}
+.achv-badge.on { filter: none; opacity: 1; background: rgba(197, 160, 89, 0.14); }
+
+.achv-count {
+  margin-left: auto;
+  color: var(--text-mute);
+  font-size: 11px;
+}
+
+.achv-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(12px);
+  max-width: min(90vw, 360px);
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--gold);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-line;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 50;
+}
+.achv-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 @media (max-width: 640px) {
   .today-wrap { padding: 10px 12px 20px; gap: 12px; }
   .cal-grid { gap: 3px; }

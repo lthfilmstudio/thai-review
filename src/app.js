@@ -10,7 +10,8 @@ import {
   findCardByKey, saveCardEdit, clearCardEdit,
 } from './state.js';
 import { loadLessons, loadTabsOnly, fetchLessonCards, loadFromBundledJson } from './data.js';
-import { initDailyLog, logReview } from './today.js';
+import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements } from './today.js';
+import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices } from './tts.js';
 import { stopListen } from './listen.js';
 import {
@@ -258,6 +259,8 @@ function nextCard() {
 function gradeAndAdvance(g) {
   setGrade(state.cardIndex, g);
   logReview(g);
+  const achvCtx = buildAchievementCtx();
+  notifyAchievements(checkAndUnlock(achvCtx), achvCtx);
   state.flipped = false;
   if (isSrsActive()) {
     const cards = filteredCards();
