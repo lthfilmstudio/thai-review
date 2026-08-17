@@ -497,6 +497,12 @@
 }
 .pill.red:hover { filter: brightness(1.2); }
 
+.pill.orange {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.pill.orange:hover { filter: brightness(1.2); }
+
 .pill.neutral {
   background: var(--surface-hover);
   color: var(--text);
@@ -684,7 +690,7 @@
 
 .list-filter-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
   flex-shrink: 0;
 }
@@ -872,7 +878,7 @@
 
 @media (max-width: 640px) {
   .list-filter-row {
-    grid-template-columns: repeat(5, minmax(54px, 1fr));
+    grid-template-columns: repeat(6, minmax(48px, 1fr));
   }
   .list-filter {
     padding: 8px 7px;

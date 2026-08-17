@@ -312,9 +312,10 @@ function renderListsMode(el) {
   const filters = [
     { id: 'all', label: '全部', count: all.length },
     { id: 'fav', label: '收藏', count: cardsForList('fav', all).length },
-    { id: 'bad', label: '差', count: cardsForList('bad', all).length },
-    { id: 'ok', label: '可以', count: cardsForList('ok', all).length },
-    { id: 'good', label: '熟', count: cardsForList('good', all).length },
+    { id: 'again', label: '重來', count: cardsForList('again', all).length },
+    { id: 'hard', label: '有點難', count: cardsForList('hard', all).length },
+    { id: 'good', label: '可以', count: cardsForList('good', all).length },
+    { id: 'easy', label: '很熟', count: cardsForList('easy', all).length },
   ];
   if (!filters.some(f => f.id === state.listFilter)) state.listFilter = 'all';
   const cards = cardsForList(state.listFilter, all);
@@ -391,7 +392,7 @@ export function renderContent(onGrade) {
       doneHtml = `<div class="srs-done">
         <div class="srs-done-icon">${SVG_CHECK}</div>
         <div class="srs-done-title">還沒有待複習卡片</div>
-        <div class="srs-done-sub">先在字卡頁按 <strong>差 / 可以 / 熟</strong>，系統才知道哪些字要再練。</div>
+        <div class="srs-done-sub">先在字卡頁按 <strong>重來 / 有點難 / 可以 / 很熟</strong>，系統才知道哪些字要再練。</div>
         ${exitHtml}
       </div>`;
     } else {

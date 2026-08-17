@@ -12,6 +12,8 @@
   --gold-soft: rgba(196, 165, 116, 0.15);
   --danger: #E8948F;
   --danger-soft: rgba(184, 84, 80, 0.15);
+  --warn: #E0A868;
+  --warn-soft: rgba(201, 138, 74, 0.16);
   --hair: rgba(245, 240, 232, 0.08);
   --surface-hover: rgba(245, 240, 232, 0.06);
   --surface-soft: rgba(245, 240, 232, 0.04);
@@ -33,6 +35,8 @@
     --gold-soft: rgba(139, 111, 63, 0.15);
     --danger: #A8524D;
     --danger-soft: rgba(168, 82, 77, 0.15);
+    --warn: #A8703C;
+    --warn-soft: rgba(168, 112, 60, 0.15);
     --hair: rgba(26, 43, 36, 0.1);
     --surface-hover: rgba(26, 43, 36, 0.06);
     --surface-soft: rgba(26, 43, 36, 0.03);
@@ -54,6 +58,8 @@ html[data-theme='light'] {
   --gold-soft: rgba(139, 111, 63, 0.15);
   --danger: #A8524D;
   --danger-soft: rgba(168, 82, 77, 0.15);
+  --warn: #A8703C;
+  --warn-soft: rgba(168, 112, 60, 0.15);
   --hair: rgba(26, 43, 36, 0.1);
   --surface-hover: rgba(26, 43, 36, 0.06);
   --surface-soft: rgba(26, 43, 36, 0.03);

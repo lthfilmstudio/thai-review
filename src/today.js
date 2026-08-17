@@ -38,11 +38,13 @@ function saveDailyLog(log) {
   }
 }
 
-/* 評分時記一筆。寫入點在 app.js gradeAndAdvance()。 */
+/* 評分時記一筆。寫入點在 app.js gradeAndAdvance()。
+   day 的四檔欄位是 again/hard/good/easy；舊資料留下的 bad/ok 欄位維持原樣不動，
+   只是新的一天不會再往那兩個欄位寫。 */
 export function logReview(gradeStr, ts = Date.now()) {
   const log = loadDailyLog();
   const key = localDateKey(ts);
-  const day = log.days[key] || { reviewed: 0, bad: 0, ok: 0, good: 0 };
+  const day = log.days[key] || { reviewed: 0, again: 0, hard: 0, good: 0, easy: 0 };
   day.reviewed += 1;
   if (gradeStr in day) day[gradeStr] += 1;
   log.days[key] = day;
@@ -57,7 +59,7 @@ export function initDailyLog(progress) {
     const v = progress[k];
     if (!v || typeof v !== 'object' || !(v.reviewedAt > 0)) continue;
     const key = localDateKey(v.reviewedAt);
-    const day = log.days[key] || { reviewed: 0, bad: 0, ok: 0, good: 0 };
+    const day = log.days[key] || { reviewed: 0, again: 0, hard: 0, good: 0, easy: 0 };
     day.reviewed += 1;
     if (v.grade in day) day[v.grade] += 1;
     log.days[key] = day;

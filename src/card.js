@@ -70,11 +70,12 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
   const pct = Math.round(((i + 1) / cards.length) * 100);
   const tag = card.type === 'sentence' ? 'EXAMPLE' : 'VOCAB';
 
-  // 預覽 3 個評分按下去後的間隔（給每顆 pill 帶 meta 文字）
+  // 預覽 4 個評分按下去後的間隔（給每顆 pill 帶 meta 文字）
   const cur = srsEntryOf(card) || {};
-  const previewBad = formatNextReview(nextReview('bad', cur).interval);
-  const previewOk = formatNextReview(nextReview('ok', cur).interval);
+  const previewAgain = formatNextReview(nextReview('again', cur).interval);
+  const previewHard = formatNextReview(nextReview('hard', cur).interval);
   const previewGood = formatNextReview(nextReview('good', cur).interval);
+  const previewEasy = formatNextReview(nextReview('easy', cur).interval);
 
   const showReviewHint = state.mode === 'card' || state.mode === 'reverse';
   const dueCount = Number(opts.dueCount || 0);
@@ -82,7 +83,7 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
     ? `<div class="review-hint-title">今天有 ${dueCount} 張待複習</div>
        <div class="review-hint-sub">先練到期的字，再繼續新卡。</div>
        <button class="review-start-btn" data-start-review>開始</button>`
-    : `<div class="review-hint-title">按差 / 可以 / 熟，系統會安排複習</div>
+    : `<div class="review-hint-title">按重來 / 有點難 / 可以 / 很熟，系統會安排複習</div>
        <div class="review-hint-sub">評過的字會在適合的時間再次出現。</div>`;
 
   el.innerHTML = `
@@ -122,14 +123,17 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
       </div>
     </div>
     <div class="grade-row" aria-label="評分">
-      <button class="pill red" data-grade="bad" aria-label="差，明天再練">
-        差<span class="pill-meta">明天再練</span><span class="pill-time">${escapeHtml(previewBad)}</span>
+      <button class="pill red" data-grade="again" aria-label="重來，明天再練">
+        重來<span class="pill-meta">明天再練</span><span class="pill-time">${escapeHtml(previewAgain)}</span>
       </button>
-      <button class="pill neutral" data-grade="ok" aria-label="可以，短期複習">
-        可以<span class="pill-meta">短期複習</span><span class="pill-time">${escapeHtml(previewOk)}</span>
+      <button class="pill orange" data-grade="hard" aria-label="有點難，較快複習">
+        有點難<span class="pill-meta">較快複習</span><span class="pill-time">${escapeHtml(previewHard)}</span>
       </button>
-      <button class="pill gold" data-grade="good" aria-label="熟，晚點再出現">
-        熟<span class="pill-meta">晚點再出現</span><span class="pill-time">${escapeHtml(previewGood)}</span>
+      <button class="pill neutral" data-grade="good" aria-label="可以，正常複習">
+        可以<span class="pill-meta">正常複習</span><span class="pill-time">${escapeHtml(previewGood)}</span>
+      </button>
+      <button class="pill gold" data-grade="easy" aria-label="很熟，晚點再出現">
+        很熟<span class="pill-meta">晚點再出現</span><span class="pill-time">${escapeHtml(previewEasy)}</span>
       </button>
     </div>
     <div class="card-nav-row">

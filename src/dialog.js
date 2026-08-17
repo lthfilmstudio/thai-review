@@ -6,6 +6,7 @@
 import { state, isFavorite, saveState } from './state.js';
 import { speakCard } from './tts.js';
 import { escapeHtml } from './ui.js';
+import { normalizeGrade } from './srs.js';
 
 const DIALOG_API = 'https://thai-tts.lthfilmstudio.workers.dev/dialog';
 const DEFAULT_PICK_COUNT = 6;
@@ -33,23 +34,23 @@ function pickRandomWords(pool, n) {
 function progressGrade(lesson, card) {
   const key = `${lesson.id}:${card._sourceThai || card.thai || ''}`;
   const entry = state.progress[key];
-  if (typeof entry === 'string') return entry;
-  if (entry && typeof entry === 'object') return entry.grade;
+  if (typeof entry === 'string') return normalizeGrade(entry);
+  if (entry && typeof entry === 'object') return normalizeGrade(entry.grade);
   return '';
 }
 
 /* 取候選池：
    - source = 'lesson' → 當前課程的所有卡片
    - source = 'fav'    → 所有 isFavorite=true 的卡片（跨課程）
-   - source = 'bad'    → 所有評為「差」的卡片（跨課程）
-   - source = 'ok'     → 所有評為「可以」的卡片（跨課程） */
+   - source = 'again'  → 所有評為「重來」的卡片（跨課程）
+   - source = 'hard'   → 所有評為「有點難」的卡片（跨課程） */
 function getPool(source) {
-  if (source === 'fav' || source === 'bad' || source === 'ok') {
+  if (source === 'fav' || source === 'again' || source === 'hard') {
     const all = [];
     for (const lesson of state.lessons || []) {
       for (const card of lesson.cards || []) {
         if (source === 'fav' && isFavorite(card)) all.push(card);
-        if ((source === 'bad' || source === 'ok') && progressGrade(lesson, card) === source) all.push(card);
+        if ((source === 'again' || source === 'hard') && progressGrade(lesson, card) === source) all.push(card);
       }
     }
     return all;
@@ -78,14 +79,14 @@ async function fetchDialog(words) {
 
 /* 主 render：從零畫整個對話面板（替代原本的卡片區）。 */
 export function renderDialogMode(el, _ignoredCards) {
-  const source = ['lesson', 'fav', 'bad', 'ok'].includes(state.settings.dialogSource)
+  const source = ['lesson', 'fav', 'again', 'hard'].includes(state.settings.dialogSource)
     ? state.settings.dialogSource
     : 'lesson';
 
   const lessonName = state.lessons?.find((l) => l.id === state.currentLessonId)?.title || '—';
   const favCount = countFavorites();
-  const badCount = countByGrade('bad');
-  const okCount = countByGrade('ok');
+  const againCount = countByGrade('again');
+  const hardCount = countByGrade('hard');
 
   el.innerHTML = `
     <div class="dialog-wrap">
@@ -100,11 +101,11 @@ export function renderDialogMode(el, _ignoredCards) {
           <button class="dlg-src-btn${source === 'fav' ? ' on' : ''}" data-src="fav">
             我的收藏<span class="dlg-src-meta">${favCount} 個字</span>
           </button>
-          <button class="dlg-src-btn${source === 'bad' ? ' on' : ''}" data-src="bad">
-            差<span class="dlg-src-meta">${badCount} 個字</span>
+          <button class="dlg-src-btn${source === 'again' ? ' on' : ''}" data-src="again">
+            重來<span class="dlg-src-meta">${againCount} 個字</span>
           </button>
-          <button class="dlg-src-btn${source === 'ok' ? ' on' : ''}" data-src="ok">
-            可以<span class="dlg-src-meta">${okCount} 個字</span>
+          <button class="dlg-src-btn${source === 'hard' ? ' on' : ''}" data-src="hard">
+            有點難<span class="dlg-src-meta">${hardCount} 個字</span>
           </button>
         </div>
       </div>
@@ -151,8 +152,8 @@ export function renderDialogMode(el, _ignoredCards) {
     if (!words.length) {
       const emptyMsg = {
         fav: '收藏還沒有單字。<br>到卡片模式點 ☆ 收藏 6 個以上再回來。',
-        bad: '目前沒有評為「差」的單字。<br>先在複習頁按幾張「差」再回來。',
-        ok: '目前沒有評為「可以」的單字。<br>先在複習頁按幾張「可以」再回來。',
+        again: '目前沒有評為「重來」的單字。<br>先在複習頁按幾張「重來」再回來。',
+        hard: '目前沒有評為「有點難」的單字。<br>先在複習頁按幾張「有點難」再回來。',
         lesson: '這堂課沒有可用單字。',
       };
       statusEl.innerHTML = `<div class="dlg-empty">${emptyMsg[src] || emptyMsg.lesson}</div>`;

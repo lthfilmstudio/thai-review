@@ -1,7 +1,7 @@
 /* 應用狀態與持久化。所有 runtime 狀態集中在 state 物件；
    settings 跟 progress 寫進 localStorage，重新開啟能還原。 */
 
-import { nextReview, countDue, getDueCards } from './srs.js';
+import { nextReview, countDue, getDueCards, normalizeGrade } from './srs.js';
 
 export const STORAGE_KEY = 'thai-review-v1';
 export const LESSONS_CACHE_KEY = 'thai-review-lessons-v1';      // 舊版（full cache）
@@ -145,7 +145,7 @@ export const state = {
   edits: {},                 // { "lessonId:thai": { thai, karaoke, zh, note } }，只存在本機
   collapsed: {},             // { "初-2": true } → 初級 2 章節收合中
   searchQuery: '',           // 搜尋虛擬課程用（不存 localStorage）
-  listFilter: 'all',         // 'all' | 'fav' | 'bad' | 'ok' | 'good'
+  listFilter: 'all',         // 'all' | 'fav' | 'again' | 'hard' | 'good' | 'easy'
   listLessonId: null,        // 全部清單目前選中的課堂
   listOrder: 'thai',         // 'thai' | 'zh'，清單卡片主要顯示語言
   settings: {
@@ -156,7 +156,7 @@ export const state = {
     theme: 'dark',           // 'auto' | 'dark' | 'light'（預設鎖深色）
     voiceProvider: 'elevenlabs', // 'elevenlabs' | 'gcp'
     voice: 'th-TH-Neural2-C',// GCP TTS voice id（thai-tts-proxy 走 Neural2 / Chirp3-HD）
-    dialogSource: 'lesson',  // 'lesson' | 'fav' | 'bad' | 'ok' — 對話模式抽字來源
+    dialogSource: 'lesson',  // 'lesson' | 'fav' | 'again' | 'hard' — 對話模式抽字來源
   },
   listen: {
     playing: false,
@@ -357,10 +357,12 @@ function progKey(cardOrIdx) {
   return cardKey(card);
 }
 
+/* 回傳目前四檔（again/hard/good/easy）語意；舊三檔資料經 normalizeGrade() 對回來，
+   呼叫端（清單篩選、對話字源）不用各自處理新舊資料相容。 */
 export function gradeOf(idxOrCard) {
   const v = state.progress[progKey(idxOrCard)];
-  if (typeof v === 'string') return v;
-  if (v && typeof v === 'object') return v.grade;
+  if (typeof v === 'string') return normalizeGrade(v);
+  if (v && typeof v === 'object') return normalizeGrade(v.grade);
   return undefined;
 }
 

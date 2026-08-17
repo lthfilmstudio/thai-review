@@ -698,9 +698,10 @@ async function init() {
       e.preventDefault();
       state.flipped = !state.flipped;
       document.getElementById('cardStage')?.classList.toggle('flipped', state.flipped);
-    } else if (e.key === '1') { gradeAndAdvance('bad'); }
-    else if (e.key === '2') { gradeAndAdvance('ok'); }
+    } else if (e.key === '1') { gradeAndAdvance('again'); }
+    else if (e.key === '2') { gradeAndAdvance('hard'); }
     else if (e.key === '3') { gradeAndAdvance('good'); }
+    else if (e.key === '4') { gradeAndAdvance('easy'); }
     else if (e.key === 'p' || e.key === 'P') {
       const cards = filteredCards();
       if (cards[state.cardIndex]) speakCard(cards[state.cardIndex]);

@@ -1,22 +1,33 @@
 /* SRS 排程：SM-2 簡化版（Anki / Quizlet 同款）。
    純函式 + 一個裝置 ID helper，stateless 方便測試。
-   3 檔評分對 SM-2 quality：bad=2、ok=3、good=5。 */
+   4 檔評分（again/hard/good/easy）對 SM-2 quality：hard=3、good=4、easy=5；
+   again 是獨立分支（重置 reps），不查表。 */
 
 const DAY_MS = 86400000;
-const GRADE_Q = { bad: 2, ok: 3, good: 5 };
+const GRADE_Q = { hard: 3, good: 4, easy: 5 };
+
+/* 舊版三檔資料（bad/ok/good）讀出來時要能對回新四檔，才能讓清單篩選 / 對話字源
+   在混合新舊資料時正確分類，不需要另外寫 migration 改寫已存的 grade 字串。 */
+const LEGACY_GRADE_MAP = { bad: 'again', ok: 'hard' };
+
+export function normalizeGrade(gradeStr) {
+  return LEGACY_GRADE_MAP[gradeStr] ?? gradeStr;
+}
 
 export function nextReview(gradeStr, prev = {}, now = Date.now()) {
-  const q = GRADE_Q[gradeStr] ?? 3;
   let { interval = 0, easeFactor = 2.5, reps = 0 } = prev;
 
-  if (q < 3) {
+  if (gradeStr === 'again') {
     reps = 0;
     interval = 1;
   } else {
+    const q = GRADE_Q[gradeStr] ?? 4;
     reps += 1;
     if (reps === 1) interval = 1;
     else if (reps === 2) interval = 3;        // 客製：泰文密集學習，原 SM-2 是 6
     else interval = Math.round(interval * easeFactor);
+    if (gradeStr === 'hard') interval = Math.max(1, Math.round(interval * 0.7));
+    else if (gradeStr === 'easy') interval = Math.round(interval * 1.3);
     easeFactor = Math.max(1.3, easeFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
   }
 
@@ -30,6 +41,16 @@ export function nextReview(gradeStr, prev = {}, now = Date.now()) {
     updatedAt: now,
     deviceId: getDeviceId(),
   };
+}
+
+/* 從既有 reps/interval 推導卡片狀態，不新增獨立欄位。
+   new：從沒評過分；learning：評過分但 reps=0（含被 again 重置的）；
+   mature：interval ≥ 21 天（沿用 Anki 慣例）；review：介於中間。 */
+export function cardStatus(entry) {
+  if (!entry || typeof entry !== 'object') return 'new';
+  if (!entry.reps) return 'learning';
+  if (entry.interval >= 21) return 'mature';
+  return 'review';
 }
 
 /* due 的定義：「曾經評過分」+「下次複習時間已到」。
