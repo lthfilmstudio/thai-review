@@ -1,17 +1,17 @@
 泰文	舊拼音(Sheet)	新拼音(目的達)	中文	來源	備註
-ร้าน	raan	rān~ -	店	book-exact	
+ร้าน	raan	rān~	店	book-exact	(book-exact已用引擎重新驗證)
 ร้านอาหาร	raan aahaan	rān~ ā hānˊ	餐廳	engine-auto	
 ร้านกาแฟ	raan gaafae	rān~ gā fɛ̄	咖啡店	engine-auto	
-ยา	yaa	yā - ḅānˋ	藥	book-exact	
+ยา	yaa	yā	藥	book-exact	(book-exact已用引擎重新驗證)
 ร้านยา	raan yaa	rān~ yā	藥局	engine-auto	
 ร้านนี้	raan ni	rān~ nī~	這家店	engine-auto	
 ชื่ออะไร	chue arai	chɯ̄ˋ aˇ rai	叫什麼名字	engine-auto	
 เดิน	dern	dhə̄n	走路	engine-auto	
 เดินไปไหน	dern pai nai	dhə̄n bai naiˊ	走到哪裡	engine-auto	
 เดินไปตลาด	dern pai talat	dhə̄n bai daˇ lātˋ	走去市場	engine-auto	
-ตลาด	talat	da.latˇ	市場	book-exact	
+ตลาด	talat	daˇ lātˋ	市場	book-exact	(book-exact已用引擎重新驗證)
 เดินไปร้านยา	dern pai raan yaa	dhə̄n bai rān~ yā	走去藥局	engine-auto	
-ยา	yaa	yā - ḅānˋ	藥	book-exact	
+ยา	yaa	yā	藥	book-exact	(book-exact已用引擎重新驗證)
 เดินไปสถานีรถไฟฟ้า	dern pai sathani rot fai fa	dhə̄n bai saˇ tāˊ nī rot~ fai fā~	走去捷運站	engine-auto	
 สถานีรถไฟฟ้า	sathani rot fai fa	saˇ tāˊ nī rot~ fai fā~	捷運站	engine-auto	
 สถานี BTS	sathani BTS	saˇ tāˊ nī BTS	BTS 站	engine-auto	
@@ -24,7 +24,7 @@
 เดินไปแปดนาที	dern pai paet natee	dhə̄n bai bɛ̄tˇ nā tī	走八分鐘	engine-auto	
 แปด	paet	bɛ̄tˇ	八	engine-auto	
 นาที	natee	nā tī	分鐘	engine-auto	
-เรียน	rian	rian     “	學、上課	book-exact	
+เรียน	rian	rīan	學、上課	book-exact	(book-exact已用引擎重新驗證)
 ภาษา	pasa	pā sāˊ	語言	engine-auto	
 ภาษาไทย	pasa thai	pā sāˊ tai	泰文	engine-auto	
 เรียนภาษาไทย	rian pasa thai	rīan pā sāˊ tai	學泰文	engine-auto	
@@ -32,10 +32,10 @@
 เก่ง	keng	gēngˇ	厲害、棒	engine-auto	
 เรียนเก่ง	rian keng	rīan gēngˇ	很會讀書	engine-auto	
 เรียนทำอาหาร	rian tam aahaan	rīan tam ā hānˊ	學做菜	engine-auto	
-อาหาร	aahaan	ā.hānˊ- kɛngˊ	食物、菜	book-exact	
+อาหาร	aahaan	ā hānˊ	食物、菜	book-exact	(book-exact已用引擎重新驗證)
 ทำอาหาร	tam aahaan	tam ā hānˊ	做菜	engine-auto	
 เรียนทำอาหาร	rian tam aahaan	rīan tam ā hānˊ	學做菜	engine-auto	
-ฟัง	fang	fang	聽	book-exact	
+ฟัง	fang	fang	聽	book-exact	(book-exact已用引擎重新驗證)
 ฟังอะไร	fang arai	fang aˇ rai	聽什麼	engine-auto	
 ฟังเข้าใจไหม	fang khao jai mai	fang kāuˋ jai maiˊ	聽得懂嗎	engine-auto	
 เข้าใจ	khao jai	kāuˋ jai	懂、了解	engine-auto	
@@ -47,9 +47,9 @@
 ฟังดีๆนะ	fang dii dii na	fang dhī dhī na~	認真聽喔	engine-auto	
 ดี	dii	dhī	好	engine-auto	
 ฟังดีๆนะ	fang dii dii na	fang dhī dhī na~	認真聽喔	engine-auto	
-พูด	pood	putˋ	說	book-exact	
+พูด	pood	pūtˋ	說	book-exact	(book-exact已用引擎重新驗證)
 พูดภาษาจีน	pood pasa jeen	pūtˋ pā sāˊ jīn	說中文	engine-auto	
-เป็น	pen	ben	會、是	book-exact	
+เป็น	pen	ben	會、是	book-exact	(book-exact已用引擎重新驗證)
 ไหม	mai	maiˊ	嗎	engine-auto	
 พูดภาษาจีนเป็นไหม	pood pasa jeen pen mai	pūtˋ pā sāˊ jīn ben maiˊ	會說中文嗎	engine-auto	
 เป็นนิดหน่อย	pen nit noi	ben nit~ nɔ̄iˇ	會一點點	engine-auto	
@@ -63,7 +63,7 @@
 อ่านออกไหม	aan ok mai	ānˇ ɔ̄kˇ maiˊ	讀得出來嗎	engine-auto	
 อ่านไม่ออก	aan mai ok	ānˇ maiˋ ɔ̄kˇ	讀不出來	engine-auto	
 อ่านไม่เป็น	aan mai pen	ānˇ maiˋ ben	不會讀	engine-auto	
-เป็น	pen	ben	會、是	book-exact	
+เป็น	pen	ben	會、是	book-exact	(book-exact已用引擎重新驗證)
 อ่านไม่เป็น	aan mai pen	ānˇ maiˋ ben	不會讀	engine-auto	
 เขียน	khian	kīanˊ	寫	engine-auto	
 เขียนสวย	khian suay	kīanˊ sūayˊ	寫得漂亮	engine-auto	
@@ -105,7 +105,7 @@
 ซื้อ	seu	sɯ̄~	買	engine-auto	
 ต่อ	tor	dɔ̄ˇ	繼續	engine-auto	
 เดินต่อ	dern tor	dhə̄n dɔ̄ˇ	繼續走	engine-auto	
-นอน	non	nɔ̅n	睡覺	book-exact	
+นอน	non	nɔ̄n	睡覺	book-exact	(book-exact已用引擎重新驗證)
 นอนต่อ	non tor	nɔ̄n dɔ̄ˇ	繼續睡	engine-auto	
 นอนต่อได้ไหม	non tor dai mai	nɔ̄n dɔ̄ˇ dhaiˋ maiˊ	可以繼續睡嗎	engine-auto	
 ไม่ได้แล้ว	mai dai laew	maiˋ dhaiˋ lɛ̄u~	不行了	engine-auto	
@@ -113,7 +113,7 @@
 อยากกินต่อ	yaak gin tor	yākˋ gin dɔ̄ˇ	想繼續吃	engine-auto	
 หรือ	reu	rɯ̄ˊ	或	engine-auto	
 กาแฟร้อนหรือกาแฟเย็น	gaafae ron reu gaafae yen	gā fɛ̄ rɔ̄n~ rɯ̄ˊ gā fɛ̄ yen	熱咖啡還是冰咖啡	engine-auto	
-ไก่ทอด	gai tod	gaiˇtɔ̅ tˋ-	炸雞	book-exact	
+ไก่ทอด	gai tod	gaiˇ tɔ̄tˋ	炸雞	book-exact	(book-exact已用引擎重新驗證)
 ทอด	tod	tɔ̄tˋ	炸	engine-auto	
 ไก่ย่าง	gai yang	gaiˇ yāngˋ	烤雞	engine-auto	
 ย่าง	yang	yāngˋ	烤	engine-auto	
@@ -206,7 +206,7 @@
 ของไทย	khong thai	kɔ̄ngˊ tai	泰國貨	engine-auto	
 ของเยอรมัน	khong yoe-ra-man	kɔ̄ngˊ yə̄n man	德國貨	engine-auto	
 ของกิน	khong kin	kɔ̄ngˊ gin	吃的東西	engine-auto	
-กิน	kin	gin    lɛu~	吃	book-exact	
+กิน	kin	gin	吃	book-exact	(book-exact已用引擎重新驗證)
 ของใช้	khong chai	kɔ̄ngˊ chai~	用的東西	engine-auto	
 ใช้	chai	chai~	用	engine-auto	
 กี่ที่คะ	gii thii kha	gīˇ tīˋ ka~	幾位？	engine-auto	
@@ -225,8 +225,8 @@
 ตายาย	taa yaai	dā yāi	外公外婆	engine-auto	
 ปู่ย่าตายาย	puu yaa taa yaai	būˇ yāˋ dā yāi	爺爺奶奶外公外婆	engine-auto	
 ตายายมาจากเมืองจีน	taa yaai maa jaak mueang jiin	dā yāi mā jākˇ mɯ̄ang jīn	外公外婆來自中國	engine-auto	
-พ่อ	phor	pɔ̅ ˋ-	爸爸	book-exact	
-แม่	mae	mɛ̅ ˋ-	媽媽	book-exact	
+พ่อ	phor	pɔ̄ˋ	爸爸	book-exact	(book-exact已用引擎重新驗證)
+แม่	mae	mɛ̄ˋ	媽媽	book-exact	(book-exact已用引擎重新驗證)
 พ่อแม่	phor mae	pɔ̄ˋ mɛ̄ˋ	父母	engine-auto	
 ผม	phom	pomˊ	我 (男性)	engine-auto	
 ฉัน	chan	chanˊ	我 (女性)	engine-auto	
@@ -238,7 +238,7 @@
 บ้าน	baan	bhānˋ	房子、家	engine-auto	
 บ้านของคุณ	baan khong khun	bhānˋ kɔ̄ngˊ kun	你的家	engine-auto	
 บ้านของคุณอยู่ที่ไหน	baan khong khun yuu thii nai	bhānˋ kɔ̄ngˊ kun yūˋ tīˋ naiˊ	你家在哪裡？	engine-auto	
-แม่บ้าน	mae baan	mɛ̅ ˋbānˋ       -	女傭、家庭主婦	book-exact	
+แม่บ้าน	mae baan	mɛ̄ˋ bhānˋ	女傭、家庭主婦	book-exact	(book-exact已用引擎重新驗證)
 ฉันเป็นแม่บ้าน	chan pen mae baan	chanˊ ben mɛ̄ˋ bhānˋ	我是家庭主婦	engine-auto	
 พ่อตา	phor taa	pɔ̄ˋ dā	岳父	engine-auto	
 แม่ยาย	mae yaai	mɛ̄ˋ yāi	岳母	engine-auto	
@@ -246,7 +246,7 @@
 สามีของฉัน	saa mii khong chan	sāˊ mī kɔ̄ngˊ chanˊ	我的先生	engine-auto	
 สามีฉัน	saa mii chan	sāˊ mī chanˊ	我先生	engine-auto	
 ลูกชาย	luuk chaai	lūkˋ chāi	兒子	engine-auto	
-ลูก	luuk	lūkˋ-	孩子、(量詞)顆	book-exact	
+ลูก	luuk	lūkˋ	孩子、(量詞)顆	book-exact	(book-exact已用引擎重新驗證)
 ลูกละเท่าไหร่	luuk la thao-rai	lūkˋ la~ tāuˋ raiˇ	一顆多少錢？	engine-auto	
 ชาย	chaai	chāi	男	engine-auto	
 ลูกสาว	luuk saao	lūkˋ sāuˊ	女兒	engine-auto	
@@ -266,19 +266,19 @@
 กินน้อย	kin noi	gin nɔ̄i~	吃得少	engine-auto	
 นอนน้อย	non noi	nɔ̄n nɔ̄i~	睡得少	engine-auto	
 เช่าบ้าน	chao baan	chāuˋ bhānˋ	租房子	engine-auto	
-ห้อง	hong	hɔngˋ-	房間	book-exact	
+ห้อง	hong	hɔ̄ngˋ	房間	book-exact	(book-exact已用引擎重新驗證)
 เช่าห้อง	chao hong	chāuˋ hɔ̄ngˋ	租房間	engine-auto	
 เช่ามอเตอร์ไซค์	chao motor-sai	chāuˋ mɔ̄ də̄ sai	租摩托車	engine-auto	
 泰文	泰式karaoke拼音	泰文	中文	engine-auto	
-แม่	mae	mɛ̅ ˋ-	媽媽	book-exact	
-พ่อ	phor	pɔ̅ ˋ-	爸爸	book-exact	
+แม่	mae	mɛ̄ˋ	媽媽	book-exact	(book-exact已用引擎重新驗證)
+พ่อ	phor	pɔ̄ˋ	爸爸	book-exact	(book-exact已用引擎重新驗證)
 ลูกสาว	luuk saao	lūkˋ sāuˊ	女兒	engine-auto	
 ลูกชาย	luuk chaai	lūkˋ chāi	兒子	engine-auto	
 หลาน	laan	lānˊ	孫子/孫女/外甥/外甥女	engine-auto	
 หลานสาว	laan saao	lānˊ sāuˊ	孫女/外甥女	engine-auto	
 หลานชาย	laan chaai	lānˊ chāi	孫子/外甥	engine-auto	
 ล้าน	laan	lān~	百萬	engine-auto	
-ร้าน	raan	rān~ -	商店	book-exact	
+ร้าน	raan	rān~	商店	book-exact	(book-exact已用引擎重新驗證)
 พี่	phii	pīˋ	哥哥/姐姐	engine-auto	
 พี่สาว	phii saao	pīˋ sāuˊ	姐姐	engine-auto	
 พี่ชาย	phii chaai	pīˋ chāi	哥哥	engine-auto	
@@ -358,7 +358,7 @@
 มีไหมคะ	mii mai kha	mī maiˊ ka~	有問題嗎？	engine-auto	
 พ่อสามี	phor saa mii	pɔ̄ˋ sāˊ mī	公公	engine-auto	
 สามี	saa mii	sāˊ mī	先生/丈夫	engine-auto	
-พ่อ	phor	pɔ̅ ˋ-	爸爸	book-exact	
+พ่อ	phor	pɔ̄ˋ	爸爸	book-exact	(book-exact已用引擎重新驗證)
 แม่สามี	mae saa mii	mɛ̄ˋ sāˊ mī	婆婆	engine-auto	
 พ่อตา	phor taa	pɔ̄ˋ dā	岳父	engine-auto	
 แม่ยาย	mae yaai	mɛ̄ˋ yāi	岳母	engine-auto	
@@ -408,7 +408,7 @@
 ใครมา	krai ma	krai mā	誰來？	engine-auto	
 มา	ma	mā	來	engine-auto	
 ใครพูด	krai pood	krai pūtˋ	誰說？	engine-auto	
-พูด	pood	putˋ	說	book-exact	
+พูด	pood	pūtˋ	說	book-exact	(book-exact已用引擎重新驗證)
 มีใครไหม	mee krai mai	mī krai maiˊ	有人嗎？	engine-auto	
 ไม่มีใคร	mai mee krai	maiˋ mī krai	沒有人	engine-auto	
 มีใครอยู่ไหม	mee krai yuu mai	mī krai yūˋ maiˊ	有人在嗎？	engine-auto	
@@ -429,14 +429,14 @@
 ตา	taa	dā	外公	engine-auto	
 ยาย	yaai	yāi	外婆	engine-auto	
 ปู่ย่าตายาย	puu yaa taa yaai	būˇ yāˋ dā yāi	（外）祖父母	engine-auto	
-พ่อ	por	pɔ̅ ˋ-	爸爸	book-exact	
-วัน	wan	wan -	日、天	book-exact	
+พ่อ	por	pɔ̄ˋ	爸爸	book-exact	(book-exact已用引擎重新驗證)
+วัน	wan	wan	日、天	book-exact	(book-exact已用引擎重新驗證)
 วันพ่อ	wan por	wan pɔ̄ˋ	父親節	engine-auto	
 สุขสันต์วันพ่อ	suk san wan por	sukˇ sanˊ wan pɔ̄ˋ	父親節快樂	engine-auto	
 สุขสันต์วันเกิด	suk san wan gued	sukˇ sanˊ wan gə̄tˇ	生日快樂	engine-auto	
-แม่	mae	mɛ̅ ˋ-	媽媽	book-exact	
+แม่	mae	mɛ̄ˋ	媽媽	book-exact	(book-exact已用引擎重新驗證)
 พ่อแม่	por mae	pɔ̄ˋ mɛ̄ˋ	父母	engine-auto	
-ลูก	look	lūkˋ-	孩子、…顆（量詞）	book-exact	
+ลูก	look	lūkˋ	孩子、…顆（量詞）	book-exact	(book-exact已用引擎重新驗證)
 พ่อแม่ลูก	por mae look	pɔ̄ˋ mɛ̄ˋ lūkˋ	父母與孩子	engine-auto	
 คุณปู่	khun puu	kun būˇ	爺爺（尊稱）	engine-auto	
 คุณย่า	khun yaa	kun yāˋ	奶奶（尊稱）	engine-auto	
@@ -471,7 +471,7 @@
 มีพี่น้อง 5 คน	mii phii nong haa khon	mī pīˋ nɔ̄ng~ 5 kon	有五個兄弟姐妹	engine-auto	
 พี่ชาย	phii chaai	pīˋ chāi	哥哥	engine-auto	
 พี่สาว	phii saao	pīˋ sāuˊ	姐姐	engine-auto	
-มี	mii	mī -	有	book-exact	
+มี	mii	mī	有	book-exact	(book-exact已用引擎重新驗證)
 น้องชาย	nong chaai	nɔ̄ng~ chāi	弟弟	engine-auto	
 ไม่มีพี่ชาย มีน้องสาว	mai mii phii chaai mii nong saao	maiˋ mī pīˋ chāi mī nɔ̄ng~ sāuˊ	沒有哥哥，有妹妹	engine-auto	
 พี่น้อง	phii nong	pīˋ nɔ̄ng~	兄弟姐妹	engine-auto	
@@ -499,7 +499,7 @@
 เด็ก	dek	dhekˇ	小孩、兒童	engine-auto	
 ตั๋วเด็ก	tua dek	dūaˊ dhekˇ	兒童票	engine-auto	
 วันเด็ก	wan dek	wan dhekˇ	兒童節	engine-auto	
-วัน	wan	wan -	日子、天	book-exact	
+วัน	wan	wan	日子、天	book-exact	(book-exact已用引擎重新驗證)
 เด็ก	dek	dhekˇ	小孩	engine-auto	
 เด็กชอบกินขนม	dek chop kin khanom	dhekˇ chɔ̄pˋ gin kaˇ nom	小孩喜歡吃零食	engine-auto	
 ผู้ใหญ่	phu yai	pūˋ yaiˇ	大人	engine-auto	
@@ -519,7 +519,7 @@
 ขอโทษค่ะ	kho thot kha	kɔ̄ˊ tōtˋ kaˋ	(女) 不好意思、對不起	engine-auto	
 ขอโทษค่ะ ห้องน้ำหญิงอยู่ตรงไหนคะ	kho thot kha hong nam ying yuu trong nai kha	kɔ̄ˊ tōtˋ kaˋ hɔ̄ngˋ nām~ yingˊ yūˋ drong naiˊ ka~	(女) 不好意思，女廁在哪個位置呢？	engine-auto	
 แฟน	faen	fɛ̄n	情人、男朋友、女朋友	engine-auto	
-แล้ว	laeo	V     lɛu~ …	了	book-exact	
+แล้ว	laeo	lɛ̄u~	了	book-exact	(book-exact已用引擎重新驗證)
 มีแฟนแล้ว	mii faen laeo	mī fɛ̄n lɛ̄u~	有情人了	engine-auto	
 เขามีแฟนแล้ว	khao mii faen laeo	kāuˊ mī fɛ̄n lɛ̄u~	他有情人了	engine-auto	
 แฟนคลับ	faen club	fɛ̄n klap~	粉絲俱樂部、粉絲	engine-auto	
@@ -550,7 +550,7 @@
 นักศึกษาชาย	nak seuk saa chaai	nak~ sɯkˇ sāˊ chāi	男大學生	engine-auto	
 มาจากไหน	maa jaak nai	mā jākˇ naiˊ	來自哪裡？	engine-auto	
 มาจากไต้หวัน	maa jaak tai wan	mā jākˇ daiˋ wanˊ	來自台灣	engine-auto	
-เป็น	pen	ben	是	book-exact	
+เป็น	pen	ben	是	book-exact	(book-exact已用引擎重新驗證)
 เช่ารถ	chao rot	chāuˋ rot~	租車	engine-auto	
 เช่าห้อง	chao hong	chāuˋ hɔ̄ngˋ	租房間	engine-auto	
 เช่าบ้าน	chao baan	chāuˋ bhānˋ	租房子	engine-auto	
@@ -575,7 +575,7 @@
 น้อง	nong	nɔ̄ng~	弟/妹（稱呼較年輕的伴侶）	engine-auto	
 เดี๋ยวเจอกันค่ะ	diao jer gan kha	dhīauˊ jə̄ gan kaˋ	(女) 等會兒見	engine-auto	
 เดี๋ยวเจอกันนะ	diao jer gan na	dhīauˊ jə̄ gan na~	等會兒見喔	engine-auto	
-ไปเที่ยว	pai thiao	maiˋḍaiˋ         - bai tiauˋ      -	去玩、去旅行	book-exact	
+ไปเที่ยว	pai thiao	bai tīauˋ	去玩、去旅行	book-exact	(book-exact已用引擎重新驗證)
 เที่ยว	thiao	tīauˋ	玩、旅行	engine-auto	
 ไปเที่ยวเมืองไทย	pai thiao mueang thai	bai tīauˋ mɯ̄ang tai	去泰國玩	engine-auto	
 บ่อยๆ	boi boi	bhɔ̄iˇ bhɔ̄iˇ	常常	engine-auto	
@@ -648,7 +648,7 @@
 ไปด้วยกันไหม	pai duay gan mai	bai dhūayˋ gan maiˊ	一起去嗎？	engine-auto	
 เขาสองคนเป็นแฟนกัน	khao song khon pen faen gan	kāuˊ sɔ̄ngˊ kon ben fɛ̄n gan	他們兩個人是情侶	engine-auto	
 เราเป็นเพื่อนกัน	rao pen phuean gan	rāu ben pɯ̄anˋ gan	我們是朋友	engine-auto	
-งาน	ngaan	ngān	工作、事情 (名詞)	book-exact	
+งาน	ngaan	ngān	工作、事情 (名詞)	book-exact	(book-exact已用引擎重新驗證)
 ทำงาน	tham ngaan	tam ngān	工作 (動詞)	engine-auto	
 วันนี้ต้องทำงาน	wan nii tong tham ngaan	wan nī~ dɔ̄ngˋ tam ngān	今天必須工作	engine-auto	
 ต้อง	tong	dɔ̄ngˋ	必須、得	engine-auto	
@@ -669,7 +669,7 @@
 มีเงิน มีเวลา	mii ngern mii wela	mī ngə̄n mī wē lā	有錢，有時間	engine-auto	
 อยากไปเที่ยวก็ไปเที่ยว	yaak pai thiao ko pai thiao	yākˋ bai tīauˋ gɔ̄ˋ bai tīauˋ	想去玩就去玩	engine-auto	
 แต่งงาน	taeng ngaan	dɛ̄ngˇ ngān	結婚	engine-auto	
-งาน	ngaan	ngān	工作（名詞）	book-exact	
+งาน	ngaan	ngān	工作（名詞）	book-exact	(book-exact已用引擎重新驗證)
 ไม่อยากแต่งงาน	mai yaak taeng ngaan	maiˋ yākˋ dɛ̄ngˇ ngān	不想結婚	engine-auto	
 อยากแต่งงานไหม	yaak taeng ngaan mai	yākˋ dɛ̄ngˇ ngān maiˊ	想結婚嗎？	engine-auto	
 แต่งงานแล้ว	taeng ngaan laeo	dɛ̄ngˇ ngān lɛ̄u~	結婚了	engine-auto	
@@ -694,10 +694,10 @@
 ยิ่งเรียนยิ่งเก่ง	ying rian ying geng	yingˋ rīan yingˋ gēngˇ	越學越厲害	engine-auto	
 ยิ่งพูดยิ่งจำได้	ying phuut ying jam dai	yingˋ pūtˋ yingˋ jam dhaiˋ	越說越記得住	engine-auto	
 ยิ่งซื้อยิ่งอยากซื้อ	ying seu ying yaak seu	yingˋ sɯ̄~ yingˋ yākˋ sɯ̄~	越買越想買	engine-auto	
-งาน	ngaan	ngān	工作（名詞）	book-exact	
+งาน	ngaan	ngān	工作（名詞）	book-exact	(book-exact已用引擎重新驗證)
 ทำงาน	tham ngaan	tam ngān	工作（動詞）	engine-auto	
 เที่ยว	thiao	tīauˋ	去玩	engine-auto	
-ไปเที่ยว	pai thiao	maiˋḍaiˋ         - bai tiauˋ      -	去玩	book-exact	
+ไปเที่ยว	pai thiao	bai tīauˋ	去玩	book-exact	(book-exact已用引擎重新驗證)
 อยากไปเที่ยว	yaak pai thiao	yākˋ bai tīauˋ	想去玩	engine-auto	
 ที่ไหน	thi nai	tīˋ naiˊ	哪裡	engine-auto	
 อยากไปเที่ยวที่ไหน	yaak pai thiao thi nai	yākˋ bai tīauˋ tīˋ naiˊ	想去哪裡玩？	engine-auto	
@@ -873,7 +873,7 @@
 หู	hu	hūˊ	耳朵	engine-auto	
 หูดี	hu dii	hūˊ dhī	耳朵靈、聽力好	engine-auto	
 หูฟัง	hu fang	hūˊ fang	耳機	engine-auto	
-ฟัง	fang	fang	聽	book-exact	
+ฟัง	fang	fang	聽	book-exact	(book-exact已用引擎重新驗證)
 ใส่หูฟัง	sai hu fang	saiˇ hūˊ fang	戴耳機	engine-auto	
 แบน	baen	bhɛ̄n	扁	engine-auto	
 ปาก	paak	bākˇ	嘴巴	engine-auto	
@@ -981,7 +981,7 @@
 มือสอง	mue song	mɯ̄ sɔ̄ngˊ	二手	engine-auto	
 มือสองถูกมาก	mue song thook mak	mɯ̄ sɔ̄ngˊ tūkˇ mākˋ	二手很便宜	engine-auto	
 รถมือสอง	rot mue song	rot~ mɯ̄ sɔ̄ngˊ	二手車	engine-auto	
-รถ	rot	rot~	車子	book-exact	
+รถ	rot	rot~	車子	book-exact	(book-exact已用引擎重新驗證)
 คอนโดมือสอง	khon do mue song	kɔ̄n dhō mɯ̄ sɔ̄ngˊ	二手公寓	engine-auto	
 ไหว้	wai	waiˋ	拜（合十）	engine-auto	
 แขน	khaen	kɛ̄nˊ	手臂	engine-auto	
@@ -998,7 +998,7 @@
 รองเท้า	rong thao	rɔ̄ng tāu~	鞋子	engine-auto	
 ใส่รองเท้า	sai rong thao	saiˇ rɔ̄ng tāu~	穿鞋子	engine-auto	
 ข้อเท้า	kho thao	kɔ̄ˋ tāu~	腳踝	engine-auto	
-ข้อ	kho	kɔ̅ˋ -	關節	book-exact	
+ข้อ	kho	kɔ̄ˋ	關節	book-exact	(book-exact已用引擎重新驗證)
 ข้อมือ	kho mue	kɔ̄ˋ mɯ̄	手腕	engine-auto	
 สร้อยข้อเท้า	soi kho thao	srɔ̄iˋ kɔ̄ˋ tāu~	腳鍊	engine-auto	
 สร้อย	soi	srɔ̄iˋ	鍊子	engine-auto	
@@ -1185,7 +1185,7 @@
 กาย	kai	gāi	身體 (文言)	engine-auto	
 สบายใจ	sabai jai	saˇ bhāi jai	心情愉快、舒心	engine-auto	
 ขอให้สุขภาพแข็งแรง	kho hai suk phap khaeng raeng	kɔ̄ˊ haiˋ sukˇ pāpˋ kɛngˊ rɛ̄ng	祝你身體健康	engine-auto	
-สุขภาพ	suk phap	sukˇka.pāpˋ	健康、身體	book-exact	
+สุขภาพ	suk phap	sukˇ pāpˋ	健康、身體	book-exact	(book-exact已用引擎重新驗證)
 แข็งแรง	khaeng raeng	kɛngˊ rɛ̄ng	健康、強壯	engine-auto	
 หา	haa	hāˊ	找	engine-auto	
 หาอะไร	haa arai	hāˊ aˇ rai	找什麼?	engine-auto	
@@ -1367,7 +1367,7 @@
 ผมชื่อเบียร์	pom chue beer	pomˊ chɯ̄ˋ bhīa	我叫Beer	engine-auto	
 ต่อ	to	dɔ̄ˇ	繼續	engine-auto	
 บ้าน	ban	bhānˋ	家	engine-auto	
-แม่บ้าน	mae ban	mɛ̅ ˋbānˋ       -	家庭主婦	book-exact	
+แม่บ้าน	mae ban	mɛ̄ˋ bhānˋ	家庭主婦	book-exact	(book-exact已用引擎重新驗證)
 บ้านเพื่อน	ban pheuan	bhānˋ pɯ̄anˋ	朋友家	engine-auto	
 ไปบ้านเพื่อน	bpai ban pheuan	bai bhānˋ pɯ̄anˋ	去朋友家	engine-auto	
 ไปนอนบ้านเพื่อน	bpai non ban pheuan	bai nɔ̄n bhānˋ pɯ̄anˋ	去朋友家睡覺	engine-auto	
@@ -1406,7 +1406,7 @@
 เล่นเกมออนไลน์	len game online	lēnˋ gēm ɔ̄n lai	玩線上遊戲	engine-auto	
 เราซื่อก็เล่นเกมออนไลน์	rao sue go len game online	rāu sɯ̄ˋ gɔ̄ˋ lēnˋ gēm ɔ̄n lai	老師也玩線上遊戲	engine-auto	
 ซื้อของออนไลน์	seu khong online	sɯ̄~ kɔ̄ngˊ ɔ̄n lai	線上買東西	engine-auto	
-ไปเที่ยว	bpai tiao	maiˋḍaiˋ         - bai tiauˋ      -	去玩	book-exact	
+ไปเที่ยว	bpai tiao	bai tīauˋ	去玩	book-exact	(book-exact已用引擎重新驗證)
 ฝาก	fak	fākˇ	寄	engine-auto	
 กระเป๋า	gra pao	graˇ bāuˊ	包包、行李	engine-auto	
 ฝากกระเป๋า	fak gra pao	fākˇ graˇ bāuˊ	寄行李	engine-auto	
@@ -1466,7 +1466,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 ตัว	tua	dūa	（張、個、隻）	engine-auto	
 เก้าอี้ตัวนี้	kao ii tua ni	gāuˋ īˋ dūa nī~	這張椅子	engine-auto	
 ขอเก้าอี้ 2 ตัว	kho kao ii song tua	kɔ̄ˊ gāuˋ īˋ 2 dūa	我想要兩張椅子	engine-auto	
-หนัง	nang	nangˊ	皮；電影	book-exact	
+หนัง	nang	nangˊ	皮；電影	book-exact	(book-exact已用引擎重新驗證)
 หนังหมู	nang moo	nangˊ mūˊ	豬皮	engine-auto	
 ชอบกินหนังหมู	chop gin nang moo	chɔ̄pˋ gin nangˊ mūˊ	喜歡吃豬皮	engine-auto	
 ชอบกินหนังหมูไหมคะ	chop gin nang moo mai kha	chɔ̄pˋ gin nangˊ mūˊ maiˊ ka~	喜歡吃豬皮嗎？	engine-auto	
@@ -1577,7 +1577,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 รถแอร์	rot air	rot~ ɛ̄	冷氣公車	engine-auto	
 ไม่มีแอร์	mai mee air	maiˋ mī ɛ̄	沒有冷氣	engine-auto	
 ผมอยากนั่งรถแอร์	pom yaak nang rot air	pomˊ yākˋ nangˋ rot~ ɛ̄	我想坐冷氣公車	engine-auto	
-เปิด	bpeut	bətˇ	開；打開	book-exact	
+เปิด	bpeut	bə̄tˇ	開；打開	book-exact	(book-exact已用引擎重新驗證)
 เปิดแอร์	bpeut air	bə̄tˇ ɛ̄	開冷氣	engine-auto	
 ร้อนมาก เปิดแอร์ได้ไหมคะ	ron mak bpeut air dai mai kha	rɔ̄n~ mākˋ bə̄tˇ ɛ̄ dhaiˋ maiˊ ka~	好熱，可以開冷氣嗎？	engine-auto	
 คอมพิวเตอร์	kom piew ter	kɔ̄m piw də̄	電腦	engine-auto	
@@ -1656,11 +1656,11 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 เก้าอี้ไม่พอ	kao ii mai phor	gāuˋ īˋ maiˋ pɔ̄	椅子不夠	engine-auto	
 ขอเก้าอี้สองตัวค่ะ/ครับ	kho kao ii song tua kha/krap	kɔ̄ˊ gāuˋ īˋ sɔ̄ngˊ dūa kaˋ/krap~	請給我兩張椅子	engine-auto	
 ขอเก้าอี้สองตัวหน่อย	kho kao ii song tua noi	kɔ̄ˊ gāuˋ īˋ sɔ̄ngˊ dūa nɔ̄iˇ	請給我兩張椅子 (客氣)	engine-auto	
-หนัง	nang	nangˊ	皮	book-exact	
+หนัง	nang	nangˊ	皮	book-exact	(book-exact已用引擎重新驗證)
 หนังไก่ทอด	nang gai thot	nangˊ gaiˇ tɔ̄tˋ	炸雞皮	engine-auto	
 หนังหมู	nang muu	nangˊ mūˊ	豬皮	engine-auto	
 กินแล้วสวย	kin laew suay	gin lɛ̄u~ sūayˊ	吃了會漂亮	engine-auto	
-หนัง	nang	nangˊ	電影	book-exact	
+หนัง	nang	nangˊ	電影	book-exact	(book-exact已用引擎重新驗證)
 ไปดูหนังกัน	pai du nang kan	bai dhū nangˊ gan	一起去看電影	engine-auto	
 หนังอะไร	nang a-rai	nangˊ aˇ rai	什麼電影？	engine-auto	
 ถ้าเป็นหนังผี	tha pen nang phi	tāˋ ben nangˊ pīˊ	如果是鬼片	engine-auto	
@@ -1744,8 +1744,8 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 กินมาม่าไปดูมือถือไป	kin mama pai du mue-thue pai	gin mā māˋ bai dhū mɯ̄ tɯ̄ˊ bai	一邊吃泡麵一邊看手機	engine-auto	
 คุยกันไม่รู้เรื่อง	khui kan mai ruu rueang	kui gan maiˋ rū~ rɯ̄angˋ	雞同鴨講	engine-auto	
 คุย	khui	kui	聊天	engine-auto	
-เรื่อง	reuang	rɯangˋ-	事情	book-exact	
-เสียง	siang	ɔ̅kˇ     - siangˊ              -	聲音	book-exact	
+เรื่อง	reuang	rɯ̄angˋ	事情	book-exact	(book-exact已用引擎重新驗證)
+เสียง	siang	sīangˊ	聲音	book-exact	(book-exact已用引擎重新驗證)
 วันนี้ไม่มีเสียง	wan nii mai mii siang	wan nī~ maiˋ mī sīangˊ	今天沒有聲音	engine-auto	
 เสียงดัง	siang dang	sīangˊ dhang	大聲	engine-auto	
 ดัง	dang	dhang	很紅、很夯	engine-auto	
@@ -1798,7 +1798,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 เสื้อแขนสั้น	seua khaen san	sɯ̄aˋ kɛ̄nˊ sanˋ	短袖(上衣)	engine-auto	
 กางเกงขายาว	kaang keng kha yao	gāng gēng kāˊ yāu	長褲	engine-auto	
 กางเกงขาสั้น	kaang keng kha san	gāng gēng kāˊ sanˋ	短褲	engine-auto	
-ใหม่	mai	maiˇ	新的	book-exact	
+ใหม่	mai	maiˇ	新的	book-exact	(book-exact已用引擎重新驗證)
 ดารา	da-ra	dhā rā	明星	engine-auto	
 ดาราใหม่	da-ra mai	dhā rā maiˇ	新明星	engine-auto	
 มีแฟนใหม่แล้ว	mii faen mai laew	mī fɛ̄n maiˇ lɛ̄u~	有新情人了	engine-auto	
@@ -1868,7 +1868,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 คุณว่ายน้ำเป็นไหม	khun wai naam bpen mai	kun wāiˋ nām~ ben maiˊ	你會游泳嗎？	engine-auto	
 ฉันว่ายน้ำไม่เป็น	chan wai naam mai bpen	chanˊ wāiˋ nām~ maiˋ ben	我不會游泳	engine-auto	
 ว่ายน้ำเก่ง	wai naam geng	wāiˋ nām~ gēngˇ	很會游泳	engine-auto	
-เสียง	siang	ɔ̅kˇ     - siangˊ              -	聲音	book-exact	
+เสียง	siang	sīangˊ	聲音	book-exact	(book-exact已用引擎重新驗證)
 เสียงดัง	siang dang	sīangˊ dhang	大聲	engine-auto	
 เสียงเบา	siang bao	sīangˊ bhāu	小聲	engine-auto	
 เสียงดังหรือเสียงเบาคะ	siang dang rue siang bao kha	sīangˊ dhang rɯ̄ˊ sīangˊ bhāu ka~	大聲還是小聲？	engine-auto	
@@ -1927,7 +1927,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 ชอบใส่ขาสั้น	chop sai kaa-san	chɔ̄pˋ saiˇ kāˊ sanˋ	喜歡穿短褲	engine-auto	
 ใส่ขาสั้นไม่ได้	sai kaa-san mai dai	saiˇ kāˊ sanˋ maiˋ dhaiˋ	不能穿短褲	engine-auto	
 ไปวัดใส่ขาสั้นไม่ได้	bpai wat sai kaa-san mai dai	bai wat~ saiˇ kāˊ sanˋ maiˋ dhaiˋ	去寺廟不能穿短褲	engine-auto	
-ใหม่	mai	maiˇ	新	book-exact	
+ใหม่	mai	maiˇ	新	book-exact	(book-exact已用引擎重新驗證)
 บ้านใหม่	baan mai	bhānˋ maiˇ	新房子	engine-auto	
 พ่อซื้อบ้านใหม่	phor sue baan mai	pɔ̄ˋ sɯ̄~ bhānˋ maiˇ	爸爸買新房子	engine-auto	
 กระเป๋าใหม่	gra-bpao mai	graˇ bāuˊ maiˇ	新包包	engine-auto	
@@ -1970,7 +1970,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 รับโทรศัพท์	rap tho-ra-sap	rap~ tōn sapˇ	接電話	engine-auto	
 ไปรับลูก	bpai rap look	bai rap~ lūkˋ	去接小孩	engine-auto	
 รับเงินเดือน	rap ngern deuan	rap~ ngə̄n dhɯ̄an	領薪水	engine-auto	
-เรื่อง	reuang	rɯangˋ-	事情、部(量詞)	book-exact	
+เรื่อง	reuang	rɯ̄angˋ	事情、部(量詞)	book-exact	(book-exact已用引擎重新驗證)
 มีเรื่องอะไร	mee reuang a-rai	mī rɯ̄angˋ aˇ rai	有什麼事？	engine-auto	
 ชอบดูเรื่องไหน	chop du reuang nai	chɔ̄pˋ dhū rɯ̄angˋ naiˊ	喜歡看哪一部？	engine-auto	
 ดารา	da-ra	dhā rā	明星	engine-auto	
@@ -2000,7 +2000,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 ร้าน นี้ อร่อย กว่า	raan nee aroi gwa	rān~ nī~ aˇ rɔ̄iˋ gwāˇ	這間店比較好吃	engine-auto	
 สี นี้ สวย กว่า	see nee suay gwa	sīˊ nī~ sūayˊ gwāˇ	這個顏色比較漂亮	engine-auto	
 ร้าน นี้ ถูก กว่า	raan nee took gwa	rān~ nī~ tūkˇ gwāˇ	這間店比較便宜	engine-auto	
-ลาย	laai	lāi -	花紋	book-exact	
+ลาย	laai	lāi	花紋	book-exact	(book-exact已用引擎重新驗證)
 ลาย นี้ สวย ที่สุด	laai nee suay tee sut	lāi nī~ sūayˊ tīˋ sutˇ	這個花紋最漂亮	engine-auto	
 ที่สุด	tee sut	tīˋ sutˇ	最	engine-auto	
 ลาย นี้ สวย ที่สุด	laai nee suay tee sut	lāi nī~ sūayˊ tīˋ sutˇ	這個花紋最漂亮	engine-auto	
@@ -2070,7 +2070,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 คุณว่ายน้ำเป็นไหม	khun wai naam bpen mai	kun wāiˋ nām~ ben maiˊ	你會游泳嗎？	engine-auto	
 ฉันว่ายน้ำไม่เป็น	chan wai naam mai bpen	chanˊ wāiˋ nām~ maiˋ ben	我不會游泳	engine-auto	
 ว่ายน้ำเก่ง	wai naam geng	wāiˋ nām~ gēngˇ	很會游泳	engine-auto	
-เสียง	siang	ɔ̅kˇ     - siangˊ              -	聲音	book-exact	
+เสียง	siang	sīangˊ	聲音	book-exact	(book-exact已用引擎重新驗證)
 เสียงดัง	siang dang	sīangˊ dhang	大聲	engine-auto	
 เสียงเบา	siang bao	sīangˊ bhāu	小聲	engine-auto	
 เสียงดังหรือเสียงเบาคะ	siang dang rue siang bao kha	sīangˊ dhang rɯ̄ˊ sīangˊ bhāu ka~	大聲還是小聲？	engine-auto	
@@ -2129,7 +2129,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 ชอบใส่ขาสั้น	chop sai kaa-san	chɔ̄pˋ saiˇ kāˊ sanˋ	喜歡穿短褲	engine-auto	
 ใส่ขาสั้นไม่ได้	sai kaa-san mai dai	saiˇ kāˊ sanˋ maiˋ dhaiˋ	不能穿短褲	engine-auto	
 ไปวัดใส่ขาสั้นไม่ได้	bpai wat sai kaa-san mai dai	bai wat~ saiˇ kāˊ sanˋ maiˋ dhaiˋ	去寺廟不能穿短褲	engine-auto	
-ใหม่	mai	maiˇ	新	book-exact	
+ใหม่	mai	maiˇ	新	book-exact	(book-exact已用引擎重新驗證)
 บ้านใหม่	baan mai	bhānˋ maiˇ	新房子	engine-auto	
 พ่อซื้อบ้านใหม่	phor sue baan mai	pɔ̄ˋ sɯ̄~ bhānˋ maiˇ	爸爸買新房子	engine-auto	
 กระเป๋าใหม่	gra-bpao mai	graˇ bāuˊ maiˇ	新包包	engine-auto	
@@ -2172,7 +2172,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 รับโทรศัพท์	rap tho-ra-sap	rap~ tōn sapˇ	接電話	engine-auto	
 ไปรับลูก	bpai rap look	bai rap~ lūkˋ	去接小孩	engine-auto	
 รับเงินเดือน	rap ngern deuan	rap~ ngə̄n dhɯ̄an	領薪水	engine-auto	
-เรื่อง	reuang	rɯangˋ-	事情、部(量詞)	book-exact	
+เรื่อง	reuang	rɯ̄angˋ	事情、部(量詞)	book-exact	(book-exact已用引擎重新驗證)
 มีเรื่องอะไร	mee reuang a-rai	mī rɯ̄angˋ aˇ rai	有什麼事？	engine-auto	
 ชอบดูเรื่องไหน	chop du reuang nai	chɔ̄pˋ dhū rɯ̄angˋ naiˊ	喜歡看哪一部？	engine-auto	
 ดารา	da-ra	dhā rā	明星	engine-auto	
@@ -2202,7 +2202,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 ร้าน นี้ อร่อย กว่า	raan nee aroi gwa	rān~ nī~ aˇ rɔ̄iˋ gwāˇ	這間店比較好吃	engine-auto	
 สี นี้ สวย กว่า	see nee suay gwa	sīˊ nī~ sūayˊ gwāˇ	這個顏色比較漂亮	engine-auto	
 ร้าน นี้ ถูก กว่า	raan nee took gwa	rān~ nī~ tūkˇ gwāˇ	這間店比較便宜	engine-auto	
-ลาย	laai	lāi -	花紋	book-exact	
+ลาย	laai	lāi	花紋	book-exact	(book-exact已用引擎重新驗證)
 ลาย นี้ สวย ที่สุด	laai nee suay tee sut	lāi nī~ sūayˊ tīˋ sutˇ	這個花紋最漂亮	engine-auto	
 ที่สุด	tee sut	tīˋ sutˇ	最	engine-auto	
 ลาย นี้ สวย ที่สุด	laai nee suay tee sut	lāi nī~ sūayˊ tīˋ sutˇ	這個花紋最漂亮	engine-auto	
@@ -2265,7 +2265,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 สีรุ้ง	see rung	sīˊ rung~	彩虹色	engine-auto	
 รุ้ง	rung	rung~	彩虹	engine-auto	
 เอาชาเย็นไม่มีสี	ao cha yen mai mee see	au chā yen maiˋ mī sīˊ	我要沒有顏色的泰式奶茶	engine-auto	
-ไม่มี	mai mee	maiˋmī -	沒有	book-exact	
+ไม่มี	mai mee	maiˋ mī	沒有	book-exact	(book-exact已用引擎重新驗證)
 ล้อเล่น	lor len	lɔ̄~ lēnˋ	開玩笑 (名詞/動詞，程度較重)	engine-auto	
 พูดเล่น	phut len	pūtˋ lēnˋ	開玩笑 (指說說而已)	engine-auto	
 เติมเต็ม	toem tem	də̄m dem	加滿	engine-auto	
@@ -2298,9 +2298,9 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 เหรียญทอง	rian thong	rīanˊ tɔ̄ng	金牌	engine-auto	
 เหรียญเงิน	rian ngern	rīanˊ ngə̄n	銀牌	engine-auto	
 เหรียญทองแดง	rian thong daeng	rīanˊ tɔ̄ng dhɛ̄ng	銅牌	engine-auto	
-เรียน	rian	rian     “	念、讀 (沒有聲調)	book-exact	
+เรียน	rian	rīan	念、讀 (沒有聲調)	book-exact	(book-exact已用引擎重新驗證)
 เหรียญ	rian	rīanˊ	硬幣 (有第二聲)	engine-auto	
-หนัง	nang	nangˊ	皮	book-exact	
+หนัง	nang	nangˊ	皮	book-exact	(book-exact已用引擎重新驗證)
 หนังหมู	nang moo	nangˊ mūˊ	豬皮	engine-auto	
 ชอบกินหนังหมูไหมคะ	chop gin nang moo mai kha	chɔ̄pˋ gin nangˊ mūˊ maiˊ ka~	喜歡吃豬皮嗎？(女/ค่ะ)	engine-auto	
 กระเป๋าหนัง	gra-bpao nang	graˇ bāuˊ nangˊ	皮包	engine-auto	
@@ -2343,8 +2343,8 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 ยี่ห้อนี้ใช้ดีไหม	yee hor nee chai dee mai	yīˋ hɔ̄ˋ nī~ chai~ dhī maiˊ	這個品牌好用嗎？	engine-auto	
 ยี่ห้อนี้ใช้ดีไหมคะ	yee hor nee chai dee mai kha	yīˋ hɔ̄ˋ nī~ chai~ dhī maiˊ ka~	這個品牌好用嗎？(女/ค่ะ)	engine-auto	
 ยี่ห้อนี้ใช้ได้	yee hor nee chai dai	yīˋ hɔ̄ˋ nī~ chai~ dhaiˋ	這個品牌還可以用	engine-auto	
-เปิด	bpeut	bətˇ	開	book-exact	
-ร้าน	raan	rān~ -	店	book-exact	
+เปิด	bpeut	bə̄tˇ	開	book-exact	(book-exact已用引擎重新驗證)
+ร้าน	raan	rān~	店	book-exact	(book-exact已用引擎重新驗證)
 เปิดร้าน	bpeut raan	bə̄tˇ rān~	開店	engine-auto	
 เปิดห้อง	bpeut hong	bə̄tˇ hɔ̄ngˋ	開房	engine-auto	
 ห้องน้ำ	hong nam	hɔ̄ngˋ nām~	廁所	engine-auto	
@@ -2360,13 +2360,13 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 ดูทีวีไปกินขนมไป	duu tee-wee bpai gin kha-nom bpai	dhū tī wī bai gin kaˇ nom bai	一邊看電視一邊吃零食	engine-auto	
 เรียนภาษาไทยไปกินขนมไป	rian phasa thai bpai gin kha-nom bpai	rīan pā sāˊ tai bai gin kaˇ nom bai	一邊上泰文課一邊吃零食	engine-auto	
 เรียนไปนอนไป	rian bpai non bpai	rīan bai nɔ̄n bai	一邊上課一邊睡覺	engine-auto	
-เรื่อง	reuang	rɯangˋ-	事情、(戲劇的)部	book-exact	
+เรื่อง	reuang	rɯ̄angˋ	事情、(戲劇的)部	book-exact	(book-exact已用引擎重新驗證)
 ฉันอยากรู้	chan yaak ru	chanˊ yākˋ rū~	我想知道	engine-auto	
 เรื่องไหน	reuang nai	rɯ̄angˋ naiˊ	哪一部？	engine-auto	
 เรื่องไหนก็สนุก	reuang nai gor sa-nuk	rɯ̄angˋ naiˊ gɔ̄ˋ saˇ nuk~	每一部都很有趣	engine-auto	
 เรื่องนี้	reuang nee	rɯ̄angˋ nī~	這部	engine-auto	
 เก่า	gao	gāuˇ	舊	engine-auto	
-ใหม่	mai	maiˇ	新	book-exact	
+ใหม่	mai	maiˇ	新	book-exact	(book-exact已用引擎重新驗證)
 รถเก่า	rot gao	rot~ gāuˇ	舊車	engine-auto	
 เก่าไม่ไป ใหม่ไม่มา	gao mai bpai mai mai maa	gāuˇ maiˋ bai maiˇ maiˋ mā	舊的不去，新的不來	engine-auto	
 รุ่น	run	runˋ	款式 / 型號	engine-auto	
@@ -2396,7 +2396,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 เอาข้าวขาหมูจานใหญ่	ao khao kha moo jan yai	au kāuˋ kāˊ mūˊ jān yaiˇ	要大盤豬腳飯	engine-auto	
 จานเล็ก	jan lek	jān lek~	小盤	engine-auto	
 เอาจานใหญ่หรือจานเล็ก	ao jan yai rue jan lek	au jān yaiˇ rɯ̄ˊ jān lek~	要大盤還是小盤？	engine-auto	
-ลูก	look	lūkˋ-	顆 (量詞) / 孩子	book-exact	
+ลูก	look	lūkˋ	顆 (量詞) / 孩子	book-exact	(book-exact已用引擎重新驗證)
 มีลูกแล้ว	mee look laew	mī lūkˋ lɛ̄u~	有小孩了	engine-auto	
 ลูกใหญ่	look yai	lūkˋ yaiˇ	大顆	engine-auto	
 เอาแอปเปิ้ลลูกใหญ่	ao apple look yai	au ɛ̄pˇ bə̄nˋ lūkˋ yaiˇ	要大顆的蘋果	engine-auto	
@@ -2410,13 +2410,13 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ดู	duu	dhū	看	engine-auto	
 อ่านหนังสือ	an nang-seu	ānˇ nangˊ sɯ̄ˊ	看書 (讀書)	engine-auto	
 ดูทีวี	duu tee-wee	dhū tī wī	看電視	engine-auto	
-หนัง	nang	nangˊ	電影	book-exact	
+หนัง	nang	nangˊ	電影	book-exact	(book-exact已用引擎重新驗證)
 ดูหนัง	duu nang	dhū nangˊ	看電影	engine-auto	
 ดูหนังไทย	duu nang thai	dhū nangˊ tai	看泰國電影	engine-auto	
 ชอบดูหนังไทยไหม	chop duu nang thai mai	chɔ̄pˋ dhū nangˊ tai maiˊ	喜歡看泰國電影嗎？	engine-auto	
 หนังผี	nang phee	nangˊ pīˊ	鬼片	engine-auto	
 ดูหมอ	duu mor	dhū mɔ̄ˊ	算命	engine-auto	
-หมอ	mor	mɔ̅ˊ	醫生	book-exact	
+หมอ	mor	mɔ̄ˊ	醫生	book-exact	(book-exact已用引擎重新驗證)
 หมอดู	mor duu	mɔ̄ˊ dhū	算命師	engine-auto	
 ดูถูก	duu thook	dhū tūkˇ	看輕 / 看不起	engine-auto	
 ถูก	thook	tūkˇ	便宜 / 對	engine-auto	
@@ -2549,7 +2549,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ไปทางขวา	pai thaang khwa	bai tāng kwāˊ	往右邊去	engine-auto	
 ทางขวา	thaang khwa	tāng kwāˊ	往右邊 / 右邊的路	engine-auto	
 ทางเข้า	thaang khao	tāng kāuˋ	入口	engine-auto	
-เข้า	khao	hāmˋ          - kauˋ                 -	進	book-exact	
+เข้า	khao	kāuˋ	進	book-exact	(book-exact已用引擎重新驗證)
 เข้าใจ	khao jai	kāuˋ jai	了解 / 明白	engine-auto	
 ทางออก	thaang ok	tāng ɔ̄kˇ	出口	engine-auto	
 เจอกันทางเข้า	joe gan thaang khao	jə̄ gan tāng kāuˋ	在入口見	engine-auto	
@@ -2605,7 +2605,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 บ้านฉันอยู่ภาคใต้	baan chan yuu phak tai	bhānˋ chanˊ yūˋ pākˋ daiˋ	我家在南部	engine-auto	
 ตะวันออก	tawan ok	daˇ wan ɔ̄kˇ	東	engine-auto	
 ตะวัน	tawan	daˇ wan	太陽	engine-auto	
-พระอาทิตย์	phra athit	pra~ā.tit~	太陽 (另一種說法)	book-exact	
+พระอาทิตย์	phra athit	pra~ ā tit~	太陽 (另一種說法)	book-exact	(book-exact已用引擎重新驗證)
 ออก	ok	ɔ̄kˇ	出	engine-auto	
 ภาคกลาง	phak klang	pākˋ glāng	中部	engine-auto	
 ประเทศตะวันออกกลาง	prathet tawan ok klang	braˇ tētˋ daˇ wan ɔ̄kˇ glāng	中東國家	engine-auto	
@@ -2653,7 +2653,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ถอยถอยถอย	thoi thoi thoi	tɔ̄iˊ tɔ̄iˊ tɔ̄iˊ	退 退 退	engine-auto	
 ภาษาจีนถอยหลัง	phasa jeen thoi lang	pā sāˊ jīn tɔ̄iˊ langˊ	中文 退步	engine-auto	
 ก้าวหน้า	kao naa	gāuˋ nāˋ	進步	engine-auto	
-ไม่	mai	maiˋ- lɛ̅ u~	沒	book-exact	
+ไม่	mai	maiˋ	沒	book-exact	(book-exact已用引擎重新驗證)
 ไม่ก้าวหน้า	mai kao naa	maiˋ gāuˋ nāˋ	沒進步	engine-auto	
 ภาษาไทยก้าวหน้า	phasa thai kao naa	pā sāˊ tai gāuˋ nāˋ	泰文有進步	engine-auto	
 ภาษาไทยของคุณก้าวหน้า	phasa thai khong khun kao naa	pā sāˊ tai kɔ̄ngˊ kun gāuˋ nāˋ	你的泰文有進步	engine-auto	
@@ -2778,7 +2778,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 เรียนต่อ	rian to	rīan dɔ̄ˇ	繼續上課	engine-auto	
 ตรงไป	trong pai	drong bai	直走	engine-auto	
 เดินตรงไป	dern trong pai	dhə̄n drong bai	走路 (直走)	engine-auto	
-ขับรถ	khab rot	kapˇrot~ -	開車	book-exact	
+ขับรถ	khab rot	kapˇ rot~	開車	book-exact	(book-exact已用引擎重新驗證)
 ขับรถตรงไป	khab rot trong pai	kapˇ rot~ drong bai	開車直走	engine-auto	
 ตรง	trong	drong	直	engine-auto	
 พูดตรงๆ	phut trong trong	pūtˋ drong drong	直接說	engine-auto	
@@ -2798,14 +2798,14 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 กินข้าวตรงเวลา	kin khao trong welaa	gin kāuˋ drong wē lā	準時吃飯	engine-auto	
 ต้องตรงเวลา	tong trong welaa	dɔ̄ngˋ drong wē lā	必須準時	engine-auto	
 ต้องมาตรงเวลา	tong maa trong welaa	dɔ̄ngˋ mā drong wē lā	要準時來	engine-auto	
-ไม่ตรงเวลา	mai trong welaa	maiˋdrong we̅ .la	不準時	book-exact	
+ไม่ตรงเวลา	mai trong welaa	maiˋ drong wē lā	不準時	book-exact	(book-exact已用引擎重新驗證)
 ใจตรงกัน	jai trong kan	jai drong gan	心意相通 (想的一樣)	engine-auto	
 เป็นคนตรงไปตรงมา	pen khon trong pai trong maa	ben kon drong bai drong mā	是個直來直往的人	engine-auto	
 ข้าม	kham	kāmˋ	過	engine-auto	
 แม่น้ำ	mae nam	mɛ̄ˋ nām~	河	engine-auto	
 ข้ามแม่น้ำ	kham mae nam	kāmˋ mɛ̄ˋ nām~	過河	engine-auto	
 นั่งเรือข้ามแม่น้ำ	nang ruea kham mae nam	nangˋ rɯ̄a kāmˋ mɛ̄ˋ nām~	坐船過河	engine-auto	
-สะพาน	saphan	sa.phān	橋	book-exact	
+สะพาน	saphan	saˇ pān	橋	book-exact	(book-exact已用引擎重新驗證)
 ข้ามสะพาน	kham saphan	kāmˋ saˇ pān	過橋	engine-auto	
 เดินข้ามสะพาน	dern kham saphan	dhə̄n kāmˋ saˇ pān	走過橋	engine-auto	
 ต้องเดินข้ามสะพาน	tong dern kham saphan	dɔ̄ngˋ dhə̄n kāmˋ saˇ pān	必須走過橋	engine-auto	
@@ -2875,7 +2875,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 เรียนต่อ	rian to	rīan dɔ̄ˇ	繼續上課	engine-auto	
 ตรงไป	trong pai	drong bai	直走	engine-auto	
 เดินตรงไป	dern trong pai	dhə̄n drong bai	走路 (直走)	engine-auto	
-ขับรถ	khap rot	kapˇrot~ -	開車	book-exact	
+ขับรถ	khap rot	kapˇ rot~	開車	book-exact	(book-exact已用引擎重新驗證)
 ขับรถตรงไป	khap rot trong pai	kapˇ rot~ drong bai	開車直走	engine-auto	
 ตรง	trong	drong	直	engine-auto	
 พูดตรงๆ	phut trong trong	pūtˋ drong drong	直接說	engine-auto	
@@ -2895,14 +2895,14 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 กินข้าวตรงเวลา	kin khao trong wela	gin kāuˋ drong wē lā	準時吃飯	engine-auto	
 ต้องตรงเวลา	tong trong wela	dɔ̄ngˋ drong wē lā	必須準時	engine-auto	
 ต้องมาตรงเวลา	tong maa trong wela	dɔ̄ngˋ mā drong wē lā	要準時來	engine-auto	
-ไม่ตรงเวลา	mai trong wela	maiˋdrong we̅ .la	不準時	book-exact	
+ไม่ตรงเวลา	mai trong wela	maiˋ drong wē lā	不準時	book-exact	(book-exact已用引擎重新驗證)
 ใจตรงกัน	jai trong kan	jai drong gan	心意相通 (想的一樣)	engine-auto	
 เป็นคนตรงไปตรงมา	pen khon trong pai trong maa	ben kon drong bai drong mā	是個直來直往的人	engine-auto	
 ข้าม	kham	kāmˋ	過	engine-auto	
 แม่น้ำ	mae nam	mɛ̄ˋ nām~	河	engine-auto	
 ข้ามแม่น้ำ	kham mae nam	kāmˋ mɛ̄ˋ nām~	過河	engine-auto	
 นั่งเรือข้ามแม่น้ำ	nang ruea kham mae nam	nangˋ rɯ̄a kāmˋ mɛ̄ˋ nām~	坐船過河	engine-auto	
-สะพาน	saphan	sa.phān	橋	book-exact	
+สะพาน	saphan	saˇ pān	橋	book-exact	(book-exact已用引擎重新驗證)
 ข้ามสะพาน	kham saphan	kāmˋ saˇ pān	過橋	engine-auto	
 เดินข้ามสะพาน	dern kham saphan	dhə̄n kāmˋ saˇ pān	走過橋	engine-auto	
 ต้องเดินข้ามสะพาน	tong dern kham saphan	dɔ̄ngˋ dhə̄n kāmˋ saˇ pān	必須走過橋	engine-auto	
@@ -2958,7 +2958,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ไม่กล้าไป	mai glaa pai	maiˋ glāˋ bai	不敢去	engine-auto	
 แถวหลัง	thaeo lang	tɛ̄uˊ langˊ	後排	engine-auto	
 ซื้อตั๋วแถวหลัง	seu tua thaeo lang	sɯ̄~ dūaˊ tɛ̄uˊ langˊ	買後排的票	engine-auto	
-ห้าง	haang	hangˋ	百貨公司	book-exact	
+ห้าง	haang	hāngˋ	百貨公司	book-exact	(book-exact已用引擎重新驗證)
 หลังห้าง	lang haang	langˊ hāngˋ	百貨公司後面	engine-auto	
 ห้างโซโก้	haang sogo	hāngˋ sō gōˋ	Sogo百貨	engine-auto	
 หลังห้างมีตลาด	lang haang mi talat	langˊ hāngˋ mī daˇ lātˋ	百貨公司後面有市場	engine-auto	
@@ -2971,9 +2971,9 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 โรงแรมชื่ออะไร	rong raem chue arai	rōng rɛ̄m chɯ̄ˋ aˇ rai	飯店叫什麼名字？	engine-auto	
 อยู่โรงแรมไหน	yuu rong raem nai	yūˋ rōng rɛ̄m naiˊ	住在哪間飯店？	engine-auto	
 อยู่โรงแรมอะไร	yuu rong raem arai	yūˋ rōng rɛ̄m aˇ rai	住什麼飯店？	engine-auto	
-โรง	rong	rōng	(字首) ...地方	book-exact	
+โรง	rong	rōng	(字首) ...地方	book-exact	(book-exact已用引擎重新驗證)
 โรงเรียน	rong rian	rōng rīan	學校	engine-auto	
-เรียน	rian	rian     “	學習/上課	book-exact	
+เรียน	rian	rīan	學習/上課	book-exact	(book-exact已用引擎重新驗證)
 โรงอาหาร	rong ahaan	rōng ā hānˊ	(公司/工廠) 餐廳	engine-auto	
 โรงหนัง	rong nang	rōng nangˊ	電影院	engine-auto	
 แถว	thaeo	tɛ̄uˊ	排	engine-auto	
@@ -2994,7 +2994,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ขึ้นลิฟต์	khuen lift	kɯnˋ lip~	搭電梯	engine-auto	
 ขึ้นไปข้างบน	khuen pai khaang bon	kɯnˋ bai kāngˋ bhon	上去上面	engine-auto	
 ต้องขึ้นไปข้างบน	tong khuen pai khaang bon	dɔ̄ngˋ kɯnˋ bai kāngˋ bhon	要上去上面	engine-auto	
-ลง	long	long	下 (動詞)	book-exact	
+ลง	long	long	下 (動詞)	book-exact	(book-exact已用引擎重新驗證)
 บันไดเลื่อน	bandai leuan	bhan dhai lɯ̄anˋ	手扶梯	engine-auto	
 บันได	bandai	bhan dhai	樓梯	engine-auto	
 เลื่อน	leuan	lɯ̄anˋ	移動	engine-auto	
@@ -3018,7 +3018,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ผมถามคุณตรงๆ ได้ไหมครับ	phom tham khun trong trong dai mai krap	pomˊ tāmˊ kun drong drong dhaiˋ maiˊ krap~	我可以直接問你嗎？ (男)	engine-auto	
 ผมก็พูดตรงๆ นะ	phom ko phut trong trong na	pomˊ gɔ̄ˋ pūtˋ drong drong na~	我也直接說啊 (男)	engine-auto	
 ตรงเวลา	trong wela	drong wē lā	準時	engine-auto	
-กินข้าวไม่ตรงเวลา	kin khao mai trong wela	gin kāuˋmaiˋdrong we̅ .lā	不準時吃飯	book-exact	
+กินข้าวไม่ตรงเวลา	kin khao mai trong wela	gin kāuˋ maiˋ drong wē lā	不準時吃飯	book-exact	(book-exact已用引擎重新驗證)
 ออก	ok	ɔ̄kˇ	出、出去、出發	engine-auto	
 อ่านไม่ออก	an mai ok	ānˇ maiˋ ɔ̄kˇ	讀不出來	engine-auto	
 รถออกไม่ตรงเวลา	rot ok mai trong wela	rot~ ɔ̄kˇ maiˋ drong wē lā	車子不準時出發	engine-auto	
@@ -3030,7 +3030,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 นั่งเรือข้ามแม่น้ำ	nang ruea kham mae nam	nangˋ rɯ̄a kāmˋ mɛ̄ˋ nām~	坐船過河	engine-auto	
 ว่ายน้ำข้ามแม่น้ำ	wai nam kham mae nam	wāiˋ nām~ kāmˋ mɛ̄ˋ nām~	游泳過河	engine-auto	
 ข้ามสะพาน	kham saphan	kāmˋ saˇ pān	過橋	engine-auto	
-สะพาน	saphan	sa.phān	橋	book-exact	
+สะพาน	saphan	saˇ pān	橋	book-exact	(book-exact已用引擎重新驗證)
 ขอถามหน่อยครับ	kho tham noi krap	kɔ̄ˊ tāmˊ nɔ̄iˇ krap~	請問一下 (男)	engine-auto	
 ขอถามหน่อยค่ะ	kho tham noi kha	kɔ̄ˊ tāmˊ nɔ̄iˇ kaˋ	請問一下 (女)	engine-auto	
 ร้านอาหารอยู่ที่ไหน	raan ahaan yuu thi nai	rān~ ā hānˊ yūˋ tīˋ naiˊ	餐廳在哪裡？	engine-auto	
@@ -3062,7 +3062,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 เมืองจีน	mueang jeen	mɯ̄ang jīn	中國	engine-auto	
 นอก	nok	nɔ̄kˋ	外面	engine-auto	
 ขึ้นเครื่องบินไปเมืองนอก	khuen khrueng bin pai mueang nok	kɯnˋ krɯ̄angˋ bhin bai mɯ̄ang nɔ̄kˋ	搭飛機去國外	engine-auto	
-ลง	long	long	下、往下	book-exact	
+ลง	long	long	下、往下	book-exact	(book-exact已用引擎重新驗證)
 เครื่องบินลง	khrueng bin long	krɯ̄angˋ bhin long	飛機降落	engine-auto	
 เดี๋ยวเจอกันนะ	diao joe gan na	dhīauˊ jə̄ gan na~	等會見喔	engine-auto	
 บันได	bandai	bhan dhai	樓梯 / 電扶梯	engine-auto	
@@ -3130,7 +3130,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 คุณ จอง ที่ นั่ง แถว หน้า หรือ แถว หลัง	khun jong thi nang thaeo naa rue thaeo lang	kun jɔ̄ng tīˋ nangˋ tɛ̄uˊ nāˋ rɯ̄ˊ tɛ̄uˊ langˊ	你訂的位子是前排還是後排？	engine-auto	
 คุณ จอง ที่ นั่ง	khun jong thi nang	kun jɔ̄ng tīˋ nangˋ	你訂位子	engine-auto	
 เข้า แถว	khao thaeo	kāuˋ tɛ̄uˊ	排隊	engine-auto	
-เข้า	khao	hāmˋ          - kauˋ                 -	進入	book-exact	
+เข้า	khao	kāuˋ	進入	book-exact	(book-exact已用引擎重新驗證)
 เข้า ใจ	khao jai	kāuˋ jai	懂、明白	engine-auto	
 ต้อง เข้า แถว	tong khao thaeo	dɔ̄ngˋ kāuˋ tɛ̄uˊ	得排隊	engine-auto	
 อยาก ซื้อ กระเป๋า ต้อง เข้า แถว	yaak seu krapao tong khao thaeo	yākˋ sɯ̄~ graˇ bāuˊ dɔ̄ngˋ kāuˋ tɛ̄uˊ	想買包包，得排隊	engine-auto	
@@ -3222,7 +3222,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 วัน หลัง ได้ ไหม	wan lang dai mai	wan langˊ dhaiˋ maiˊ	改天可以嗎？	engine-auto	
 วัน หลัง มา ใหม่ นะ คะ	wan lang maa mai na kha	wan langˊ mā maiˇ na~ ka~	改天再來喔	engine-auto	
 วัน หลัง มา ใหม่	wan lang maa mai	wan langˊ mā maiˇ	改天再來	engine-auto	
-ใหม่	mai	maiˇ	新的 / 再	book-exact	
+ใหม่	mai	maiˇ	新的 / 再	book-exact	(book-exact已用引擎重新驗證)
 เก่า ไม่ ไป ใหม่ ไม่ มา	kao mai pai mai mai maa	gāuˇ maiˋ bai maiˇ maiˋ mā	舊的不去，新的不來	engine-auto	
 บ้าน ใหม่	baan mai	bhānˋ maiˇ	新房子	engine-auto	
 แฟน ใหม่	faen mai	fɛ̄n maiˇ	新情人	engine-auto	
@@ -3278,7 +3278,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 วันเสาร์ ไปซุปเปอร์มาร์เก็ต ซื้อผัก	wan sao bpai super market seu phak	wan sāuˊ bai sup~ bə̄ mā getˇ sɯ̄~ pakˇ	星期六去超市買菜	engine-auto	
 วันอาทิตย์ หยุด 1 วัน	wan aa thit yoot neung wan	wan ā tit~ yutˇ 1 wan	星期日休息一天	engine-auto	
 วันอาทิตย์ ร้านปิด	wan aa thit ran pit	wan ā tit~ rān~ bitˇ	星期日店關	engine-auto	
-ปิด	pit	bitˇ	關	book-exact	
+ปิด	pit	bitˇ	關	book-exact	(book-exact已用引擎重新驗證)
 เสาร์ อาทิตย์ นี้ ไม่ว่าง	sao aa thit nee mai wang	sāuˊ ā tit~ nī~ maiˋ wāngˋ	這週六日 (這週末) 沒空	engine-auto	
 เสาร์ อาทิตย์ นี้ ไปเที่ยวกับคุณไม่ได้	sao aa thit nee bpai thiao gap khun mai dai	sāuˊ ā tit~ nī~ bai tīauˋ gapˇ kun maiˋ dhaiˋ	這週末不能跟你去玩	engine-auto	
 ไปเที่ยวกับคุณไม่ได้	bpai thiao gap khun mai dai	bai tīauˋ gapˇ kun maiˋ dhaiˋ	不能跟你去玩	engine-auto	
@@ -3394,7 +3394,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ปลายเดือน	plai duean	blāi dhɯ̄an	月底	engine-auto	
 สิ้นเดือน	sin duean	sinˋ dhɯ̄an	月底	engine-auto	
 ปลาย	plai	blāi	尾巴/末端	engine-auto	
-สิ้น	sin	sinˋ-	結束	book-exact	
+สิ้น	sin	sinˋ	結束	book-exact	(book-exact已用引擎重新驗證)
 สิ้นใจ	sin jai	sinˋ jai	過世	engine-auto	
 เขาสิ้นใจแล้ว	khao sin jai laew	kāuˊ sinˋ jai lɛ̄u~	他過世了	engine-auto	
 กลางปี	klang pee	glāng bī	年中	engine-auto	
@@ -3626,7 +3626,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 หายใจออก	haai jai ok	hāiˊ jai ɔ̄kˇ	吐氣	engine-auto	
 ทั้งวัน	thang wan	tang~ wan	整天	engine-auto	
 ทั้ง	thang	tang~	整	engine-auto	
-วัน	wan	wan -	天	book-exact	
+วัน	wan	wan	天	book-exact	(book-exact已用引擎重新驗證)
 ทำงานทั้งวัน	tham ngan thang wan	tam ngān tang~ wan	整天工作	engine-auto	
 ทั้งคืน	thang khuen	tang~ kɯ̄n	整夜	engine-auto	
 เล่นเกมทั้งคืน	len game thang khuen	lēnˋ gēm tang~ kɯ̄n	玩遊戲整夜	engine-auto	
@@ -3804,7 +3804,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 กระป๋องละเท่าไหร่	krapong la thao rai	graˇ bɔ̄ngˊ la~ tāuˋ raiˇ	一罐多少錢	engine-auto	
 ทับทิม	thap thim	tap~ tim	紅寶石 (泰式甜點)	engine-auto	
 ทับทิมกรอบ	thap thim krop	tap~ tim grɔ̄pˇ	紅寶石甜點	engine-auto	
-กรอบ	krop	grɔ̅ pˇ	脆	book-exact	
+กรอบ	krop	grɔ̄pˇ	脆	book-exact	(book-exact已用引擎重新驗證)
 ลองกอง	longkong	lɔ̄ng gɔ̄ng	蘭薩果/龍宮果	engine-auto	
 เคยกินลองกองไหม	khoei kin longkong mai	kə̄i gin lɔ̄ng gɔ̄ng maiˊ	吃過龍宮果嗎	engine-auto	
 เคยเห็น	khoei hen	kə̄i henˊ	看過	engine-auto	
@@ -4038,7 +4038,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 เก็บกระเป๋าใต้ที่นั่ง	gep gra bpao dtai tee nang	gepˇ graˇ bāuˊ daiˋ tīˋ nangˋ	把包包收在座位下面	engine-auto	
 ชั้นใต้ดิน	chan dtai din	chan~ daiˋ dhin	地下樓	engine-auto	
 รถอยู่ชั้นใต้ดิน	rot yoo chan dtai din	rot~ yūˋ chan~ daiˋ dhin	車子在地下樓	engine-auto	
-ลง	long	long	下（動詞）	book-exact	
+ลง	long	long	下（動詞）	book-exact	(book-exact已用引擎重新驗證)
 ลงบันไดเลื่อน	long ban dai leuan	long bhan dhai lɯ̄anˋ	下手扶梯	engine-auto	
 เครื่องลง	kreuang long	krɯ̄angˋ long	降落（飛機下）	engine-auto	
 เครื่องบินลงกี่โมง	kreuang bin long gee moong	krɯ̄angˋ bhin long gīˇ mōng	飛機幾點降落	engine-auto	
@@ -4109,7 +4109,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 เก็บกระเป๋าใต้ที่นั่ง	gep gra bpao dtai tee nang	gepˇ graˇ bāuˊ daiˋ tīˋ nangˋ	把包包收在座位下面	engine-auto	
 ชั้นใต้ดิน	chan dtai din	chan~ daiˋ dhin	地下樓	engine-auto	
 รถอยู่ชั้นใต้ดิน	rot yoo chan dtai din	rot~ yūˋ chan~ daiˋ dhin	車子在地下樓	engine-auto	
-ลง	long	long	下（動詞）	book-exact	
+ลง	long	long	下（動詞）	book-exact	(book-exact已用引擎重新驗證)
 ลงบันไดเลื่อน	long ban dai leuan	long bhan dhai lɯ̄anˋ	下手扶梯	engine-auto	
 เครื่องลง	kreuang long	krɯ̄angˋ long	降落（飛機下）	engine-auto	
 เครื่องบินลงกี่โมง	kreuang bin long gee moong	krɯ̄angˋ bhin long gīˇ mōng	飛機幾點降落	engine-auto	
@@ -4162,7 +4162,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ถามตรงๆ	taam dtrong dtrong	tāmˊ drong drong	直接問	engine-auto	
 ตรงเวลา	dtrong way laa	drong wē lā	準時	engine-auto	
 รถออกตรงเวลา	rot awk dtrong way laa	rot~ ɔ̄kˇ drong wē lā	車子準時出發	engine-auto	
-ไม่ตรงเวลา	mai dtrong way laa	maiˋdrong we̅ .la	不準時	book-exact	
+ไม่ตรงเวลา	mai dtrong way laa	maiˋ drong wē lā	不準時	book-exact	(book-exact已用引擎重新驗證)
 ข้าม	kaam	kāmˋ	過 / 跨越	engine-auto	
 นั่งเรือข้ามแม่น้ำ	nang reua kaam mae naam	nangˋ rɯ̄a kāmˋ mɛ̄ˋ nām~	搭船過河	engine-auto	
 ขับรถข้ามสะพาน	kap rot kaam sa paan	kapˇ rot~ kāmˋ saˇ pān	開車過橋	engine-auto	
@@ -4459,7 +4459,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ติดแม่	tit mae	ditˇ mɛ̄ˋ	黏媽媽	engine-auto	
 ติดใจ	tit jai	ditˇ jai	著迷/滿意	engine-auto	
 ออกเสียงยาก	ok siang yak	ɔ̄kˇ sīangˊ yākˋ	發音難	engine-auto	
-เสียง	siang	ɔ̅kˇ     - siangˊ              -	聲音	book-exact	
+เสียง	siang	sīangˊ	聲音	book-exact	(book-exact已用引擎重新驗證)
 เสียงดัง	siang dang	sīangˊ dhang	大聲	engine-auto	
 เสียงเบา	siang bao	sīangˊ bhāu	小聲	engine-auto	
 ฟังพูดไม่ค่อยยาก แต่อ่านเขียนยากมาก	fang phut mai khoy yak tae an khian yak mak	fang pūtˋ maiˋ kɔ̄iˋ yākˋ dɛ̄ˇ ānˇ kīanˊ yākˋ mākˋ	聽說不難但讀寫非常難	engine-auto	
@@ -5068,7 +5068,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 วันนี้ต้องไปกินเลี้ยง	Wanni tong pai kin liang	wan nī~ dɔ̄ngˋ bai gin līang~	今天要去吃聚餐	engine-auto	
 ขอบคุณค่ะ	Khop khun kha	kɔ̄pˇ kun kaˋ	謝謝	engine-auto	
 ครั้งที่สอง	khrang thi song	krang~ tīˋ sɔ̄ngˊ	第二次	engine-auto	
-อย่า	ya	yaˇ + V.    + ḍī        gua ?	別、不要	book-exact	
+อย่า	ya	yāˋ	別、不要	book-exact	(book-exact已用引擎重新驗證)
 เรื่องนี้อย่าพูดดีกว่า	rueang ni ya phut di kwa	rɯ̄angˋ nī~ yāˋ pūtˋ dhī gwāˇ	這件事別說比較好	engine-auto	
 อย่าไปคนเดียวดีกว่า	ya pai khon diao di kwa	yāˋ bai kon dhīau dhī gwāˇ	別一個人去比較好	engine-auto	
 อย่างไร	yang rai	yāngˋ rai	如何	engine-auto	
@@ -5108,7 +5108,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 คุณทำอาหารเสร็จหรือยัง	khun tham a han set rue yang	kun tam ā hānˊ sretˇ rɯ̄ˊ yang	你煮飯完了沒	engine-auto	
 คุณทำงานเสร็จหรือยัง	khun tham ngan set rue yang	kun tam ngān sretˇ rɯ̄ˊ yang	你工作完了沒	engine-auto	
 ยังไม่เสร็จ	yang mai set	yang maiˋ sretˇ	還沒完	engine-auto	
-ยังไม่	yang mai	yang maiˋ	還沒	book-exact	
+ยังไม่	yang mai	yang maiˋ	還沒	book-exact	(book-exact已用引擎重新驗證)
 สิบโมงแล้ว ทำไมยังไม่ไปทำงาน	sip mong laeo tham mai yang mai pai tham ngan	sipˇ mōng lɛ̄u~ tam mai yang maiˋ bai tam ngān	十點了為什麼還不去上班	engine-auto	
 เที่ยงคืนแล้ว ทำไมยังไม่นอน	thiang khuen laeo tham mai yang mai non	tīangˋ kɯ̄n lɛ̄u~ tam mai yang maiˋ nɔ̄n	半夜了為什麼還不睡覺	engine-auto	
 กำลัง อยู่	kam lang yu	gam lang yūˋ	正在	engine-auto	
@@ -5129,7 +5129,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ไปทำธุระ	Pai Tham Thura	bai tam tu~ ra~	去辦事	engine-auto	
 จะไปทำธุระ	Cha Pai Tham Thura	jaˇ bai tam tu~ ra~	將要去辦事	engine-auto	
 กำลังจะไปทำธุระ	Kam Lang Cha Pai Tham Thura	gam lang jaˇ bai tam tu~ ra~	正要去辦事	engine-auto	
-ธุรกิจ	Thura Kit	tu~ra~gitˇ	商業 / 生意	book-exact	
+ธุรกิจ	Thura Kit	tun gitˇ	商業 / 生意	book-exact	(book-exact已用引擎重新驗證)
 คุณทำธุรกิจอะไร	Khun Tham Thura Kit A Rai	kun tam tun gitˇ aˇ rai	你做什麼生意？	engine-auto	
 นักธุรกิจ	Nak Thura Kit	nak~ tun gitˇ	商人 / 生意人	engine-auto	
 นักเรียน	Nak Rian	nak~ rīan	學生	engine-auto	
@@ -5179,14 +5179,14 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ห้องไม่สะอาด	Hong Mai Sa-at	hɔ̄ngˋ maiˋ saˇ ātˇ	房間不乾淨	engine-auto	
 แก้วไม่สะอาด	Kaeo Mai Sa-at	gɛ̄uˋ maiˋ saˇ ātˇ	杯子不乾淨	engine-auto	
 จานไม่สะอาด	Chan Mai Sa-at	jān maiˋ saˇ ātˇ	盤子不乾淨	engine-auto	
-อีกที	Ik Thi	īkˇtī	再一次	book-exact	
+อีกที	Ik Thi	īkˇ tī	再一次	book-exact	(book-exact已用引擎重新驗證)
 พูดอีกที	Phut Ik Thi	pūtˋ īkˇ tī	再說一次	engine-auto	
 ช่วยพูดอีกที	Chuai Phut Ik Thi	chūayˋ pūtˋ īkˇ tī	請再說一次	engine-auto	
 ช่วยพูดอีกทีได้ไหมคะ	Chuai Phut Ik Thi Dai Mai Kha	chūayˋ pūtˋ īkˇ tī dhaiˋ maiˊ ka~	請再說一次好嗎？（女）	engine-auto	
 ช่วยพูดอีกทีได้ไหมครับ ผมฟังไม่เข้าใจ	Chuai Phut Ik Thi Dai Mai Khrap Phom Fang Mai Khao Chai	chūayˋ pūtˋ īkˇ tī dhaiˋ maiˊ krap~ pomˊ fang maiˋ kāuˋ jai	請再說一次好嗎？我不懂（男）	engine-auto	
 ผมฟังไม่เข้าใจ ช่วยพูดอีกทีได้ไหมครับ	Phom Fang Mai Khao Chai Chuai Phut Ik Thi Dai Mai Khrap	pomˊ fang maiˋ kāuˋ jai chūayˋ pūtˋ īkˇ tī dhaiˋ maiˊ krap~	我不懂，請再說一次好嗎？（男）	engine-auto	
 ฉันฟังไม่เข้าใจ ช่วยพูดอีกทีได้ไหม	Chan Fang Mai Khao Chai Chuai Phut Ik Thi Dai Mai	chanˊ fang maiˋ kāuˋ jai chūayˋ pūtˋ īkˇ tī dhaiˋ maiˊ	我不懂，可以再說一次嗎？（女）	engine-auto	
-ผิด	Phit	pitˇ-	錯	book-exact	
+ผิด	Phit	pitˇ	錯	book-exact	(book-exact已用引擎重新驗證)
 ทำผิด	Tham Phit	tam pitˇ	做錯	engine-auto	
 ฉันทำผิดแล้ว	Chan Tham Phit Laeo	chanˊ tam pitˇ lɛ̄u~	我做錯了	engine-auto	
 ดูผิด	Du Phit	dhū pitˇ	看錯	engine-auto	
@@ -5206,15 +5206,15 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ไปกินข้าวกัน ฉันเลี้ยง	Pai Kin Khao Kan Chan Liang	bai gin kāuˋ gan chanˊ līang~	一起去吃飯吧，我請客	engine-auto	
 ฉันเลี้ยงข้าวคุณ	Chan Liang Khao Khun	chanˊ līang~ kāuˋ kun	我請你吃飯	engine-auto	
 พูดแต่ภาษาไทย	phut tae phasa thai	pūtˋ dɛ̄ˇ pā sāˊ tai	只說泰文	engine-auto	
-ฟังแต่เพลงไทย	fang tae phleng thai	fang    dɛ̅ ˇ ple̅ ng thai	只聽泰國歌	book-exact	
+ฟังแต่เพลงไทย	fang tae phleng thai	fang dɛ̄ˇ plēng tai	只聽泰國歌	book-exact	(book-exact已用引擎重新驗證)
 ไปเที่ยวแต่เมืองไทย	pai thiao tae mueang thai	bai tīauˋ dɛ̄ˇ mɯ̄ang tai	只去泰國玩	engine-auto	
 ไปแต่เมืองไทย	pai tae mueang thai	bai dɛ̄ˇ mɯ̄ang tai	只去泰國	engine-auto	
 กินแต่อาหารไทย	kin tae ahan thai	gin dɛ̄ˇ ā hānˊ tai	只吃泰國菜	engine-auto	
 อัลบั้ม	albam	an bhamˋ	專輯	engine-auto	
-อัลบั้มชุดไหน	albam chut nai	albumˋchut~ naiˊ?	哪一張專輯	book-exact	
+อัลบั้มชุดไหน	albam chut nai	an bhamˋ chut~ naiˊ	哪一張專輯	book-exact	(book-exact已用引擎重新驗證)
 โกหก	kohok	gō hokˇ	說謊	engine-auto	
 ไม่ชอบคนโกหก	mai chop khon kohok	maiˋ chɔ̄pˋ kon gō hokˇ	不喜歡說謊的人	engine-auto	
-อย่าโกหกฉัน	ya kohok chan	yaˇgō.hokˇ chan~	別對我說謊	book-exact	
+อย่าโกหกฉัน	ya kohok chan	yāˋ gō hokˇ chanˊ	別對我說謊	book-exact	(book-exact已用引擎重新驗證)
 ร้องเพลง	rong phleng	rɔ̄ng~ plēng	唱歌	engine-auto	
 ร้องคาราโอเกะ	rong kharaoke	rɔ̄ng~ kā rā ō geˇ	唱卡拉OK	engine-auto	
 ไปร้องคาราโอเกะกัน	pai rong kharaoke kan	bai rɔ̄ng~ kā rā ō geˇ gan	一起去唱卡拉OK吧	engine-auto	
@@ -5222,13 +5222,13 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ร้องไม่เป็น	rong mai pen	rɔ̄ng~ maiˋ ben	不會唱	engine-auto	
 ร้องไห้	rong hai	rɔ̄ng~ haiˋ	哭	engine-auto	
 บอก	bok	bhɔ̄kˇ	告訴/說	engine-auto	
-พูด	phut	putˋ	說	book-exact	
+พูด	phut	pūtˋ	說	book-exact	(book-exact已用引擎重新驗證)
 ใครบอก	khrai bok	krai bhɔ̄kˇ	誰告訴你的	engine-auto	
 ไม่บอก	mai bok	maiˋ bhɔ̄kˇ	不告訴你	engine-auto	
 อย่าบอกใคร	ya bok khrai	yāˋ bhɔ̄kˇ krai	別告訴別人	engine-auto	
 พูดตรงๆ	phut trong trong	pūtˋ drong drong	直說	engine-auto	
 บอกตรงๆ	bok trong trong	bhɔ̄kˇ drong drong	直說	engine-auto	
-ความจริง	khwam ching	kwām jing	真相	book-exact	
+ความจริง	khwam ching	kwām jing	真相	book-exact	(book-exact已用引擎重新驗證)
 บอกแล้วไม่ฟัง	bok laeo mai fang	bhɔ̄kˇ lɛ̄u~ maiˋ fang	說了不聽	engine-auto	
 เชื่อ	chuea	chɯ̄aˋ	相信	engine-auto	
 บอกแล้วไม่เชื่อ	bok laeo mai chuea	bhɔ̄kˇ lɛ̄u~ maiˋ chɯ̄aˋ	說了不相信	engine-auto	
@@ -5239,7 +5239,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ฟังเพลงไทย	fang phleng thai	fang plēng tai	聽泰國歌	engine-auto	
 ชอบฟังเพลงไทยไหมคะ	chop fang phleng thai mai kha	chɔ̄pˋ fang plēng tai maiˊ ka~	喜歡聽泰國歌嗎？	engine-auto	
 ชอบฟังเพลงไทยค่ะ	chop fang phleng thai kha	chɔ̄pˋ fang plēng tai kaˋ	喜歡聽泰國歌	engine-auto	
-เพลงจีน	phleng chin	plēng jīn	中文歌	book-exact	
+เพลงจีน	phleng chin	plēng jīn	中文歌	book-exact	(book-exact已用引擎重新驗證)
 ฟังเพลงจีน	fang phleng chin	fang plēng jīn	聽中文歌	engine-auto	
 ฟังไม่ทัน	fang mai than	fang maiˋ tan	聽不趕/聽不及（來不及聽）	engine-auto	
 ไปไม่ทัน	pai mai than	bai maiˋ tan	去不及（來不及去）	engine-auto	
@@ -5248,7 +5248,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 พูดไม่ชัด	phut mai chat	pūtˋ maiˋ chat~	說不清楚	engine-auto	
 ใส่พริก	sai phrik	saiˇ prik~	加辣椒	engine-auto	
 ใส่พริกเยอะๆ	sai phrik yo yo	saiˇ prik~ yə~ yə~	加很多辣椒	engine-auto	
-พริกไทย	phrik thai	prik~ thai	胡椒	book-exact	
+พริกไทย	phrik thai	prik~ tai	胡椒	book-exact	(book-exact已用引擎重新驗證)
 พริกไทยดำ	phrik thai dam	prik~ tai dham	黑胡椒	engine-auto	
 เอาออก	ao ok	au ɔ̄kˇ	拿掉 / 取出	engine-auto	
 น้ำพริกเผา	nam phrik phao	nām~ prik~ pāuˊ	辣椒膏	engine-auto	
@@ -5268,8 +5268,8 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 หอมแดง	hom daeng	hɔ̄mˊ dhɛ̄ng	紅蔥頭	engine-auto	
 ถั่วงอก	thua ngok	tūaˇ ngɔ̄kˋ	豆芽菜	engine-auto	
 กินถั่วงอกไหมคะ	kin thua ngok mai kha	gin tūaˇ ngɔ̄kˋ maiˊ ka~	吃豆芽菜嗎？	engine-auto	
-เปิด	poet	bətˇ	開	book-exact	
-ปิด	pit	bitˇ	關	book-exact	
+เปิด	poet	bə̄tˇ	開	book-exact	(book-exact已用引擎重新驗證)
+ปิด	pit	bitˇ	關	book-exact	(book-exact已用引擎重新驗證)
 เปิดไฟ	poet fai	bə̄tˇ fai	開燈	engine-auto	
 ปิดไฟ	pit fai	bitˇ fai	關燈	engine-auto	
 เปิดร้าน	poet ran	bə̄tˇ rān~	開店	engine-auto	
@@ -5311,7 +5311,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 เอาแต่นอน	Ao tae non	au dɛ̄ˇ nɔ̄n	只顧著睡覺	engine-auto	
 กินแต่ขนม	Kin tae khanom	gin dɛ̄ˇ kaˇ nom	只吃點心（零食）	engine-auto	
 ไปแต่เมืองไทย	Pai tae mueang thai	bai dɛ̄ˇ mɯ̄ang tai	只去泰國	engine-auto	
-ร้อง	Rong	rɔ̅ ng~	唱	book-exact	
+ร้อง	Rong	rɔ̄ng~	唱	book-exact	(book-exact已用引擎重新驗證)
 ร้องเพลง	Rong pheng	rɔ̄ng~ plēng	唱歌	engine-auto	
 ร้องเพลงเป็นไหม	Rong pheng pen mai	rɔ̄ng~ plēng ben maiˊ	你會唱歌嗎？	engine-auto	
 ร้องคาราโอเกะ	Rong kharaoke	rɔ̄ng~ kā rā ō geˇ	唱卡拉OK	engine-auto	
@@ -5321,7 +5321,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ทำไมร้องไห้	Thammai rong hai	tam mai rɔ̄ng~ haiˋ	你為什麼哭？	engine-auto	
 เพลง	Pheng	plēng	歌曲	engine-auto	
 เพลงไทย	Pheng thai	plēng tai	泰文歌	engine-auto	
-เพลงจีน	Pheng chin	plēng jīn	中文歌	book-exact	
+เพลงจีน	Pheng chin	plēng jīn	中文歌	book-exact	(book-exact已用引擎重新驗證)
 เพลงญี่ปุ่น	Pheng yipun	plēng yīˋ bunˇ	日文歌	engine-auto	
 อัลบั้ม	Album	an bhamˋ	專輯	engine-auto	
 เพลงนี้อยู่อัลบั้มชุดไหน	Pheng ni yu album chut nai	plēng nī~ yūˋ an bhamˋ chut~ naiˊ	這首歌在哪一張專輯？	engine-auto	
@@ -5342,13 +5342,13 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 ออกเสียงไม่ชัด	awk siang mai chat	ɔ̄kˇ sīangˊ maiˋ chat~	發音不清楚	engine-auto	
 ออกเสียงชัด	awk siang chat	ɔ̄kˇ sīangˊ chat~	發音清楚	engine-auto	
 TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engine-auto	
-เปิด	perd	bətˇ	開	book-exact	
+เปิด	perd	bə̄tˇ	開	book-exact	(book-exact已用引擎重新驗證)
 พรุ่งนี้ร้านจะเปิดไหม	prung ni ran ja perd mai	prungˋ nī~ rān~ jaˇ bə̄tˇ maiˊ	明天店會開嗎	engine-auto	
 พรุ่งนี้ร้านเปิดค่ะ	prung ni ran perd ka	prungˋ nī~ rān~ bə̄tˇ kaˋ	明天店會開	engine-auto	
 ขอโทษค่ะ ห้างเปิดกี่โมงคะ	kor tot ka hang perd gi mong ka	kɔ̄ˊ tōtˋ kaˋ hāngˋ bə̄tˇ gīˇ mōng ka~	對不起，百貨公司幾點開	engine-auto	
 เปิด 10 โมงครึ่งค่ะ	perd sip mong krueng ka	bə̄tˇ 10 mōng krɯngˋ kaˋ	10點半開	engine-auto	
 เปิด 11 โมงค่ะ	perd sip et mong ka	bə̄tˇ 11 mōng kaˋ	11點開	engine-auto	
-ปิด	pit	bitˇ	關	book-exact	
+ปิด	pit	bitˇ	關	book-exact	(book-exact已用引擎重新驗證)
 จะปิดเทอมเมื่อไหร่	ja pit term muea rai	jaˇ bitˇ tə̄m mɯ̄aˋ raiˇ	什麼時候要放假（學期結束）	engine-auto	
 ร้านปิดกี่โมงคะ	ran pit gi mong ka	rān~ bitˇ gīˇ mōng ka~	店幾點關	engine-auto	
 ร้านปิด 1 ทุ่มค่ะ	ran pit nueng tum ka	rān~ bitˇ 1 tumˋ kaˋ	店晚上7點關	engine-auto	
@@ -5376,7 +5376,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ใส่พริกเยอะๆ	sai phrik yoyo	saiˇ prik~ yə~ yə~	辣椒加很多	engine-auto	
 ใส่พริกเยอะหน่อย	sai phrik yonoi	saiˇ prik~ yə~ nɔ̄iˇ	辣椒加多一點	engine-auto	
 น้ำพริกเผา	namphrikphao	nām~ prik~ pāuˊ	辣椒膏	engine-auto	
-พริกไทย	phrikthai	prik~ thai	胡椒	book-exact	
+พริกไทย	phrikthai	prik~ tai	胡椒	book-exact	(book-exact已用引擎重新驗證)
 หอมแดง	homdaeng	hɔ̄mˊ dhɛ̄ng	紅蔥頭	engine-auto	
 ต้องใส่หอมแดง	tong sai homdaeng	dɔ̄ngˋ saiˇ hɔ̄mˊ dhɛ̄ng	必須加紅蔥頭	engine-auto	
 หัวหอม	huahom	hūaˊ hɔ̄mˊ	洋蔥	engine-auto	
@@ -5407,16 +5407,16 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 เขาเพิ่งไป	kao pheng pai	kāuˊ pə̄ngˋ bai	他剛走	engine-auto	
 ฉันเพิ่งกินอิ่ม	chan pheng kin im	chanˊ pə̄ngˋ gin imˇ	我剛吃飽	engine-auto	
 ผึ้ง	phueng	pɯngˋ	蜜蜂	engine-auto	
-ตื่น	tuen	dɯ̅nˇ	醒來、起床	book-exact	
+ตื่น	tuen	dɯ̄nˇ	醒來、起床	book-exact	(book-exact已用引擎重新驗證)
 ตื่นสาย	tuen sai	dɯ̄nˇ sāiˊ	晚起（睡過頭）	engine-auto	
 มาสาย	ma sai	mā sāiˊ	遲到	engine-auto	
-ตื่นสายก็เลยมาสาย	tuen sai ko loei ma sai	dɯ̅nˇsaiˊgɔ̅ˋlǝ̅i ma saiˊ	晚起所以遲到	book-exact	
+ตื่นสายก็เลยมาสาย	tuen sai ko loei ma sai	dɯ̄nˇ sāiˊ gɔ̄ˋ lə̄i mā sāiˊ	晚起所以遲到	book-exact	(book-exact已用引擎重新驗證)
 ทำไมมาสาย	tam mai ma sai	tam mai mā sāiˊ	為什麼遲到	engine-auto	
 รีบ	rip	rīpˋ	趕快	engine-auto	
 ถ่ายรูป	thai rup	tāiˇ rūpˋ	拍照	engine-auto	
 รีบถ่ายรูป	rip thai rup	rīpˋ tāiˇ rūpˋ	趕快拍照	engine-auto	
 ไปทำธุระ	pai tam thu ra	bai tam tu~ ra~	去辦事	engine-auto	
-รีบไปรีบมา	rip pai rip ma	rīpˋbai rīpˋma	快去快回	book-exact	
+รีบไปรีบมา	rip pai rip ma	rīpˋ bai rīpˋ mā	快去快回	book-exact	(book-exact已用引擎重新驗證)
 รีบไปไหน	rip pai nai	rīpˋ bai naiˊ	趕著去哪	engine-auto	
 ไม่ต้องรีบ	mai tong rip	maiˋ dɔ̄ngˋ rīpˋ	不用趕	engine-auto	
 ใจเย็นๆ	chai yen yen	jai yen yen	冷靜、慢慢來	engine-auto	
@@ -5425,22 +5425,22 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ของขวัญ	khong khwan	kɔ̄ngˊ kwanˊ	禮物	engine-auto	
 ของขวัญวันเกิด	khong khwan wan koet	kɔ̄ngˊ kwanˊ wan gə̄tˇ	生日禮物	engine-auto	
 ของขวัญแต่งงาน	khong khwan taeng ngan	kɔ̄ngˊ kwanˊ dɛ̄ngˇ ngān	結婚禮物	engine-auto	
-ให้ของขวัญเพื่อน	hai khong khwan phuean	haiˋkɔ̅ ngˊkwanˊ pɯanˋ	給朋友禮物	book-exact	
+ให้ของขวัญเพื่อน	hai khong khwan phuean	haiˋ kɔ̄ngˊ kwanˊ pɯ̄anˋ	給朋友禮物	book-exact	(book-exact已用引擎重新驗證)
 ให้ของขวัญแฟน	hai khong khwan faen	haiˋ kɔ̄ngˊ kwanˊ fɛ̄n	給情人（伴侶）禮物	engine-auto	
 ให้มือถือลูก	hai mue thue luk	haiˋ mɯ̄ tɯ̄ˊ lūkˋ	給孩子手機	engine-auto	
-นั่ง	nang	nangˋ	坐	book-exact	
+นั่ง	nang	nangˋ	坐	book-exact	(book-exact已用引擎重新驗證)
 นั่งตุ๊กตุ๊ก	nang tuk tuk	nangˋ duk~ duk~	坐嘟嘟車	engine-auto	
 รถตุ๊กตุ๊ก	rot tuk tuk	rot~ duk~ duk~	嘟嘟車	engine-auto	
 เคยนั่งตุ๊กตุ๊กไหมคะ	koei nang tuk tuk mai ka	kə̄i nangˋ duk~ duk~ maiˊ ka~	你坐過嘟嘟車嗎？	engine-auto	
 นั่งสองแถว	nang song thaeo	nangˋ sɔ̄ngˊ tɛ̄uˊ	坐雙條車	engine-auto	
 เคยนั่งสองแถวไหม	koei nang song thaeo mai	kə̄i nangˋ sɔ̄ngˊ tɛ̄uˊ maiˊ	你坐過雙條車嗎？	engine-auto	
 ฉันเคยนั่งสองแถว	chan koei nang song thaeo	chanˊ kə̄i nangˋ sɔ̄ngˊ tɛ̄uˊ	我坐過雙條車	engine-auto	
-รถตู้	rot tu	rot~ dūˋ	廂型車	book-exact	
+รถตู้	rot tu	rot~ dūˋ	廂型車	book-exact	(book-exact已用引擎重新驗證)
 นั่งรถตู้	nang rot tu	nangˋ rot~ dūˋ	坐廂型車	engine-auto	
 เคยนั่งรถตู้ไหม	koei nang rot tu mai	kə̄i nangˋ rot~ dūˋ maiˊ	你坐過廂型車嗎？	engine-auto	
 นั่งลง	nang long	nangˋ long	坐下	engine-auto	
 ทำไมไม่นั่งลง	tam mai mai nang long	tam mai maiˋ nangˋ long	為什麼不坐下？	engine-auto	
-นั่งกับพื้น	nang gap pheun	gapˇpɯ̅n~	坐在地板上	book-exact	
+นั่งกับพื้น	nang gap pheun	nangˋ gapˇ pɯ̄n~	坐在地板上	book-exact	(book-exact已用引擎重新驗證)
 พื้น	pheun	pɯ̄n~	地板	engine-auto	
 ชอบนั่งกับพื้นไหมคะ	chob nang gap pheun mai ka	chɔ̄pˋ nangˋ gapˇ pɯ̄n~ maiˊ ka~	喜歡坐在地板上嗎？	engine-auto	
 ไม่ชอบนั่งกับพื้น	mai chob nang gap pheun	maiˋ chɔ̄pˋ nangˋ gapˇ pɯ̄n~	不喜歡坐在地板上	engine-auto	
@@ -5453,7 +5453,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ชอบเดินตลาดไหมคะ	chob doen talat mai ka	chɔ̄pˋ dhə̄n daˇ lātˋ maiˊ ka~	喜歡逛市場嗎？	engine-auto	
 เดินห้าง	doen hang	dhə̄n hāngˋ	逛百貨公司	engine-auto	
 ชอบเดินห้างไหน	chob doen hang nai	chɔ̄pˋ dhə̄n hāngˋ naiˊ	喜歡逛哪家百貨公司？	engine-auto	
-นอน	non	nɔ̅n	睡覺	book-exact	
+นอน	non	nɔ̄n	睡覺	book-exact	(book-exact已用引擎重新驗證)
 นอนดึก	non duek	nɔ̄n dhɯkˇ	晚睡、熬夜	engine-auto	
 เที่ยงคืน	thiang khuen	tīangˋ kɯ̄n	午夜	engine-auto	
 ไม่นอนดึก	mai non duek	maiˋ nɔ̄n dhɯkˇ	不晚睡	engine-auto	
@@ -5480,7 +5480,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ตื่นเต้น	tuen ten	dɯ̄nˇ dēnˋ	興奮、緊張	engine-auto	
 เต้น	ten	dēnˋ	跳舞	engine-auto	
 จะตื่นเต้นไหมคะ	ja tuen ten mai ka	jaˇ dɯ̄nˇ dēnˋ maiˊ ka~	會緊張嗎？	engine-auto	
-พัก	pak	pak~	休息	book-exact	
+พัก	pak	pak~	休息	book-exact	(book-exact已用引擎重新驗證)
 พัก 5 นาที	pak 5 na tee	pak~ 5 nā tī	休息5分鐘	engine-auto	
 พักเที่ยง	pak tiang	pak~ tīangˋ	午休	engine-auto	
 พักเที่ยงกี่ชั่วโมงคะ	pak tiang gee chua mong ka	pak~ tīangˋ gīˇ chūaˋ mōng ka~	午休幾小時？	engine-auto	
@@ -5515,7 +5515,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ชอบทั้งถ่ายรูปและถ่ายวิดีโอ	chob thang thae rup lae thae video	chɔ̄pˋ tang~ tāiˇ rūpˋ lɛ~ tāiˇ wi~ dhī ō	喜歡拍照也喜歡錄影	engine-auto	
 ถ่ายหนัง	thae nang	tāiˇ nangˊ	拍電影	engine-auto	
 ถ่ายเอกสาร	thae ekkasan	tāiˇ ēkˇ sānˊ	影印	engine-auto	
-เอกสาร	ekkasan	ekˇga.sānˊ-	文件	book-exact	
+เอกสาร	ekkasan	ēkˇ sānˊ	文件	book-exact	(book-exact已用引擎重新驗證)
 ใช้เอกสารอะไรบ้าง	chai ekkasan arai bang	chai~ ēkˇ sānˊ aˇ rai bhāngˋ	需要用到哪些文件？	engine-auto	
 ก๊อปปี้	copy	gɔ̄p~ bīˋ	影印、拷貝	engine-auto	
 ร้านถ่ายเอกสาร	ran thae ekkasan	rān~ tāiˇ ēkˇ sānˊ	影印店	engine-auto	
@@ -5562,7 +5562,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 เขามาสายบ่อยๆ	khao ma sai boi boi	kāuˊ mā sāiˊ bhɔ̄iˇ bhɔ̄iˇ	他常常遲到	engine-auto	
 เธอมาสายอีกแล้ว	thoe ma sai ik laeo	tə̄ mā sāiˊ īkˇ lɛ̄u~	你又遲到了	engine-auto	
 ของขวัญ	khong khwan	kɔ̄ngˊ kwanˊ	禮物	engine-auto	
-ให้ของขวัญเพื่อน	hai khong khwan phuean	haiˋkɔ̅ ngˊkwanˊ pɯanˋ	送朋友禮物	book-exact	
+ให้ของขวัญเพื่อน	hai khong khwan phuean	haiˋ kɔ̄ngˊ kwanˊ pɯ̄anˋ	送朋友禮物	book-exact	(book-exact已用引擎重新驗證)
 ของขวัญวันเกิด	khong khwan wan koet	kɔ̄ngˊ kwanˊ wan gə̄tˇ	生日禮物	engine-auto	
 ของขวัญแต่งงาน	khong khwan taeng ngaan	kɔ̄ngˊ kwanˊ dɛ̄ngˇ ngān	結婚禮物	engine-auto	
 ให้ของขวัญแม่	hai khong khwan mae	haiˋ kɔ̄ngˊ kwanˊ mɛ̄ˋ	給媽媽禮物	engine-auto	
@@ -5570,7 +5570,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ถ้าเช่ารถตู้วันละเท่าไหร่	tha chao rot tu wan la thao rai	tāˋ chāuˋ rot~ dūˋ wan la~ tāuˋ raiˇ	如果租廂型車一天多少錢	engine-auto	
 ที่จอดรถตู้อยู่ตรงไหนคะ	thi chot rot tu yu trong nai kha	tīˋ jɔ̄tˇ rot~ dūˋ yūˋ drong naiˊ ka~	廂型車停車場在哪裡？	engine-auto	
 ขี้เกียจนั่งรถเมล์	khi kiat nang rot me	kīˋ gīatˇ nangˋ rot~ mē	懶得坐公車	engine-auto	
-นั่งกับพื้น	nang kap phuen	gapˇpɯ̅n~	坐在地板上	book-exact	
+นั่งกับพื้น	nang kap phuen	nangˋ gapˇ pɯ̄n~	坐在地板上	book-exact	(book-exact已用引擎重新驗證)
 นั่งกินข้าวกับพื้น	nang kin khao kap phuen	nangˋ gin kāuˋ gapˇ pɯ̄n~	坐在地板上吃飯	engine-auto	
 นั่งทำงานกับพื้น	nang tam ngaan kap phuen	nangˋ tam ngān gapˇ pɯ̄n~	坐在地板上工作	engine-auto	
 พื้นไม่สะอาด	phuen mai sa-at	pɯ̄n~ maiˋ saˇ ātˇ	地板不乾淨	engine-auto	
@@ -5611,7 +5611,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 เมื่อคืนฉันฝันถึงคุณ	muea khuen chan fan thueng khun	mɯ̄aˋ kɯ̄n chanˊ fanˊ tɯngˊ kun	昨晚我夢到你	engine-auto	
 เมื่อคืนฉันฝันถึงภาษาไทย	muea khuen chan fan thueng pha sa thai	mɯ̄aˋ kɯ̄n chanˊ fanˊ tɯngˊ pā sāˊ tai	昨晚我夢到泰文	engine-auto	
 อย่าฝันกลางวัน	ya fan klang wan	yāˋ fanˊ glāng wan	別做白日夢	engine-auto	
-ตื่น	tuen	dɯ̅nˇ	醒、起床	book-exact	
+ตื่น	tuen	dɯ̄nˇ	醒、起床	book-exact	(book-exact已用引擎重新驗證)
 ตื่นหกโมงเช้าทุกวัน	tuen hok mong chao thuk wan	dɯ̄nˇ hokˇ mōng chāu~ tuk~ wan	每天早上六點起床	engine-auto	
 ตื่นๆๆ	tuen tuen tuen	dɯ̄nˇ dɯ̄nˇ dɯ̄nˇ	起床起床起床！	engine-auto	
 รีบตื่น	rip tuen	rīpˋ dɯ̄nˇ	趕快起床	engine-auto	
@@ -5629,7 +5629,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ขอถ่ายรูปด้วยได้มั้ยคะ	kho tai rup duay dai mai kha	kɔ̄ˊ tāiˇ rūpˋ dhūayˋ dhaiˋ mai~ ka~	我可以跟你拍照嗎？	engine-auto	
 ถ่ายเอกสาร	tai ek ka san	tāiˇ ēkˇ sānˊ	影印	engine-auto	
 ช่วยถ่ายเอกสารให้หน่อยค่ะ	chuay tai ek ka san hai noi kha	chūayˋ tāiˇ ēkˇ sānˊ haiˋ nɔ̄iˇ kaˋ	請幫我影印	engine-auto	
-เอกสาร	ek ka san	ekˇga.sānˊ-	文件	book-exact	
+เอกสาร	ek ka san	ēkˇ sānˊ	文件	book-exact	(book-exact已用引擎重新驗證)
 ใช้เอกสารอะไรบ้าง	chai ek ka san arai bang	chai~ ēkˇ sānˊ aˇ rai bhāngˋ	用哪些文件？	engine-auto	
 จะจองกี่โมงคะ	ja jong ki mong kha	jaˇ jɔ̄ng gīˇ mōng ka~	要訂幾點？	engine-auto	
 จอด	chot	jɔ̄tˇ	停（車、船）	engine-auto	
@@ -5651,7 +5651,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ไม่ยอมทำ	mai yom tam	maiˋ yɔ̄m tam	不肯做	engine-auto	
 ไม่ยอมไป	mai yom pai	maiˋ yɔ̄m bai	不肯去	engine-auto	
 ทิ้ง	thing	ting~	丟/丟掉	engine-auto	
-เก่าแล้วยังไม่ยอมทิ้ง	kao laeo yang mai yom thing	gauˇlɛ̅ u~yang maiˋyɔ̅m ting~	舊了還不肯丟掉	book-exact	
+เก่าแล้วยังไม่ยอมทิ้ง	kao laeo yang mai yom thing	gāuˇ lɛ̄u~ yang maiˋ yɔ̄m ting~	舊了還不肯丟掉	book-exact	(book-exact已用引擎重新驗證)
 ไม่ยอมตื่น	mai yom tuen	maiˋ yɔ̄m dɯ̄nˇ	不肯起床	engine-auto	
 ไม่ยอมนอน	mai yom non	maiˋ yɔ̄m nɔ̄n	不肯睡覺	engine-auto	
 พอ...ก็...	phor...kor...	pɔ̄...gɔ̄ˋ...	一...就...	engine-auto	
@@ -5688,7 +5688,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ความจำไม่ดี	khwam jam mai di	kwām jam maiˋ dhī	記憶力不好	engine-auto	
 ความจำเสื่อม	khwam jam sueam	kwām jam sɯ̄amˇ	記憶衰退（失智）	engine-auto	
 เสื่อม	sueam	sɯ̄amˇ	衰退	engine-auto	
-ลืม	luem	lɯ̅m	忘記	book-exact	
+ลืม	luem	lɯ̄m	忘記	book-exact	(book-exact已用引擎重新驗證)
 ลืมกุญแจ	luem kun jae	lɯ̄m gun jɛ̄	忘記鑰匙	engine-auto	
 กุญแจรถ	kun jae rot	gun jɛ̄ rot~	車鑰匙	engine-auto	
 กุญแจห้อง	kun jae hong	gun jɛ̄ hɔ̄ngˋ	房間鑰匙	engine-auto	
@@ -5697,11 +5697,11 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ลืมเอามือถือมา	luem ao mue thue ma	lɯ̄m au mɯ̄ tɯ̄ˊ mā	忘記帶手機來	engine-auto	
 ลืมเอากุญแจมา	luem ao kun jae ma	lɯ̄m au gun jɛ̄ mā	忘記帶鑰匙來	engine-auto	
 ขี้ลืม	khi luem	kīˋ lɯ̄m	健忘	engine-auto	
-เห็น	hen	henˊ	看到	book-exact	
+เห็น	hen	henˊ	看到	book-exact	(book-exact已用引擎重新驗證)
 เห็นผีมั้ย	hen phi mai	henˊ pīˊ mai~	看到鬼嗎？	engine-auto	
 เห็นกับตา	hen kap ta	henˊ gapˇ dā	親眼看到	engine-auto	
 ฉันเห็นกับตา เขามีคนอื่น	chan hen kap ta khao mi khon uen	chanˊ henˊ gapˇ dā kāuˊ mī kon ɯ̄nˇ	我親眼看到他有別人	engine-auto	
-มองไม่เห็นอะไร	mong mai hen arai	mɔ̅ ng maiˋhenˊa.rai	看不見任何東西	book-exact	
+มองไม่เห็นอะไร	mong mai hen arai	mɔ̄ng maiˋ henˊ aˇ rai	看不見任何東西	book-exact	(book-exact已用引擎重新驗證)
 มอง	mong	mɔ̄ng	看/望	engine-auto	
 เห็นด้วย	hen duay	henˊ dhūayˋ	同意	engine-auto	
 เห็นด้วยมั้ย	hen duay mai	henˊ dhūayˋ mai~	同意嗎？	engine-auto	
@@ -5722,7 +5722,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 พาแฟนไปช้อปปิ้ง	pha faen pai shopping	pā fɛ̄n bai chɔ̄p~ bingˋ	帶情人去購物	engine-auto	
 พาหมาไปเดินเล่น	pha ma pai doen len	pā māˊ bai dhə̄n lēnˋ	遛狗（帶狗去散步）	engine-auto	
 พาแม่ไปหาหมอ	pha mae pai ha mor	pā mɛ̄ˋ bai hāˊ mɔ̄ˊ	帶媽媽去看醫生	engine-auto	
-เอา	ao	au ….. ma	拿、帶（口語，有/無生命皆可）	book-exact	
+เอา	ao	au	拿、帶（口語，有/無生命皆可）	book-exact	(book-exact已用引擎重新驗證)
 เอาหนังสือมา	ao nang su ma	au nangˊ sɯ̄ˊ mā	帶書來	engine-auto	
 เติม	toem	də̄m	填、加	engine-auto	
 เติมเงิน	toem ngoen	də̄m ngə̄n	儲值	engine-auto	
@@ -5753,7 +5753,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ไม่ยอมตื่นนอน	mai yorm tuen norn	maiˋ yɔ̄m dɯ̄nˇ nɔ̄n	不肯起床	engine-auto	
 ไม่ยอมทำความสะอาด	mai yorm tham khwam sa-at	maiˋ yɔ̄m tam kwām saˇ ātˇ	不肯打掃	engine-auto	
 ไม่ยอมเซ็นชื่อ	mai yorm sen chue	maiˋ yɔ̄m sen chɯ̄ˋ	不肯簽名	engine-auto	
-พอตื่นขึ้นมาก็เล่นมือถือ	por tuen khuen ma kor len mue thue	pɔ̅ dɯ̅nˇkɯnˋmā gɔ̅ lenˋmɯ̅ tɯ̅ˊ	一起床就玩手機	book-exact	
+พอตื่นขึ้นมาก็เล่นมือถือ	por tuen khuen ma kor len mue thue	pɔ̄ dɯ̄nˇ kɯnˋ mā gɔ̄ˋ lēnˋ mɯ̄ tɯ̄ˊ	一起床就玩手機	book-exact	(book-exact已用引擎重新驗證)
 พอนอนหลับก็ฝันเลย	por norn lup kor fun loey	pɔ̄ nɔ̄n lapˇ gɔ̄ˋ fanˊ lə̄i	一睡著就做夢	engine-auto	
 พอพูดถึงเขาเขาก็มา	por phood thueng khao khao kor ma	pɔ̄ pūtˋ tɯngˊ kāuˊ kāuˊ gɔ̄ˋ mā	一說到他，他就來	engine-auto	
 พอร้านเปิดคนก็เยอะเลย	por ran perd khon kor yoe loey	pɔ̄ rān~ bə̄tˇ kon gɔ̄ˋ yə~ lə̄i	一開店人就很多	engine-auto	
@@ -5761,11 +5761,11 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 วันนี้มีข่าวอะไร	wan nee mee khao arai	wan nī~ mī kāuˇ aˇ rai	今天有什麼新聞？	engine-auto	
 วันนี้มีข่าวใหญ่	wan nee mee khao yai	wan nī~ mī kāuˇ yaiˇ	今天有大新聞	engine-auto	
 ข่าวปลอม	khao plom	kāuˇ blɔ̄m	假新聞	engine-auto	
-ก่อน	korn	gɔ̅ nˇ V/N.	先	book-exact	
+ก่อน	korn	gɔ̄nˇ	先	book-exact	(book-exact已用引擎重新驗證)
 ต้องทำธุระเสร็จก่อน	tong tham thura set korn	dɔ̄ngˋ tam tu~ ra~ sretˇ gɔ̄nˇ	要先辦完事情	engine-auto	
 ต้องเซ็นสัญญาก่อน	tong sen sanya korn	dɔ̄ngˋ sen sanˊ yā gɔ̄nˇ	要先簽合約	engine-auto	
 ใส่หัวหอมก่อน	sai hua hom korn	saiˇ hūaˊ hɔ̄mˊ gɔ̄nˇ	先放洋蔥	engine-auto	
-เห็น	hen	henˊ	看見 / 看到	book-exact	
+เห็น	hen	henˊ	看見 / 看到	book-exact	(book-exact已用引擎重新驗證)
 ฉันเคยเห็นที่ตลาด	chan khuey hen thee talat	chanˊ kə̄i henˊ tīˋ daˇ lātˋ	我在市場見過。	engine-auto	
 เห็นกับตา	hen gap dta	henˊ gapˇ dā	親眼看見	engine-auto	
 เห็นด้วย	hen duay	henˊ dhūayˋ	同意	engine-auto	
@@ -5779,12 +5779,12 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 อย่าเห็นแก่ตัว	ya hen gae dtua	yāˋ henˊ gɛ̄ˇ dūa	別自私。	engine-auto	
 คุณเห็นแก่ตัวมาก	khun hen gae dtua mak	kun henˊ gɛ̄ˇ dūa mākˋ	你很自私喔。	engine-auto	
 มอง	mong	mɔ̄ng	看、望	engine-auto	
-มองไม่เห็นอะไร	mong mai hen arai	mɔ̅ ng maiˋhenˊa.rai	什麼都看不見。	book-exact	
+มองไม่เห็นอะไร	mong mai hen arai	mɔ̄ng maiˋ henˊ aˇ rai	什麼都看不見。	book-exact	(book-exact已用引擎重新驗證)
 มองข้างนอก	mong khang nok	mɔ̄ng kāngˋ nɔ̄kˋ	看外面。	engine-auto	
 มีคนมองเธออยู่	mee khon mong thoe yu	mī kon mɔ̄ng tə̄ yūˋ	有人在看你。	engine-auto	
 มีคนกำลังมองเธออยู่	mee khon gamlang mong thoe yu	mī kon gam lang mɔ̄ng tə̄ yūˋ	有人正在看你。	engine-auto	
 เขาขับรถไม่มองทาง	khao khap rot mai mong thang	kāuˊ kapˇ rot~ maiˋ mɔ̄ng tāng	他開車不看路。	engine-auto	
-ลืม	luem	lɯ̅m	忘記	book-exact	
+ลืม	luem	lɯ̄m	忘記	book-exact	(book-exact已用引擎重新驗證)
 ลืมเอามือถือมา	luem ao mue thue ma	lɯ̄m au mɯ̄ tɯ̄ˊ mā	忘了帶手機來	engine-auto	
 ลืมเอากระเป๋าเงินมา	luem ao grapao ngen ma	lɯ̄m au graˇ bāuˊ ngə̄n mā	忘了帶錢包來	engine-auto	
 ลืมเอากุญแจมา	luem ao gunjae ma	lɯ̄m au gun jɛ̄ mā	忘了帶鑰匙來	engine-auto	
@@ -5845,13 +5845,13 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ตั้งแต่เมื่อไหร่	tangtae muearai	dangˋ dɛ̄ˇ mɯ̄aˋ raiˇ	從什麼時候	engine-auto	
 มีมือถือตั้งแต่เมื่อไหร่	mee mue thue tangtae muearai	mī mɯ̄ tɯ̄ˊ dangˋ dɛ̄ˇ mɯ̄aˋ raiˇ	從什麼時候有手機？	engine-auto	
 มาเรียนภาษาไทยตั้งแต่เมื่อไหร่	ma rian phasa thai tangtae muearai	mā rīan pā sāˊ tai dangˋ dɛ̄ˇ mɯ̄aˋ raiˇ	從什麼時候來學泰文？	engine-auto	
-ตั้งแต่ผมยังเป็นเด็ก	tangtae phom yang pen dek	dangˋdɛ̅ˇpomˊyang ben ḍekˇ	從我還是小孩的時候（男）	book-exact	
+ตั้งแต่ผมยังเป็นเด็ก	tangtae phom yang pen dek	dangˋ dɛ̄ˇ pomˊ yang ben dhekˇ	從我還是小孩的時候（男）	book-exact	(book-exact已用引擎重新驗證)
 ตั้งแต่ฉันยังเป็นเด็ก	tangtae chan yang pen dek	dangˋ dɛ̄ˇ chanˊ yang ben dhekˇ	從我還是小孩的時候（女）	engine-auto	
 ตั้งแต่เดือนที่แล้ว	tangtae duean thee laeo	dangˋ dɛ̄ˇ dhɯ̄an tīˋ lɛ̄u~	從上個月開始	engine-auto	
 ตั้งแต่ปีที่แล้ว	tangtae pee thee laeo	dangˋ dɛ̄ˇ bī tīˋ lɛ̄u~	從去年開始	engine-auto	
 แต่งงานตั้งแต่เมื่อไหร่	taengngan tangtae muearai	dɛ̄ngˇ ngān dangˋ dɛ̄ˇ mɯ̄aˋ raiˇ	從什麼時候結婚的？	engine-auto	
 ตรงเวลา	trong wela	drong wē lā	準時	engine-auto	
-ไม่ตรงเวลา	mai trong wela	maiˋdrong we̅ .la	不準時	book-exact	
+ไม่ตรงเวลา	mai trong wela	maiˋ drong wē lā	不準時	book-exact	(book-exact已用引擎重新驗證)
 ตลอดไป	talot pai	daˇ lɔ̄tˋ bai	永遠 / 一直	derived	
 ไม่มีชีวิตแล้ว	mai mee cheewit laeo	maiˋ mī chī wit~ lɛ̄u~	沒有生命了	engine-auto	
 เสียชีวิตแล้ว	sia cheewit laeo	sīaˊ chī wit~ lɛ̄u~	去世了（正式）	engine-auto	
@@ -5881,7 +5881,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ตอนกินข้าว	ton gin khao	dɔ̄n gin kāuˋ	吃飯的時候	engine-auto	
 เวลาไปเที่ยว	wela pai thiao	wē lā bai tīauˋ	去玩的時候	engine-auto	
 เวลาทำงาน	wela tham ngan	wē lā tam ngān	工作的時候	engine-auto	
-ช่วง	chuang	chuangˋ- blianˇ	時期 / 期間	book-exact	
+ช่วง	chuang	chūangˋ	時期 / 期間	book-exact	(book-exact已用引擎重新驗證)
 ตรุษจีน	trut jeen	drutˇ jīn	春節	engine-auto	
 ก่อนนอน	gon non	gɔ̄nˇ nɔ̄n	睡前	engine-auto	
 ก่อนนอนทำอะไร	gon non tham arai	gɔ̄nˇ nɔ̄n tam aˇ rai	睡前做什麼？	engine-auto	
@@ -5897,7 +5897,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 เมื่อกี้	mueagee	mɯ̄aˋ gīˋ	剛才	engine-auto	
 เมื่อกี้ฉันพูดอะไร	mueagee chan phut arai	mɯ̄aˋ gīˋ chanˊ pūtˋ aˇ rai	剛才我說什麼	engine-auto	
 เมื่อกี้คุณพูดอะไร	mueagee khun phut arai	mɯ̄aˋ gīˋ kun pūtˋ aˇ rai	剛才你說什麼	engine-auto	
-เมื่อก่อน	mueagon	mɯaˋgɔ̅ nˇ- ḍiauˊnī~ -	以前 / 以往	book-exact	
+เมื่อก่อน	mueagon	mɯ̄aˋ gɔ̄nˇ	以前 / 以往	book-exact	(book-exact已用引擎重新驗證)
 เมื่อก่อนตัวเล็ก	mueagon dtua lek	mɯ̄aˋ gɔ̄nˇ dūa lek~	以前很小隻	engine-auto	
 เดี๋ยวนี้ตัวใหญ่	diaonee dtua yai	dhīauˊ nī~ dūa yaiˇ	現在很大隻	engine-auto	
 หลังกินข้าว	lang gin khao	langˊ gin kāuˋ	飯後	engine-auto	
@@ -5923,7 +5923,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ฉันเพิ่งเรียนภาษาไทย	chan phueng rian phasa thai	chanˊ pə̄ngˋ rīan pā sāˊ tai	我剛學泰語	engine-auto	
 เพิ่งแต่งงาน	phueng taengngan	pə̄ngˋ dɛ̄ngˇ ngān	剛結婚	engine-auto	
 รีบ	reep	rīpˋ	趕快、急著	engine-auto	
-รีบไปรีบมา	reep pai reep ma	rīpˋbai rīpˋma	快去快回	book-exact	
+รีบไปรีบมา	reep pai reep ma	rīpˋ bai rīpˋ mā	快去快回	book-exact	(book-exact已用引擎重新驗證)
 รีบกิน	reep gin	rīpˋ gin	趕快吃	engine-auto	
 รีบไปไหน	reep pai nai	rīpˋ bai naiˊ	你要趕去哪？	engine-auto	
 รีบหางาน	reep ha ngan	rīpˋ hāˊ ngān	趕快找工作	engine-auto	
@@ -5937,12 +5937,12 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ไปทัน	pai than	bai tan	去得及、來得及去	engine-auto	
 ฟังทันไหม	fang than mai	fang tan maiˊ	聽得跟得上嗎？	engine-auto	
 เรียนทันไหม	rian than mai	rīan tan maiˊ	學得跟得上嗎？	engine-auto	
-ไม่ทัน	mai than	maiˋtan	跟不上、來不及	book-exact	
+ไม่ทัน	mai than	maiˋ tan	跟不上、來不及	book-exact	(book-exact已用引擎重新驗證)
 ทันไหมคะ	than mai kha	tan maiˊ ka~	跟得上嗎？（女用）	engine-auto	
 หรือยัง	rue yang	rɯ̄ˊ yang	...了沒？（標準）	engine-auto	
 รึยัง	rue yang	rɯ~ yang	...了沒？（口語）	engine-auto	
 ลึยัง	lue yang	lɯ~ yang	...了沒？（更口語）	engine-auto	
-มาเดี๋ยวนี้	ma diao nee	ma ḍiauˊnī~	現在立刻過來	book-exact	
+มาเดี๋ยวนี้	ma diao nee	mā dhīauˊ nī~	現在立刻過來	book-exact	(book-exact已用引擎重新驗證)
 โรตีสายไหม	rotee sai mai	rō dī sāiˊ maiˊ	糖絲捲餅	engine-auto	
 อาทิตย์หน้าเจอกันนะคะ	athit na joe gan na kha	ā tit~ nāˋ jə̄ gan na~ ka~	下週見囉（女用）	engine-auto	
 วันนี้ขอบคุณนะคะ	wan nee khop khun na kha	wan nī~ kɔ̄pˇ kun na~ ka~	今天謝謝喔（女用）	engine-auto	
@@ -6030,7 +6030,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ฉันฟังไม่ทัน พูดอีกทีได้ไหมคะ	Chan fang mai than phut ik thi dai mai kha	chanˊ fang maiˋ tan pūtˋ īkˇ tī dhaiˋ maiˊ ka~	我來不及聽，可以再說一次嗎？	engine-auto	
 คุณรีบไปไหน	Khun rip pai nai	kun rīpˋ bai naiˊ	你急著去哪裡？	engine-auto	
 ถ้าไม่รีบไป เดี๋ยวไปไม่ทัน	Tha mai rip pai dieo pai mai than	tāˋ maiˋ rīpˋ bai dhīauˊ bai maiˋ tan	如果不趕快去，等下會來不及	engine-auto	
-สัตว์	Sat	satˇ	動物（罵人畜生）	book-exact	
+สัตว์	Sat	satˇ	動物（罵人畜生）	book-exact	(book-exact已用引擎重新驗證)
 เลี้ยง	Liang	līang~	養 / 照顧	engine-auto	
 เลี้ยงหมากี่ตัว	Liang ma gi tua	līang~ māˊ gīˇ dūa	養幾隻狗？	engine-auto	
 แม่ไก่	Mae gai	mɛ̄ˋ gaiˇ	母雞	engine-auto	
@@ -6119,7 +6119,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ตุ๊กแกน่ารักไหมคะ	Tuk kae na rak mai kha	duk~ gɛ̄ nāˋ rak~ maiˊ ka~	大壁虎可愛嗎？	engine-auto	
 เหี้ย	Hia	hīaˋ	澤巨蜥 (罵人的話)	engine-auto	
 ตัวเงินตัวทอง	Tua ngen tua thong	dūa ngə̄n dūa tɔ̄ng	澤巨蜥 (吉祥稱呼：金銀物)	engine-auto	
-สัตว์	sat	satˇ	動物（或罵人的話）	book-exact	
+สัตว์	sat	satˇ	動物（或罵人的話）	book-exact	(book-exact已用引擎重新驗證)
 สัตว์อะไรกินได้	sat arai kin dai	satˇ aˇ rai gin dhaiˋ	什麼動物可以吃？	engine-auto	
 หมูกินได้	moo kin dai	mūˊ gin dhaiˋ	豬可以吃	engine-auto	
 ไก่กินได้	kai kin dai	gaiˇ gin dhaiˋ	雞可以吃	engine-auto	
@@ -6204,7 +6204,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 อีกครั้ง	eek khrang	īkˇ krang~	再一次	engine-auto	
 พูดอีกครั้งได้ไหม	poot eek khrang dai mai	pūtˋ īkˇ krang~ dhaiˋ maiˊ	可以再說一遍嗎？	engine-auto	
 ขอ	kho	kɔ̄ˊ	請求	engine-auto	
-ร้อง	rong	rɔ̅ ng~	喊、大聲叫	book-exact	
+ร้อง	rong	rɔ̄ng~	喊、大聲叫	book-exact	(book-exact已用引擎重新驗證)
 ขอร้อง	kho rong	kɔ̄ˊ rɔ̄ng~	拜託、哀求	engine-auto	
 โปรดรักฉัน รักฉันเถอะนะ จะไม่ทำให้เธอเสียใจ	prot rak chan rak chan thue na ja mai tham hai ter sia jai	brōtˇ rak~ chanˊ rak~ chanˊ təˇ na~ jaˇ maiˋ tam haiˋ tə̄ sīaˊ jai	拜託（請愛我，愛我吧），不會讓妳傷心	engine-auto	
 โปรด	prot	brōtˇ	請（正式/書面用語）	engine-auto	
@@ -6215,7 +6215,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 จะไม่ทำให้เธอเสียใจ	ja mai tham hai ter sia jai	jaˇ maiˋ tam haiˋ tə̄ sīaˊ jai	不會讓妳傷心	engine-auto	
 ฉันสู้เขาไม่ไหว เทียบกับใครที่เธอมี	chan su khao mai wai thiap kab khrai thee ter mee	chanˊ sūˋ kāuˊ maiˋ waiˊ tīapˋ gapˇ krai tīˋ tə̄ mī	我比不上他，比起你擁有的任何人	engine-auto	
 สู้	su	sūˋ	比、拼	engine-auto	
-สู้ๆ	su su	sūˋsūˋ	加油！	book-exact	
+สู้ๆ	su su	sūˋ sūˋ	加油！	book-exact	(book-exact已用引擎重新驗證)
 A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A 比不上 B	engine-auto	
 ฉันสู้เขาไม่ได้	chan su khao mai dai	chanˊ sūˋ kāuˊ maiˋ dhaiˋ	我比不上他	engine-auto	
 สู้ไม่ไหว	su mai wai	sūˋ maiˋ waiˊ	比不上（體力或能力無法負荷）	engine-auto	
@@ -6246,8 +6246,8 @@ B อยู่ระหว่าง A กับ C	B yoo rawang A kab C	B yūˋ r
 ผ่าน	phan	pānˇ	經過	engine-auto	
 เดินผ่านเซเว่นทุกวัน	doen phan seven thuk wan	dhə̄n pānˇ sē wēnˋ tuk~ wan	每天走經過 7-Eleven	engine-auto	
 ผ่านมา 20 กว่าปีแล้วแต่ยังไม่ลืม	phan ma yee sip kwa pee laeo tae yang mai luem	pānˇ mā 20 gwāˇ bī lɛ̄u~ dɛ̄ˇ yang maiˋ lɯ̄m	過了 20 多年了但還沒忘記	engine-auto	
-พระเอก	phra ek	pra~ -	男主角	book-exact	
-ตัวเอก	tua ek	dua ēkˇ	主角	book-exact	
+พระเอก	phra ek	pra~ ēkˇ	男主角	book-exact	(book-exact已用引擎重新驗證)
+ตัวเอก	tua ek	dūa ēkˇ	主角	book-exact	(book-exact已用引擎重新驗證)
 นางเอก	nang ek	nāng ēkˇ	女主角	engine-auto	
 ตัวรอง	tua rong	dūa rɔ̄ng	第二主角（副角）	engine-auto	
 พระรอง	phra rong	pra~ rɔ̄ng	男二	engine-auto	
@@ -6256,8 +6256,8 @@ B อยู่ระหว่าง A กับ C	B yoo rawang A kab C	B yūˋ r
 ตัวประกอบ	tua prakop	dūa braˇ gɔ̄pˇ	配角	engine-auto	
 แฟนคลับ	fan khlap	fɛ̄n klap~	粉絲團	engine-auto	
 แฟนมิต	fan meet	fɛ̄n mit~	粉絲見面會	engine-auto	
-เล่นหนัง	len nang	lēnˋ nangˊ	演電影	book-exact	
-ปิดกล้อง	pit klong	bitˇglɔngˋ	殺青（關機）	book-exact	
+เล่นหนัง	len nang	lēnˋ nangˊ	演電影	book-exact	(book-exact已用引擎重新驗證)
+ปิดกล้อง	pit klong	bitˇ glɔ̄ngˋ	殺青（關機）	book-exact	(book-exact已用引擎重新驗證)
 กล้อง	klong	glɔ̄ngˋ	攝影機	engine-auto	
 เอฟซี	ef see	ēpˇ sī	粉絲（FC）	engine-auto	
 ผู้กำกับ	phu kam kap	pūˋ gam gapˇ	導演	engine-auto	
@@ -6280,7 +6280,7 @@ B อยู่ระหว่าง A กับ C	B yoo rawang A kab C	B yūˋ r
 เรื่องนี้เธอบอกเขาหรือยัง	rueang ni thoe bok khao rue yang	rɯ̄angˋ nī~ tə̄ bhɔ̄kˇ kāuˊ rɯ̄ˊ yang	這件事你告訴他了沒？	engine-auto	
 เสร็จหรือยัง	set rue yang	sretˇ rɯ̄ˊ yang	完成了沒？	engine-auto	
 เธอถ่ายรูปเสร็จหรือยัง	thoe thai rup set rue yang	tə̄ tāiˇ rūpˋ sretˇ rɯ̄ˊ yang	你拍照拍完了沒？	engine-auto	
-ยังไม่	yang mai	yang maiˋ	還沒	book-exact	
+ยังไม่	yang mai	yang maiˋ	還沒	book-exact	(book-exact已用引擎重新驗證)
 คุณไปทำธุระหรือยัง	khun pai tham thura rue yang	kun bai tam tu~ ra~ rɯ̄ˊ yang	你去辦事了沒？	engine-auto	
 ยัง ฉันยังไม่ไปทำ	yang chan yang mai pai tham	yang chanˊ yang maiˋ bai tam	還沒，我還沒去辦	engine-auto	
 อย่างไร	yang rai	yāngˋ rai	如何 / 怎麼（正式）	engine-auto	
@@ -6304,7 +6304,7 @@ B อยู่ระหว่าง A กับ C	B yoo rawang A kab C	B yūˋ r
 คุณมาหาผมมีธุระอะไร	khun ma ha phom mi thura arai	kun mā hāˊ pomˊ mī tu~ ra~ aˇ rai	你來找我（男）有什麼事嗎？	engine-auto	
 คุณมาหาฉันมีธุระอะไร	khun ma ha chan mi thura arai	kun mā hāˊ chanˊ mī tu~ ra~ aˇ rai	你來找我（女）有什麼事嗎？	engine-auto	
 ไม่มีธุระอะไร ผมคิดถึงคุณ	mai mi thura arai phom khit thueng khun	maiˋ mī tu~ ra~ aˇ rai pomˊ kit~ tɯngˊ kun	沒什麼事，我想你	engine-auto	
-ธุรกิจ	thurakit	tu~ra~gitˇ	生意 / 業務	book-exact	
+ธุรกิจ	thurakit	tun gitˇ	生意 / 業務	book-exact	(book-exact已用引擎重新驗證)
 Uber Eat ธุรกิจดีมาก	Uber Eat thurakit di mak	Uber Eat tun gitˇ dhī mākˋ	Uber Eat 生意很好	engine-auto	
 ที่บ้านทำธุรกิจอะไร	thi ban tham thurakit arai	tīˋ bhānˋ tam tun gitˇ aˇ rai	家裡做什麼生意？	engine-auto	
 ทำความสะอาด	tam khwam sa at	tam kwām saˇ ātˇ	清潔	engine-auto	
@@ -6322,14 +6322,14 @@ Uber Eat ธุรกิจดีมาก	Uber Eat thurakit di mak	Uber Eat tun
 ทำใจไม่ได้	tam chai mai dai	tam jai maiˋ dhaiˋ	無法接受 / 釋懷	engine-auto	
 แฟนนอกใจ ทำใจไม่ได้	faen nok chai tam chai mai dai	fɛ̄n nɔ̄kˋ jai tam jai maiˋ dhaiˋ	另一半劈腿，我無法接受	engine-auto	
 ถูกแฟนทิ้ง ทำใจไม่ได้	thuk faen ting tam chai mai dai	tūkˇ fɛ̄n ting~ tam jai maiˋ dhaiˋ	被另一半甩了，我無法接受	engine-auto	
-อีกที	ik ti	īkˇtī	再一次	book-exact	
+อีกที	ik ti	īkˇ tī	再一次	book-exact	(book-exact已用引擎重新驗證)
 ช่วยพูดอีกที	chuai phut ik ti	chūayˋ pūtˋ īkˇ tī	請再說一次	engine-auto	
 ช่วยพูดอีกทีได้ไหมคะ	chuai phut ik ti dai mai kha	chūayˋ pūtˋ īkˇ tī dhaiˋ maiˊ ka~	可以請再說一次嗎？	engine-auto	
 ฉันฟังไม่ทัน	chan fang mai than	chanˊ fang maiˋ tan	我來不及聽	engine-auto	
-ผิด	phit	pitˇ-	錯 / 錯誤	book-exact	
+ผิด	phit	pitˇ	錯 / 錯誤	book-exact	(book-exact已用引擎重新驗證)
 ฉันดูผิดคน	chan du phit khon	chanˊ dhū pitˇ kon	我看錯人了	engine-auto	
 คุณไปผิดทาง	khun pai phit tang	kun bai pitˇ tāng	你走錯路了	engine-auto	
-ใหม่	mai	maiˇ	新的 / 重新	book-exact	
+ใหม่	mai	maiˇ	新的 / 重新	book-exact	(book-exact已用引擎重新驗證)
 ซื้อรถใหม่	seu rot mai	sɯ̄~ rot~ maiˇ	買新車	engine-auto	
 มีแฟนใหม่	mi faen mai	mī fɛ̄n maiˇ	有新男友	engine-auto	
 พูดผิด พูดใหม่	phut phit phut mai	pūtˋ pitˇ pūtˋ maiˇ	說錯了，重新說	engine-auto	
@@ -6342,7 +6342,7 @@ Uber Eat ธุรกิจดีมาก	Uber Eat thurakit di mak	Uber Eat tun
 เอาแต่ทำงาน	ao tae tam ngan	au dɛ̄ˇ tam ngān	只工作	engine-auto	
 ร้องแต่เพลง	rong tae phleng	rɔ̄ng~ dɛ̄ˇ plēng	只唱歌	engine-auto	
 จำได้แต่เขา	cham dai tae khao	jam dhaiˋ dɛ̄ˇ kāuˊ	只記得他	engine-auto	
-ร้อง	rong	rɔ̅ ng~	叫聲 / 唱 / 哭	book-exact	
+ร้อง	rong	rɔ̄ng~	叫聲 / 唱 / 哭	book-exact	(book-exact已用引擎重新驗證)
 ร้องไห้	rong hai	rɔ̄ng~ haiˋ	哭泣	engine-auto	
 ร้องเพลง	rong phleng	rɔ̄ng~ plēng	唱歌	engine-auto	
 ไก่ร้องยังไง	kai rong yang ngai	gaiˇ rɔ̄ng~ yang ngai	雞怎麼叫？	engine-auto	
@@ -6381,12 +6381,12 @@ Uber Eat ธุรกิจดีมาก	Uber Eat thurakit di mak	Uber Eat tun
 เสียงไม่ชัด	siang mai chat	sīangˊ maiˋ chat~	網路不好，聲音不清楚	engine-auto	
 สองแถว	song tae	sɔ̄ngˊ tɛ̄uˊ	雙條車	engine-auto	
 นั่งสองแถว	nang song tae	nangˋ sɔ̄ngˊ tɛ̄uˊ	坐雙條車	engine-auto	
-รถตู้	rot tu	rot~ dūˋ	麵包車	book-exact	
+รถตู้	rot tu	rot~ dūˋ	麵包車	book-exact	(book-exact已用引擎重新驗證)
 เคยนั่งรถตู้ไหมคะ	khoei nang rot tu mai kha	kə̄i nangˋ rot~ dūˋ maiˊ ka~	曾經坐過麵包車嗎？	engine-auto	
 รถตุ๊กตุ๊ก	rot tuk tuk	rot~ duk~ duk~	嘟嘟車	engine-auto	
 เคยนั่งรถตุ๊กตุ๊กไหมคะ	khoei nang rot tuk tuk mai kha	kə̄i nangˋ rot~ duk~ duk~ maiˊ ka~	曾經坐過嘟嘟車嗎？	engine-auto	
 ไม่เคยนั่งตุ๊กตุ๊กค่ะ	mai khoei nang tuk tuk kha	maiˋ kə̄i nangˋ duk~ duk~ kaˋ	沒坐過嘟嘟車	engine-auto	
-นั่งกับพื้น	nang kap pheun	gapˇpɯ̅n~	坐在地上	book-exact	
+นั่งกับพื้น	nang kap pheun	nangˋ gapˇ pɯ̄n~	坐在地上	book-exact	(book-exact已用引擎重新驗證)
 ชอบนั่งกับพื้นไหมคะ	chop nang kap pheun mai kha	chɔ̄pˋ nangˋ gapˇ pɯ̄n~ maiˊ ka~	喜歡坐在地上嗎？	engine-auto	
 นอนหลับ	non lap	nɔ̄n lapˇ	睡著	engine-auto	
 เมื่อคืนนอนไม่หลับ	meua kheun non mai lap	mɯ̄aˋ kɯ̄n nɔ̄n maiˋ lapˇ	昨天晚上睡不著	engine-auto	
@@ -6403,7 +6403,7 @@ Uber Eat ธุรกิจดีมาก	Uber Eat thurakit di mak	Uber Eat tun
 ตื่นเต้น	teun ten	dɯ̄nˇ dēnˋ	興奮 / 緊張	engine-auto	
 ผมตื่นเต้นมาก ผมไม่กล้าร้องเพลง	phom teun ten mak phom mai kla rong phleng	pomˊ dɯ̄nˇ dēnˋ mākˋ pomˊ maiˋ glāˋ rɔ̄ng~ plēng	我很緊張，不敢唱歌	engine-auto	
 ไม่ต้องตื่นเต้นนะ สบายสบาย	mai tong teun ten na sabai sabai	maiˋ dɔ̄ngˋ dɯ̄nˇ dēnˋ na~ saˇ bhāi saˇ bhāi	不要緊張，放輕鬆	engine-auto	
-พัก	phak	pak~	休息	book-exact	
+พัก	phak	pak~	休息	book-exact	(book-exact已用引擎重新驗證)
 พักเที่ยง	phak thiang	pak~ tīangˋ	午休	engine-auto	
 พักกลางวัน	phak klang wan	pak~ glāng wan	午休 (另一說法)	engine-auto	
 พักกี่นาที	phak ki na thi	pak~ gīˇ nā tī	休息幾分鐘？	engine-auto	
@@ -6419,7 +6419,7 @@ Uber Eat ธุรกิจดีมาก	Uber Eat thurakit di mak	Uber Eat tun
 ถ่าย	tai	tāiˇ	拍照 / 拍	engine-auto	
 เดี๋ยวเดี๋ยว ถ่ายรูปก่อน	diao diao tai rup kon	dhīauˊ dhīauˊ tāiˇ rūpˋ gɔ̄nˇ	等等，先拍照	engine-auto	
 ช่วยถ่ายเอกสารให้หน่อย	chuai tai ek ka san hai noi	chūayˋ tāiˇ ēkˇ sānˊ haiˋ nɔ̄iˇ	請幫我影印	engine-auto	
-เอกสาร	ek ka san	ekˇga.sānˊ-	文件	book-exact	
+เอกสาร	ek ka san	ēkˇ sānˊ	文件	book-exact	(book-exact已用引擎重新驗證)
 ถ้าจะเปิดบัญชี ต้องใช้เอกสารอะไรบ้าง	ta cha poet ban chi tong chai ek ka san arai bang	tāˋ jaˇ bə̄tˇ bhan chī dɔ̄ngˋ chai~ ēkˇ sānˊ aˇ rai bhāngˋ	如果要開戶，要用哪些文件？	engine-auto	
 จองตั๋วเครื่องบิน	chong tua khreuang bin	jɔ̄ng dūaˊ krɯ̄angˋ bhin	訂機票	engine-auto	
 จองตั๋วเครื่องบินหรือยัง	chong tua khreuang bin reu yang	jɔ̄ng dūaˊ krɯ̄angˋ bhin rɯ̄ˊ yang	訂機票了嗎？	engine-auto	
@@ -6471,7 +6471,7 @@ Uber Eat ธุรกิจดีมาก	Uber Eat thurakit di mak	Uber Eat tun
 ตั้งแต่...	tang tae	dangˋ dɛ̄ˇ...	自從...	engine-auto	
 ตั้งแต่เลี้ยงแมว ฉันก็ไปไหนไม่ได้	tang tae liang maeo chan ko pai nai mai dai	dangˋ dɛ̄ˇ līang~ mɛ̄u chanˊ gɔ̄ˋ bai naiˊ maiˋ dhaiˋ	自從養了貓以後，我哪裡都不能去	engine-auto	
 นางเอก	nang ek	nāng ēkˇ	女主角	engine-auto	
-พระเอก	phra ek	pra~ -	男主角	book-exact	
+พระเอก	phra ek	pra~ ēkˇ	男主角	book-exact	(book-exact已用引擎重新驗證)
 เชื่อ	cheua	chɯ̄aˋ	相信	engine-auto	
 ฉันไม่เชื่อคุณ	chan mai cheua khun	chanˊ maiˋ chɯ̄aˋ kun	我不相信你	engine-auto	
 ตอนเช้า	ton chao	dɔ̄n chāu~	早上	engine-auto	
@@ -6480,11 +6480,11 @@ Uber Eat ธุรกิจดีมาก	Uber Eat thurakit di mak	Uber Eat tun
 ตอนไหน	ton nai	dɔ̄n naiˊ	什麼時候	engine-auto	
 ตอนกินข้าว	ton kin khao	dɔ̄n gin kāuˋ	吃飯的時候	engine-auto	
 ตอนเด็ก	ton dek	dɔ̄n dhekˇ	小時候	engine-auto	
-ก่อน	kon	gɔ̅ nˇ V/N.	在...之前 / 先	book-exact	
+ก่อน	kon	gɔ̄nˇ	在...之前 / 先	book-exact	(book-exact已用引擎重新驗證)
 ก่อนไป	kon pai	gɔ̄nˇ bai	去之前	engine-auto	
 สามปีก่อน	sam pi kon	sāmˊ bī gɔ̄nˇ	三年前	engine-auto	
 สองเดือนก่อน	song deuan kon	sɔ̄ngˊ dhɯ̄an gɔ̄nˇ	兩個月前	engine-auto	
-เมื่อก่อน	meua kon	mɯaˋgɔ̅ nˇ- ḍiauˊnī~ -	以前	book-exact	
+เมื่อก่อน	meua kon	mɯ̄aˋ gɔ̄nˇ	以前	book-exact	(book-exact已用引擎重新驗證)
 เมื่อก่อนเขาเห็นแก่ตัวมาก	meua kon khao hen kae tua mak	mɯ̄aˋ gɔ̄nˇ kāuˊ henˊ gɛ̄ˇ dūa mākˋ	以前他很自私	engine-auto	
 เมื่อก่อนอินเทอร์เน็ตแพงมาก ตอนนี้ถูกลง	meua kon in toe net phaeng mak ton ni tuk long	mɯ̄aˋ gɔ̄nˇ in tə̄ net~ pɛ̄ng mākˋ dɔ̄n nī~ tūkˇ long	以前網路很貴，但現在變便宜了	engine-auto	
 เดี๋ยวผมต้องพาแม่ไปหาหมอ ผมขอตัวก่อนนะ	diao phom tong pha mae pai ha mo phom kho tua kon na	dhīauˊ pomˊ dɔ̄ngˋ pā mɛ̄ˋ bai hāˊ mɔ̄ˊ pomˊ kɔ̄ˊ dūa gɔ̄nˇ na~	等一下我要帶媽媽去看醫生，我先告辭了	engine-auto	
@@ -6525,7 +6525,7 @@ FC	FC	FC	粉絲	engine-auto
 กินเลย ไม่ต้องเกรงใจ	kin loei mai tong kreng chai	gin lə̄i maiˋ dɔ̄ngˋ grēng jai	吃吧！不要客氣	engine-auto	
 คิดว่าตัวเองเก่ง	kit wa tua eng keng	kit~ wāˋ dūa ēng gēngˇ	認為自己很厲害	engine-auto	
 คุณคิดว่ายังไง	khun kit wa yang ngai	kun kit~ wāˋ yang ngai	你覺得呢？	engine-auto	
-ยังไม่แก่หรอก	yang mai kae rok	yang maiˋgɛ̅ ˇrɔ̅ kˇ	還沒老啦	book-exact	
+ยังไม่แก่หรอก	yang mai kae rok	yang maiˋ gɛ̄ˇ rɔ̄kˇ	還沒老啦	book-exact	(book-exact已用引擎重新驗證)
 ฉันแก่แล้ว	chan kae laeo	chanˊ gɛ̄ˇ lɛ̄u~	我老了	engine-auto	
 ผักแก่ ไม่อร่อย	phak kae mai a-roi	pakˇ gɛ̄ˇ maiˋ aˇ rɔ̄iˋ	菜很老，不好吃	engine-auto	
 เกินไป	koern pai	gə̄n bai	太過於...	engine-auto	
@@ -6533,7 +6533,7 @@ FC	FC	FC	粉絲	engine-auto
 หวานเกินไป	wan koern pai	wānˊ gə̄n bai	太甜了	engine-auto	
 แพงเกินไป	phaeng koern pai	pɛ̄ng gə̄n bai	太貴了	engine-auto	
 แพงเกินไป ถูกหน่อยได้ไหม	phaeng koern pai tuk noi dai mai	pɛ̄ng gə̄n bai tūkˇ nɔ̄iˇ dhaiˋ maiˊ	太貴了，可以便宜一點嗎？	engine-auto	
-พูดมากเกินไปแล้วนะ	phut mak koern pai laeo na	pūtˋmākˋgə̅ n bai lɛ̅ u~ na~	說太多了喔	book-exact	
+พูดมากเกินไปแล้วนะ	phut mak koern pai laeo na	pūtˋ mākˋ gə̄n bai lɛ̄u~ na~	說太多了喔	book-exact	(book-exact已用引擎重新驗證)
 ...ไปหน่อย	...pai noi	...bai nɔ̄iˇ	有點... / ...了一點	engine-auto	
 เค็มไปหน่อย	khem pai noi	kem bai nɔ̄iˇ	有點太鹹了	engine-auto	
 แก่ไปหน่อย	kae pai noi	gɛ̄ˇ bai nɔ̄iˇ	變老了一點	engine-auto	
@@ -6541,14 +6541,14 @@ FC	FC	FC	粉絲	engine-auto
 รถไฟความเร็วสูง	rot fai khwam reo sung	rot~ fai kwām rew sūngˊ	高鐵	engine-auto	
 เร็ว	reo	rew	快	engine-auto	
 สูง	sung	sūngˊ	高	engine-auto	
-จน	chon	jon	窮	book-exact	
+จน	chon	jon	窮	book-exact	(book-exact已用引擎重新驗證)
 คนรวย / คนมีเงิน	khon ruai / khon mi ngoen	kon rūay / kon mī ngə̄n	有錢人	engine-auto	
 เศรษฐี	set thi	srētˇ tīˊ	富翁	engine-auto	
 ทำอย่างไรให้รวย	tam yang ngai hai ruai	tam yāngˋ rai haiˋ rūay	如何變有錢？	engine-auto	
 เล่นหุ้น	len hun	lēnˋ hunˋ	玩股票	engine-auto	
-ขอให้รวยๆ	kho hai ruai ruai	kɔ̅ ˊhaiˋruei ruei	祝你大發財	book-exact	
+ขอให้รวยๆ	kho hai ruai ruai	kɔ̄ˊ haiˋ rūay rūay	祝你大發財	book-exact	(book-exact已用引擎重新驗證)
 รวยแต่แก่	ruai tae kae	rūay dɛ̄ˇ gɛ̄ˇ	有錢但老了	engine-auto	
-คนจนเล่นหวย คนรวยเล่นหุ้น	khon chon len huai khon ruai len hun	khon jon lenˋhueiˊkhon ruei lenˋhunˋ	窮人買彩券，有錢人玩股票	book-exact	
+คนจนเล่นหวย คนรวยเล่นหุ้น	khon chon len huai khon ruai len hun	kon jon lēnˋ hūayˊ kon rūay lēnˋ hunˋ	窮人買彩券，有錢人玩股票	book-exact	(book-exact已用引擎重新驗證)
 ต่ำ	tam	damˇ	低 / 矮	engine-auto	
 สูง	sung	sūngˊ	高	engine-auto	
 ไทเป 101 สูงกี่ชั้นคะ	tai-pe neung sun neung sung ki chan kha	tai bē 101 sūngˊ gīˇ chan~ ka~	台北101有幾層樓高？	engine-auto	
@@ -6565,14 +6565,14 @@ IQ ต่ำ	IQ tam	IQ damˇ	IQ 低	engine-auto
 EQ สูง	EQ sung	EQ sūngˊ	EQ 高	engine-auto	
 EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto	
 เร็ว	reo	rew	快	engine-auto	
-ช้า	cha	chā~	慢	book-exact	
+ช้า	cha	chā~	慢	book-exact	(book-exact已用引擎重新驗證)
 ขับรถเร็ว / ขับรถช้า	khap rot reo / khap rot cha	kapˇ rot~ rew / kapˇ rot~ chā~	開車快 / 開車慢	engine-auto	
 แท็กซี่เมืองไทยขับรถเร็ว	taek-si meuang thai khap rot reo	tɛk~ sīˋ mɯ̄ang tai kapˇ rot~ rew	泰國計程車開很快	engine-auto	
 ขับรถเร็วเกินไป	khap rot reo koern pai	kapˇ rot~ rew gə̄n bai	開太快了	engine-auto	
 เวลาผ่านไปเร็ว	we-la phan pai reo	wē lā pānˇ bai rew	時間過得很快	engine-auto	
 นอนดึกแก่เร็ว	non deuk kae reo	nɔ̄n dhɯkˇ gɛ̄ˇ rew	晚睡老得快	engine-auto	
 พูดช้าๆ หน่อยได้ไหมคะ	phut cha cha noi dai mai kha	pūtˋ chā~ chā~ nɔ̄iˇ dhaiˋ maiˊ ka~	請說慢一點可以嗎？	engine-auto	
-แต่งงานเร็ว	taeng ngan reo	dɛngˇngān reu / chā~	早婚 / 快婚	book-exact	
+แต่งงานเร็ว	taeng ngan reo	dɛ̄ngˇ ngān rew	早婚 / 快婚	book-exact	(book-exact已用引擎重新驗證)
 แต่งงานช้า	taeng ngan cha	dɛ̄ngˇ ngān chā~	晚婚	engine-auto	
 มาเร็ว	ma reo	mā rew	早到	engine-auto	
 มาช้า	ma cha	mā chā~	晚到	engine-auto	
@@ -6580,7 +6580,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ง่าย	ngai	ngāiˋ	容易 / 簡單	engine-auto	
 ยาก	yak	yākˋ	難	engine-auto	
 ภาษาไทยง่ายไหม	phasa thai ngai mai	pā sāˊ tai ngāiˋ maiˊ	泰文簡單嗎？	engine-auto	
-แก่แล้วไม่มีอะไรดี	kae laeo mai mi arai di	gɛ̅ ˇlɛ̅ u~ maiˋmī a.rai ḍī	老了沒什麼好的	book-exact	
+แก่แล้วไม่มีอะไรดี	kae laeo mai mi arai di	gɛ̄ˇ lɛ̄u~ maiˋ mī aˇ rai dhī	老了沒什麼好的	book-exact	(book-exact已用引擎重新驗證)
 กินข้าวไม่ตรงเวลาแก่ง่าย	kin khao mai trong we-la kae ngai	gin kāuˋ maiˋ drong wē lā gɛ̄ˇ ngāiˋ	飲食不正常老得快	engine-auto	
 ออกกำลังกาย	ok kam-lang kai	ɔ̄kˇ gam lang gāi	運動	engine-auto	
 ชอบออกกำลังกายไหมคะ	chop ok kam-lang kai mai kha	chɔ̄pˋ ɔ̄kˇ gam lang gāi maiˊ ka~	喜歡運動嗎？	engine-auto	
@@ -6589,28 +6589,28 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 เตี้ย	tia	dīaˋ	矮	engine-auto	
 ต่ำ	tam	damˇ	矮 / 低	engine-auto	
 สูง	sung	sūngˊ	高	engine-auto	
-คนไทยส่วนใหญ่เตี้ยกว่าฝรั่ง	khon thai suan yai tia kwa farang	khon thai suanˇyaiˇdiaˋguāˇfa.rangˇ	泰國人大部分比外國人矮	book-exact	
+คนไทยส่วนใหญ่เตี้ยกว่าฝรั่ง	khon thai suan yai tia kwa farang	kon tai sūanˇ yaiˇ dīaˋ gwāˇ faˇ rangˋ	泰國人大部分比外國人矮	book-exact	(book-exact已用引擎重新驗證)
 ฉันเตี้ยกว่าเขา	chan tia kwa khao	chanˊ dīaˋ gwāˇ kāuˊ	我比他矮	engine-auto	
 เขาเตี้ยกว่าฉัน	khao tia kwa chan	kāuˊ dīaˋ gwāˇ chanˊ	他比我矮	engine-auto	
 ผอม / ผอมลง	phom / phom long	pɔ̄mˊ / pɔ̄mˊ long	瘦 / 瘦下來	engine-auto	
 ผอมลงทำยาก	phom long tam yak	pɔ̄mˊ long tam yākˋ	要瘦下來很難	engine-auto	
-อยากผอม อยากหุ่นดี	yak phom yak hun di	yākˇpɔ̅ mˊ yākˇhunˇḍī	想瘦 / 想身材好	book-exact	
+อยากผอม อยากหุ่นดี	yak phom yak hun di	yākˋ pɔ̄mˊ yākˋ hunˇ dhī	想瘦 / 想身材好	book-exact	(book-exact已用引擎重新驗證)
 อยากผอม อยากหุ่นดีไหมคะ	yak phom yak hun di mai kha	yākˋ pɔ̄mˊ yākˋ hunˇ dhī maiˊ ka~	你想變瘦、想身材好嗎？	engine-auto	
 ฉันหุ่นดีแล้ว	chan hun di laeo	chanˊ hunˇ dhī lɛ̄u~	我身材已經很好了	engine-auto	
 คิดว่าตัวเองหุ่นดี	kit wa tua eng hun di	kit~ wāˋ dūa ēng hunˇ dhī	認為自己身材很好	engine-auto	
-ทั้งเตี้ยทั้งอ้วน	tang tia tang uan	tang~ ḍīaˋ tang~ uanˋ	又矮又胖	book-exact	
+ทั้งเตี้ยทั้งอ้วน	tang tia tang uan	tang~ dīaˋ tang~ ūanˋ	又矮又胖	book-exact	(book-exact已用引擎重新驗證)
 ทั้งเผ็ดทั้งอร่อย	tang phet tang a roi	tang~ petˇ tang~ aˇ rɔ̄iˋ	又辣又好吃	engine-auto	
 ทั้งรวยทั้งสวย	tang ruai tang suai	tang~ rūay tang~ sūayˊ	又有錢又漂亮	engine-auto	
-วิธีลดความอ้วน	witi lot khwam uan	wi~ tī lot~ kwām uanˋ	減肥的方法	book-exact	
+วิธีลดความอ้วน	witi lot khwam uan	wi~ tī lot~ kwām ūanˋ	減肥的方法	book-exact	(book-exact已用引擎重新驗證)
 วิธีทำอาหาร	witi tam a han	wi~ tī tam ā hānˊ	烹飪的方法	engine-auto	
 วิธีที่หนึ่ง	witi thi neung	wi~ tī tīˋ nɯngˇ	第一個方法	engine-auto	
 วิธีที่สอง	witi thi song	wi~ tī tīˋ sɔ̄ngˊ	第二個方法	engine-auto	
 เต้นแอโรบิก	ten ae ro bik	dēnˋ ɛ̄ rō bhikˇ	跳有氧舞蹈	engine-auto	
 เล่นโยคะ	len yo kha	lēnˋ yō ka~	做瑜珈	engine-auto	
 เล่นโยคะทำให้แข็งแรง	len yo kha tam hai khaeng raeng	lēnˋ yō ka~ tam haiˋ kɛngˊ rɛ̄ng	做瑜珈會讓身體強壯	engine-auto	
-ไปฟิตเนส	pai fit net	bai fit~ nesˇ	去健身房	book-exact	
+ไปฟิตเนส	pai fit net	bai fit~ nētˋ	去健身房	book-exact	(book-exact已用引擎重新驗證)
 กินอาหารไขมันต่ำ	kin a han khai man tam	gin ā hānˊ kaiˊ man damˇ	吃低脂食物	engine-auto	
-กินแต่ผักลวกไข่ต้ม	kin tae phak luak khai tom	gin dɛ̅ ˇpakˇluakˋkaiˇdomˋ	只吃燙青菜跟水煮蛋	book-exact	
+กินแต่ผักลวกไข่ต้ม	kin tae phak luak khai tom	gin dɛ̄ˇ pakˇ lūakˋ kaiˇ domˋ	只吃燙青菜跟水煮蛋	book-exact	(book-exact已用引擎重新驗證)
 2 ทุ่มครึ่ง	Song Thum Khrueng	2 tumˋ krɯngˋ	8點半了	engine-auto	
 ตรงเวลา	Trong Wela	drong wē lā	準時	engine-auto	
 ฉันคิดว่าเขาไม่รักคุณ	Chan Khit Wa Khao Mai Rak Khun	chanˊ kit~ wāˋ kāuˊ maiˋ rak~ kun	我認為他不愛你	engine-auto	
@@ -6641,8 +6641,8 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 เค็ม	Khem	kem	很鹹	engine-auto	
 รวย	Ruay	rūay	富有	engine-auto	
 ที่บ้านรวยมาก อะไรก็มี	Thi Ban Ruay Mak Arai Ko Mi	tīˋ bhānˋ rūay mākˋ aˇ rai gɔ̄ˋ mī	家裡很富有，什麼都有	engine-auto	
-จน	Chon	jon	窮	book-exact	
-แก่	Kae	gɛ̅ ˇ	老	book-exact	
+จน	Chon	jon	窮	book-exact	(book-exact已用引擎重新驗證)
+แก่	Kae	gɛ̄ˇ	老	book-exact	(book-exact已用引擎重新驗證)
 คนแก่	Khon Kae	kon gɛ̄ˇ	老人	engine-auto	
 ผักแก่	Phak Kae	pakˇ gɛ̄ˇ	老的（粗的）蔬菜	engine-auto	
 ผักแก่ไม่อร่อย	Phak Kae Mai Aroi	pakˇ gɛ̄ˇ maiˋ aˇ rɔ̄iˋ	菜很老不好吃	engine-auto	
@@ -6651,13 +6651,13 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 หน้าอ่อน	Na On	nāˋ ɔ̄nˇ	臉看起來很年輕	engine-auto	
 ไม่ค่อยเห็นคนแก่บนรถไฟฟ้า	Mai Khoi Hen Khon Kae Bon Rot Fai Fa	maiˋ kɔ̄iˋ henˊ kon gɛ̄ˇ bhon rot~ fai fā~	我不太常看到老人在捷運上	engine-auto	
 เร็ว	Reo	rew	快 / 早	engine-auto	
-แต่งงานเร็ว	Taeng Ngan Reo	dɛngˇngān reu / chā~	早結婚	book-exact	
+แต่งงานเร็ว	Taeng Ngan Reo	dɛ̄ngˇ ngān rew	早結婚	book-exact	(book-exact已用引擎重新驗證)
 นอนเร็ว	Non Reo	nɔ̄n rew	早睡	engine-auto	
 เดินเร็ว	Doen Reo	dhə̄n rew	走得快	engine-auto	
 ขับรถเร็ว	Khap Rot Reo	kapˇ rot~ rew	開車開得快	engine-auto	
 เร็วๆ หน่อย	Reo Reo Noi	rew rew nɔ̄iˇ	快一點快一點	engine-auto	
 เร็วหน่อย เร็วหน่อย	Reo Noi Reo Noi	rew nɔ̄iˇ rew nɔ̄iˇ	快一點快一點	engine-auto	
-ช้า	Cha	chā~	晚 / 慢	book-exact	
+ช้า	Cha	chā~	晚 / 慢	book-exact	(book-exact已用引擎重新驗證)
 แต่งงานช้า	Taeng Ngan Cha	dɛ̄ngˇ ngān chā~	晚結婚	engine-auto	
 พูดช้าๆ หน่อย	Phut Cha Cha Noi	pūtˋ chā~ chā~ nɔ̄iˇ	說慢一點	engine-auto	
 ผมฟังไม่ทัน	Phom Fang Mai Than	pomˊ fang maiˋ tan	我聽不進去（男）	engine-auto	
@@ -6687,7 +6687,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 หิวง่าย	Hiu Ngai	hiwˊ ngāiˋ	容易餓	engine-auto	
 ภาษาไทยง่าย ภาษาไทยไม่ยาก	Phasa Thai Ngai Phasa Thai Mai Yak	pā sāˊ tai ngāiˋ pā sāˊ tai maiˋ yākˋ	泰文容易，泰文不難	engine-auto	
 พูดง่ายแต่ทำยาก	Phut Ngai Tae Tham Yak	pūtˋ ngāiˋ dɛ̄ˇ tam yākˋ	說得很簡單，但很難做	engine-auto	
-ผอม	Phom	pɔ̅ mˊ	瘦	book-exact	
+ผอม	Phom	pɔ̄mˊ	瘦	book-exact	(book-exact已用引擎重新驗證)
 ฉันคิดว่าตัวเองผอมมาก	Chan Khit Wa Tua Eng Phom Mak	chanˊ kit~ wāˋ dūa ēng pɔ̄mˊ mākˋ	我覺得自己很瘦	engine-auto	
 หุ่นดี	Hun Di	hunˇ dhī	身材好	engine-auto	
 หุ่น	Hun	hunˇ	身材	engine-auto	
@@ -6701,7 +6701,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 คุณชอบออกกำลังกายไหม	Khun Chop Ok Kamlang Kai Mai	kun chɔ̄pˋ ɔ̄kˇ gam lang gāi maiˊ	你喜歡運動嗎	engine-auto	
 ไม่มีเวลาไปออกกำลังกาย	Mai Mi Wela Pai Ok Kamlang Kai	maiˋ mī wē lā bai ɔ̄kˇ gam lang gāi	沒有時間去運動	engine-auto	
 ทั้ง...ทั้ง...	Thang Thang	tang~...tang~...	又...又...	engine-auto	
-ทั้งเตี้ยทั้งอ้วน	Thang Tia Thang Uan	tang~ ḍīaˋ tang~ uanˋ	又矮又胖	book-exact	
+ทั้งเตี้ยทั้งอ้วน	Thang Tia Thang Uan	tang~ dīaˋ tang~ ūanˋ	又矮又胖	book-exact	(book-exact已用引擎重新驗證)
 ทั้งถูกทั้งดี	Thang Thuk Thang Di	tang~ tūkˇ tang~ dhī	又便宜又好	engine-auto	
 ผู้ชายคนนี้ทั้งหล่อทั้งรวย	Phu Chai Khon Ni Thang Lo Thang Ruay	pūˋ chāi kon nī~ tang~ lɔ̄ˇ tang~ rūay	這個男人又帥又有錢	engine-auto	
 ผู้หญิงคนนี้ทั้งสูงทั้งหุ่นดี	Phu Ying Khon Ni Thang Sung Thang Hun Di	pūˋ yingˊ kon nī~ tang~ sūngˊ tang~ hunˇ dhī	這個女人又高又身材好	engine-auto	
@@ -6710,7 +6710,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 เต้นไม่หยุด	Ten Mai Yut	dēnˋ maiˋ yutˇ	跳個不停	engine-auto	
 ทั้งร้องทั้งเต้น	Thang Rong Thang Ten	tang~ rɔ̄ng~ tang~ dēnˋ	又唱又跳	engine-auto	
 วิธี	Withi	wi~ tī	方法	engine-auto	
-วิธีลดความอ้วน	Withi Lot Khwam Uan	wi~ tī lot~ kwām uanˋ	減肥的方法	book-exact	
+วิธีลดความอ้วน	Withi Lot Khwam Uan	wi~ tī lot~ kwām ūanˋ	減肥的方法	book-exact	(book-exact已用引擎重新驗證)
 มีหลายวิธี	Mi Lai Withi	mī lāiˊ wi~ tī	有好幾個方法	engine-auto	
 วิธีที่หนึ่ง	Withi Thi Nueng	wi~ tī tīˋ nɯngˇ	第一個方法	engine-auto	
 วิธีแรก	Withi Raek	wi~ tī rɛ̄kˋ	第一個方法	engine-auto	
@@ -6725,10 +6725,10 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ปัญหา	Panha	ban hāˊ	問題	engine-auto	
 แค่นี้ไม่มีปัญหา	Khae Ni Mai Mi Panha	kɛ̄ˋ nī~ maiˋ mī ban hāˊ	就這樣，沒問題	engine-auto	
 แค่	Khae	kɛ̄ˋ	只	engine-auto	
-เรียนภาษาไทยแค่ปีเดียวเอง	Rian Phasa Thai Khae Pi Diao Eng	rian pā.sāˊthai kɛ̅ ˋbī diau e̅ ng	只學泰文一年而已	book-exact	
+เรียนภาษาไทยแค่ปีเดียวเอง	Rian Phasa Thai Khae Pi Diao Eng	rīan pā sāˊ tai kɛ̄ˋ bī dhīau ēng	只學泰文一年而已	book-exact	(book-exact已用引擎重新驗證)
 ปีเดียว	Pi Diao	bī dhīau	一年	engine-auto	
 เอง	Eng	ēng	而已	engine-auto	
-ตั้งใจ	Tang Chai	dangˋjai	認真	book-exact	
+ตั้งใจ	Tang Chai	dangˋ jai	認真	book-exact	(book-exact已用引擎重新驗證)
 สอน	Son	sɔ̄nˊ	教	engine-auto	
 ตั้งใจสอน	Tang Chai Son	dangˋ jai sɔ̄nˊ	認真教	engine-auto	
 สอนภาษาไทย	Son Phasa Thai	sɔ̄nˊ pā sāˊ tai	教泰文	engine-auto	
@@ -6738,7 +6738,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ตั้งใจมาก	Tang Chai Mak	dangˋ jai mākˋ	很認真	engine-auto	
 ตั้งใจจะ	Tang Chai Cha	dangˋ jai jaˇ	打算要	engine-auto	
 ตั้งใจจะไปญี่ปุ่น	Tang Chai Cha Pai Yipun	dangˋ jai jaˇ bai yīˋ bunˇ	打算要去日本	engine-auto	
-ตั้งใจ	Tang Chai	dangˋjai	故意	book-exact	
+ตั้งใจ	Tang Chai	dangˋ jai	故意	book-exact	(book-exact已用引擎重新驗證)
 ขอโทษครับ ผมไม่ได้ตั้งใจ	Kho Thot Khrap Phom Mai Dai Tang Chai	kɔ̄ˊ tōtˋ krap~ pomˊ maiˋ dhaiˋ dangˋ jai	對不起，我不是故意的	engine-auto	
 เบื่อ	Buea	bhɯ̄aˇ	無聊 / 厭煩	engine-auto	
 เบื่องานมากๆ	Buea Ngan Mak Mak	bhɯ̄aˇ ngān mākˋ mākˋ	非常厭煩工作	engine-auto	
@@ -6754,7 +6754,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ซวย	Suay	sūay	倒霉	engine-auto	
 น่าเบื่อ	Na Buea	nāˋ bhɯ̄aˇ	令人覺得無聊 / 好無聊	engine-auto	
 น่ารำคาญ	Na Ramkhan	nāˋ ram kān	令人煩躁	engine-auto	
-ขยัน	Khayan	ka.yanˊ	勤奮 / 勤勞	book-exact	
+ขยัน	Khayan	kaˇ yanˊ	勤奮 / 勤勞	book-exact	(book-exact已用引擎重新驗證)
 ฉันก็เหมือนกัน	Chan Ko Muean Kan	chanˊ gɔ̄ˋ mɯ̄anˊ gan	我也是（勤勞工作）	engine-auto	
 เก็บเงิน / เก็บตังค์	Kep Ngoen / Kep Tang	gepˇ ngə̄n / gepˇ dang	存錢 / 結帳	engine-auto	
 พี่คะ / น้องคะ เก็บเงินค่ะ	Phi Kha / Nong Kha Kep Ngoen Kha	pīˋ ka~ / nɔ̄ng~ ka~ gepˇ ngə̄n kaˋ	哥哥/姐姐 結帳	engine-auto	
@@ -6772,8 +6772,8 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ทำหน้าเฉยๆ	Tham Na Choei Choei	tam nāˋ chə̄iˊ chə̄iˊ	面無表情 / 做一個沒反應的臉	engine-auto	
 น่าเบื่อ	Na Buea	nāˋ bhɯ̄aˇ	好無聊 / 令人覺得無聊	engine-auto	
 น่ารำคาญ	Na Ramkhan	nāˋ ram kān	令人煩躁	engine-auto	
-สะดวก	Saduak	sa.ḍuakˇ	方便	book-exact	
-ติดต่อ	Tittat	ditˇdɔ̅ ˇ-	聯絡	book-exact	
+สะดวก	Saduak	saˇ dhūakˇ	方便	book-exact	(book-exact已用引擎重新驗證)
+ติดต่อ	Tittat	ditˇ dɔ̄ˇ	聯絡	book-exact	(book-exact已用引擎重新驗證)
 ถ้ามีปัญหาต้องติดต่อใคร	Tha Mi Panha Tong Tittat Khrai	tāˋ mī ban hāˊ dɔ̄ngˋ ditˇ dɔ̄ˇ krai	如果有問題要跟誰聯絡	engine-auto	
 พิเศษ	Phiset	pi~ sētˇ	特別	engine-auto	
 คนพิเศษ	Khon Phiset	kon pi~ sētˇ	特別的人	engine-auto	
@@ -6798,8 +6798,8 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 เวฟไหมคะ	Web Mai Kha	wēpˋ maiˊ ka~	要微波嗎	engine-auto	
 ช่วยเวฟให้หน่อย	Chuay Web Hai Noi	chūayˋ wēpˋ haiˋ nɔ̄iˇ	請幫我微波一下	engine-auto	
 เวฟกี่นาที	Web Ki Nathi	wēpˋ gīˇ nā tī	微波幾分鐘	engine-auto	
-ปลอดภัย	Plot Phai	blɔ̅ tˇ.pai	安全	book-exact	
-ปลอดภัยไว้ก่อน	Plot Phai Wai Kon	blɔ̅ tˇ.pai wai~gɔ̅ nˇ	安全第一	book-exact	
+ปลอดภัย	Plot Phai	blɔ̄tˇ pai	安全	book-exact	(book-exact已用引擎重新驗證)
+ปลอดภัยไว้ก่อน	Plot Phai Wai Kon	blɔ̄tˇ pai wai~ gɔ̄nˇ	安全第一	book-exact	(book-exact已用引擎重新驗證)
 อันตราย	Antarai	an drāi	危險 / 危害	engine-auto	
 ต่อ	To	dɔ̄ˇ	對... / 繼續	engine-auto	
 อันตรายต่อสุขภาพ	Antarai To Sukkhaphap	an drāi dɔ̄ˇ sukˇ pāpˋ	危害健康	engine-auto	
@@ -6839,19 +6839,19 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ตัดสั้นแค่นี้พอ	tat san khae ni pho	datˇ sanˋ kɛ̄ˋ nī~ pɔ̄	剪這樣短就夠	engine-auto	
 ถ้ามีปัญหา เอากลับมาเปลี่ยนได้ไหม	tha mi panha ao klap ma plian dai mai	tāˋ mī ban hāˊ au glapˇ mā blīanˇ dhaiˋ maiˊ	如果有問題，可以拿來換嗎？	engine-auto	
 ถ้ามีปัญหา ต้องติดต่อใคร	tha mi panha tong tiktio khrai	tāˋ mī ban hāˊ dɔ̄ngˋ ditˇ dɔ̄ˇ krai	如果有問題，要跟誰聯絡？	engine-auto	
-ตั้งใจ	tangchai	dangˋjai	刻意 / 認真	book-exact	
-พระเอก	phra ek	pra~ -	男主角	book-exact	
+ตั้งใจ	tangchai	dangˋ jai	刻意 / 認真	book-exact	(book-exact已用引擎重新驗證)
+พระเอก	phra ek	pra~ ēkˇ	男主角	book-exact	(book-exact已用引擎重新驗證)
 นางเอก	nang ek	nāng ēkˇ	女主角	engine-auto	
 ขอโทษนะ ผมไม่ได้ตั้งใจทำให้คุณเสียใจ	khothot na phom mai dai tangchai tham hai khun siachai	kɔ̄ˊ tōtˋ na~ pomˊ maiˋ dhaiˋ dangˋ jai tam haiˋ kun sīaˊ jai	對不起喔，我不是故意讓你傷心難過	engine-auto	
 ขอโทษนะ ฉันไม่ได้ตั้งใจ	khothot na chan mai dai tangchai	kɔ̄ˊ tōtˋ na~ chanˊ maiˋ dhaiˋ dangˋ jai	對不起，我不是故意的	engine-auto	
 ทำอะไรก็ต้องตั้งใจ	tham arai ko tong tangchai	tam aˇ rai gɔ̄ˋ dɔ̄ngˋ dangˋ jai	做什麼都要認真	engine-auto	
 ตั้งใจเรียน	tangchai rian	dangˋ jai rīan	認真上課	engine-auto	
 ตั้งใจสอน	tangchai sorn	dangˋ jai sɔ̄nˊ	認真教書	engine-auto	
-ขยัน	khayan	ka.yanˊ	勤勞 / 努力	book-exact	
+ขยัน	khayan	kaˇ yanˊ	勤勞 / 努力	book-exact	(book-exact已用引擎重新驗證)
 การบ้าน	kanban	gān bhānˋ	作業 / 功課	engine-auto	
 เด็กๆ ไม่ยอมทำการบ้าน	dek dek mai yom tham kanban	dhekˇ dhekˇ maiˋ yɔ̄m tam gān bhānˋ	小朋友們不肯做作業	engine-auto	
 ตอนเด็ก คุณการบ้านเยอะไหม	torn dek khun kanban yoe mai	dɔ̄n dhekˇ kun gān bhānˋ yə~ maiˊ	小時候你有很多作業嗎？	engine-auto	
-สะดวก	saduak	sa.ḍuakˇ	方便	book-exact	
+สะดวก	saduak	saˇ dhūakˇ	方便	book-exact	(book-exact已用引擎重新驗證)
 กำลังเรียนภาษาไทยอยู่	kamlang rian phasa thai yu	gam lang rīan pā sāˊ tai yūˋ	正在學泰文	engine-auto	
 ต้องติดต่อเบอร์ 0213456789	tong tiktio boe sun song nueng sam si ha hok chet paet kao	dɔ̄ngˋ ditˇ dɔ̄ˇ bhə̄ 0213456789	要聯絡這個號碼	engine-auto	
 สำคัญ	samkhan	samˊ kan	重要	engine-auto	
@@ -6881,8 +6881,8 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ที่ห้องเครื่องทำน้ำอุ่นเสียครับ	thi hong khruang tham nam un sia khrap	tīˋ hɔ̄ngˋ krɯ̄angˋ tam nām~ unˇ sīaˊ krap~	房間的熱水器壞了	engine-auto	
 ช่วยอุ่นให้หน่อยค่ะ	chuai un hai noi kha	chūayˋ unˇ haiˋ nɔ̄iˇ kaˋ	請幫我加熱一下	engine-auto	
 ช่วยเวฟให้หน่อยค่ะ	chuai wep hai noi kha	chūayˋ wēpˋ haiˋ nɔ̄iˇ kaˋ	請幫我微波一下	engine-auto	
-ปลอดภัย	plort phai	blɔ̅ tˇ.pai	安全	book-exact	
-ปลอดภัยไว้ก่อน	plort phai wai korn	blɔ̅ tˇ.pai wai~gɔ̅ nˇ	安全第一	book-exact	
+ปลอดภัย	plort phai	blɔ̄tˇ pai	安全	book-exact	(book-exact已用引擎重新驗證)
+ปลอดภัยไว้ก่อน	plort phai wai korn	blɔ̄tˇ pai wai~ gɔ̄nˇ	安全第一	book-exact	(book-exact已用引擎重新驗證)
 ฉันคิดว่าวิธีนี้ปลอดภัยที่สุด	chan khit wa withi ni plort phai thi sut	chanˊ kit~ wāˋ wi~ tī nī~ blɔ̄tˇ pai tīˋ sutˇ	我認為這個方法是最安全的	engine-auto	
 อันตราย	antarai	an drāi	危險	engine-auto	
 ที่นั่นอันตรายไหม	thi nan antarai mai	tīˋ nanˋ an drāi maiˊ	那邊危險嗎？	engine-auto	
@@ -6893,14 +6893,14 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ห้องมืดเกินไป	hong muet koen pai	hɔ̄ngˋ mɯ̄tˋ gə̄n bai	房間太暗了	engine-auto	
 ห้องมืดไป	hong muet pai	hɔ̄ngˋ mɯ̄tˋ bai	房間太暗了（省略語）	engine-auto	
 เขาเป็นม้ามืด	khao pen ma muet	kāuˊ ben mā~ mɯ̄tˋ	他是黑馬	engine-auto	
-เป็น	pen	ben	是	book-exact	
+เป็น	pen	ben	是	book-exact	(book-exact已用引擎重新驗證)
 ไม่ใช่	mai chai	maiˋ chaiˋ	不是	engine-auto	
 รู้สึก	ru suek	rū~ sɯkˇ	感覺	engine-auto	
 รู้สึกอะไรไหม	ru suek a rai mai	rū~ sɯkˇ aˇ rai maiˊ	有感覺到什麼嗎	engine-auto	
 รู้สึกหนาว	ru suek nao	rū~ sɯkˇ nāuˊ	覺得很冷	engine-auto	
 รู้สึกสนุก	ru suek sa nook	rū~ sɯkˇ saˇ nuk~	感到好玩	engine-auto	
 รู้สึกแปลก	ru suek plaek	rū~ sɯkˇ blɛ̄kˇ	感覺奇怪	engine-auto	
-รู้สึกแปลกจัง	ru suek plaek jang	rū~sɯkˇ blɛ̅ kˇjang	感覺真奇怪	book-exact	
+รู้สึกแปลกจัง	ru suek plaek jang	rū~ sɯkˇ blɛ̄kˇ jang	感覺真奇怪	book-exact	(book-exact已用引擎重新驗證)
 แปลก	plaek	blɛ̄kˇ	奇怪	engine-auto	
 จัง	jang	jang	真的（口語）	engine-auto	
 แปลกมาก	plaek mak	blɛ̄kˇ mākˋ	非常奇怪	engine-auto	
@@ -6912,26 +6912,26 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ชิน	chin	chin	習慣	engine-auto	
 ชินหรือยัง	chin rue yang	chin rɯ̄ˊ yang	習慣了嗎	engine-auto	
 ยังไม่ชิน	yang mai chin	yang maiˋ chin	還不習慣	engine-auto	
-ชินแล้วก็เลยไม่รู้สึก	chin laeo kor loei mai ru suek	chin lɛ̅ u~ gɔ̅ ˋlə̅ i maiˋrū~ sɯkˇ	習慣了所以就沒感覺了	book-exact	
+ชินแล้วก็เลยไม่รู้สึก	chin laeo kor loei mai ru suek	chin lɛ̄u~ gɔ̄ˋ lə̄i maiˋ rū~ sɯkˇ	習慣了所以就沒感覺了	book-exact	(book-exact已用引擎重新驗證)
 ต่างกัน	tang kan	dāngˇ gan	不同、有差異	engine-auto	
 ต่างกันยังไง	tang kan yang ngai	dāngˇ gan yang ngai	有什麼不同	engine-auto	
 ช็อกโกแลตสองอันนี้ต่างกันยังไง	chock ko laet song an nee tang kan yang ngai	chɔ̄kˋ gō lɛ̄tˋ sɔ̄ngˊ an nī~ dāngˇ gan yang ngai	這兩個巧克力有什麼不同	engine-auto	
-ราคาต่างกัน	ra kha tang kan	rā.kā da̅ ngˇgan	價格不同	book-exact	
+ราคาต่างกัน	ra kha tang kan	rā kā dāngˇ gan	價格不同	book-exact	(book-exact已用引擎重新驗證)
 อันนี้หวานกว่า	an nee wan kwa	an nī~ wānˊ gwāˇ	這個比較甜	engine-auto	
 อายุต่างกัน	a yu tang kan	ā yu~ dāngˇ gan	年紀不同	engine-auto	
 ไต้หวันกับเมืองไทยเวลาต่างกันหนึ่งชั่วโมง	tai wan kap mueang thai ve la tang kan nueng chu a mong	daiˋ wanˊ gapˇ mɯ̄ang tai wē lā dāngˇ gan nɯngˇ chūaˋ mōng	台灣跟泰國時間差一小時	engine-auto	
 สามทุ่มครึ่ง	sam thum khrueng	sāmˊ tumˋ krɯngˋ	九點半	engine-auto	
 สองทุ่มครึ่ง	song thum khrueng	sɔ̄ngˊ tumˋ krɯngˋ	八點半	engine-auto	
 เป็นโรคอะไร	pen rok a rai	ben rōkˋ aˇ rai	得了什麼病	engine-auto	
-โรค	rok	rōkˋ- duā	疾病	book-exact	
-เป็น	pen	ben	是（患病）	book-exact	
-เป็นโรคเบาหวาน	pen rok bao wan	ben rōkˋ bau wānˊ/ ma.reng / AIDS	患有糖尿病	book-exact	
+โรค	rok	rōkˋ	疾病	book-exact	(book-exact已用引擎重新驗證)
+เป็น	pen	ben	是（患病）	book-exact	(book-exact已用引擎重新驗證)
+เป็นโรคเบาหวาน	pen rok bao wan	ben rōkˋ bhāu wānˊ	患有糖尿病	book-exact	(book-exact已用引擎重新驗證)
 เบาหวาน	bao wan	bhāu wānˊ	糖尿病	engine-auto	
 มะเร็ง	ma reng	ma~ reng	癌症	engine-auto	
 เขาเป็นมะเร็ง	khao pen ma reng	kāuˊ ben ma~ reng	他患有癌症	engine-auto	
 เอดส์	et	ētˇ	愛滋病	engine-auto	
 เขาเป็นเอดส์	khao pen et	kāuˊ ben ētˇ	他患有愛滋病	engine-auto	
-กรอบ	krop	grɔ̅ pˇ	很脆	book-exact	
+กรอบ	krop	grɔ̄pˇ	很脆	book-exact	(book-exact已用引擎重新驗證)
 คะน้าหมูกรอบ	khana moo krop	ka~ nā~ mūˊ grɔ̄pˇ	芥蘭脆皮豬肉	engine-auto	
 หมูกรอบ	moo krop	mūˊ grɔ̄pˇ	脆皮豬肉（燒肉）	engine-auto	
 ก็ชอบเหมือนกัน	kor chop muean kan	gɔ̄ˋ chɔ̄pˋ mɯ̄anˊ gan	也喜歡	engine-auto	
@@ -6951,7 +6951,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ติดโควิด 19	tit covid sip kao	ditˇ kō wit~ 19	感染新冠肺炎	engine-auto	
 กลัวเมียจับได้	klua mia chap dai	glūa mīa japˇ dhaiˋ	怕老婆抓到	engine-auto	
 จับได้	chap dai	japˇ dhaiˋ	抓到	engine-auto	
-เหม็น	men	menˊ	臭	book-exact	
+เหม็น	men	menˊ	臭	book-exact	(book-exact已用引擎重新驗證)
 เหม็นควันรถ	men khwan rot	menˊ kwan rot~	臭車煙	engine-auto	
 ควัน	khwan	kwan	煙	engine-auto	
 เหม็นควันบุหรี่	men khwan buri	menˊ kwan bhuˇ rīˇ	臭菸味	engine-auto	
@@ -6976,7 +6976,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 หน้าดุ	na du	nāˋ dhuˇ	看起來很兇	engine-auto	
 โดนพ่อดุ	don phor du	dhōn pɔ̄ˋ dhuˇ	被爸爸罵	engine-auto	
 แย่	yae	yɛ̄ˋ	糟糕	engine-auto	
-อากาศ	a kat	ā.gātˇ	天氣	book-exact	
+อากาศ	a kat	ā gātˇ	天氣	book-exact	(book-exact已用引擎重新驗證)
 วันนี้อากาศเป็นยังไง	wan nee a kat pen yang ngai	wan nī~ ā gātˇ ben yang ngai	今天天氣怎麼樣	engine-auto	
 อากาศเย็นสบาย	a kat yen sa bai	ā gātˇ yen saˇ bhāi	天氣涼爽舒適	engine-auto	
 อาการ	a kan	ā gān	症狀	engine-auto	
@@ -6985,12 +6985,12 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 นิสัยแย่	ni sai yae	ni~ saiˊ yɛ̄ˋ	個性很糟	engine-auto	
 คนนี้นิสัยแย่มาก	khon nee ni sai yae mak	kon nī~ ni~ saiˊ yɛ̄ˋ mākˋ	這個人個性很糟	engine-auto	
 ขับรถแย่	khap rot yae	kapˇ rot~ yɛ̄ˋ	開車技術很爛	engine-auto	
-รสชาติ	rot chaat	rot~ chātˋ	口味（味道）	book-exact	
+รสชาติ	rot chaat	rot~ chātˋ	口味（味道）	book-exact	(book-exact已用引擎重新驗證)
 อร่อยไหม	a roy mai	aˇ rɔ̄iˋ maiˊ	好吃嗎	engine-auto	
-มาม่ารสอะไร	ma ma rot a rai	mā.māˋ	泡麵什麼口味	book-exact	
+มาม่ารสอะไร	ma ma rot a rai	mā māˋ rot~ aˇ rai	泡麵什麼口味	book-exact	(book-exact已用引擎重新驗證)
 .	.	.	.	engine-auto	
 แย่	yae	yɛ̄ˋ	糟糕	engine-auto	
-อากาศ	a kat	ā.gātˇ	天氣	book-exact	
+อากาศ	a kat	ā gātˇ	天氣	book-exact	(book-exact已用引擎重新驗證)
 วันนี้อากาศเป็นยังไง	wan nee a kat pen yang ngai	wan nī~ ā gātˇ ben yang ngai	今天天氣怎麼樣	engine-auto	
 อากาศเย็นสบาย	a kat yen sa bai	ā gātˇ yen saˇ bhāi	天氣涼爽舒適	engine-auto	
 อาการ	a kan	ā gān	症狀	engine-auto	
@@ -6999,15 +6999,15 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 นิสัยแย่	ni sai yae	ni~ saiˊ yɛ̄ˋ	個性很糟	engine-auto	
 คนนี้นิสัยแย่มาก	khon nee ni sai yae mak	kon nī~ ni~ saiˊ yɛ̄ˋ mākˋ	這個人個性很糟	engine-auto	
 ขับรถแย่	khap rot yae	kapˇ rot~ yɛ̄ˋ	開車技術很爛	engine-auto	
-รสชาติ	rot chaat	rot~ chātˋ	口味（味道）	book-exact	
+รสชาติ	rot chaat	rot~ chātˋ	口味（味道）	book-exact	(book-exact已用引擎重新驗證)
 อร่อยไหม	a roy mai	aˇ rɔ̄iˋ maiˊ	好吃嗎	engine-auto	
-มาม่ารสอะไร	ma ma rot a rai	mā.māˋ	泡麵什麼口味	book-exact	
+มาม่ารสอะไร	ma ma rot a rai	mā māˋ rot~ aˇ rai	泡麵什麼口味	book-exact	(book-exact已用引擎重新驗證)
 รู้สึก	ru suek	rū~ sɯkˇ	感覺	engine-auto	
 รู้สึกอะไรไหม	ru suek a rai mai	rū~ sɯkˇ aˇ rai maiˊ	有感覺到什麼嗎	engine-auto	
 รู้สึกหนาว	ru suek nao	rū~ sɯkˇ nāuˊ	覺得很冷	engine-auto	
 รู้สึกสนุก	ru suek sa nook	rū~ sɯkˇ saˇ nuk~	感到好玩	engine-auto	
 รู้สึกแปลก	ru suek plaek	rū~ sɯkˇ blɛ̄kˇ	感覺奇怪	engine-auto	
-รู้สึกแปลกจัง	ru suek plaek jang	rū~sɯkˇ blɛ̅ kˇjang	感覺真奇怪	book-exact	
+รู้สึกแปลกจัง	ru suek plaek jang	rū~ sɯkˇ blɛ̄kˇ jang	感覺真奇怪	book-exact	(book-exact已用引擎重新驗證)
 แปลก	plaek	blɛ̄kˇ	奇怪	engine-auto	
 จัง	jang	jang	真的（口語）	engine-auto	
 แปลกมาก	plaek mak	blɛ̄kˇ mākˋ	非常奇怪	engine-auto	
@@ -7019,24 +7019,24 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ชิน	chin	chin	習慣	engine-auto	
 ชินหรือยัง	chin rue yang	chin rɯ̄ˊ yang	習慣了嗎	engine-auto	
 還不進	yang mai chin	還不進	還不習慣	engine-auto	
-ชินแล้วก็เลยไม่รู้สึก	chin laeo kor loei mai ru suek	chin lɛ̅ u~ gɔ̅ ˋlə̅ i maiˋrū~ sɯkˇ	習慣了所以就沒感覺了	book-exact	
+ชินแล้วก็เลยไม่รู้สึก	chin laeo kor loei mai ru suek	chin lɛ̄u~ gɔ̄ˋ lə̄i maiˋ rū~ sɯkˇ	習慣了所以就沒感覺了	book-exact	(book-exact已用引擎重新驗證)
 ต่างกัน	tang kan	dāngˇ gan	不同、有差異	engine-auto	
 ต่างกันยังไง	tang kan yang ngai	dāngˇ gan yang ngai	有什麼不同	engine-auto	
 ช็อกโกแลตสองอันนี้ต่างกันยังไง	chock ko laet song an nee tang kan yang ngai	chɔ̄kˋ gō lɛ̄tˋ sɔ̄ngˊ an nī~ dāngˇ gan yang ngai	這兩個巧克力有什麼不同	engine-auto	
-ราคาต่างกัน	ra kha tang kan	rā.kā da̅ ngˇgan	價格不同	book-exact	
+ราคาต่างกัน	ra kha tang kan	rā kā dāngˇ gan	價格不同	book-exact	(book-exact已用引擎重新驗證)
 อันนี้หวานกว่า	an nee wan kwa	an nī~ wānˊ gwāˇ	這個比較甜	engine-auto	
 อายุต่างกัน	a yu tang kan	ā yu~ dāngˇ gan	年紀不同	engine-auto	
 ไต้หวันกับเมืองไทยเวลาต่างกันหนึ่งชั่วโมง	tai wan kap mueang thai ve la tang kan nueng chu a mong	daiˋ wanˊ gapˇ mɯ̄ang tai wē lā dāngˇ gan nɯngˇ chūaˋ mōng	台灣跟泰國時間差一小時	engine-auto	
 เป็นโรคอะไร	pen rok a rai	ben rōkˋ aˇ rai	得了什麼病	engine-auto	
-โรค	rok	rōkˋ- duā	疾病	book-exact	
-เป็น	pen	ben	是（用於患病）	book-exact	
-เป็นโรคเบาหวาน	pen rok bao wan	ben rōkˋ bau wānˊ/ ma.reng / AIDS	患有糖尿病	book-exact	
+โรค	rok	rōkˋ	疾病	book-exact	(book-exact已用引擎重新驗證)
+เป็น	pen	ben	是（用於患病）	book-exact	(book-exact已用引擎重新驗證)
+เป็นโรคเบาหวาน	pen rok bao wan	ben rōkˋ bhāu wānˊ	患有糖尿病	book-exact	(book-exact已用引擎重新驗證)
 เบาหวาน	bao wan	bhāu wānˊ	糖尿病	engine-auto	
 มะเร็ง	ma reng	ma~ reng	癌症	engine-auto	
 เขาเป็นมะเร็ง	khao pen ma reng	kāuˊ ben ma~ reng	他患有癌症	engine-auto	
 เอดส์	et	ētˇ	愛滋病	engine-auto	
 เขาเป็นเอดส์	khao pen et	kāuˊ ben ētˇ	他患有愛滋病	engine-auto	
-กรอบ	krop	grɔ̅ pˇ	很脆	book-exact	
+กรอบ	krop	grɔ̄pˇ	很脆	book-exact	(book-exact已用引擎重新驗證)
 คะน้าหมูกรอบ	khana moo krop	ka~ nā~ mūˊ grɔ̄pˇ	芥蘭脆皮豬肉	engine-auto	
 หมูกรอบ	moo krop	mūˊ grɔ̄pˇ	脆皮豬肉（燒肉）	engine-auto	
 ก็ชอบเหมือนกัน	kor chop muean kan	gɔ̄ˋ chɔ̄pˋ mɯ̄anˊ gan	也喜歡	engine-auto	
@@ -7056,7 +7056,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ติดโควิด 19	tit covid sip kao	ditˇ kō wit~ 19	感染新冠肺炎	engine-auto	
 กลัวเมียจับได้	klua mia chap dai	glūa mīa japˇ dhaiˋ	怕老婆抓到	engine-auto	
 จับได้	chap dai	japˇ dhaiˋ	抓到	engine-auto	
-เหม็น	men	menˊ	臭	book-exact	
+เหม็น	men	menˊ	臭	book-exact	(book-exact已用引擎重新驗證)
 เหม็นควันรถ	men khwan rot	menˊ kwan rot~	臭車煙	engine-auto	
 ควัน	khwan	kwan	煙	engine-auto	
 เหม็นควันบุหรี่	men khwan buri	menˊ kwan bhuˇ rīˇ	臭菸味	engine-auto	
@@ -7081,7 +7081,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 เจ้านายดุ	chao nai du	jāuˋ nāi dhuˇ	上司很兇	engine-auto	
 หน้าดุ	na du	nāˋ dhuˇ	看起來很兇	engine-auto	
 แย่	yae	yɛ̄ˋ	糟糕	engine-auto	
-อากาศ	a kat	ā.gātˇ	天氣	book-exact	
+อากาศ	a kat	ā gātˇ	天氣	book-exact	(book-exact已用引擎重新驗證)
 วันนี้อากาศเป็นยังไง	wan nee a kat pen yang ngai	wan nī~ ā gātˇ ben yang ngai	今天天氣怎麼樣	engine-auto	
 อากาศเย็นสบาย	a kat yen sa bai	ā gātˇ yen saˇ bhāi	天氣涼爽舒適	engine-auto	
 อาการ	a kan	ā gān	症狀	engine-auto	
@@ -7090,9 +7090,9 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 นิสัยแย่	ni sai yae	ni~ saiˊ yɛ̄ˋ	個性很糟	engine-auto	
 คนนี้นิสัยแย่มาก	khon nee ni sai yae mak	kon nī~ ni~ saiˊ yɛ̄ˋ mākˋ	這個人個性很糟	engine-auto	
 ขับรถแย่	khap rot yae	kapˇ rot~ yɛ̄ˋ	開車技術很爛	engine-auto	
-รสชาติ	rot chaat	rot~ chātˋ	口味（味道）	book-exact	
+รสชาติ	rot chaat	rot~ chātˋ	口味（味道）	book-exact	(book-exact已用引擎重新驗證)
 อร่อยไหม	a roy mai	aˇ rɔ̄iˋ maiˊ	好吃嗎	engine-auto	
-มาม่ารสอะไร	ma ma rot a rai	mā.māˋ	泡麵什麼口味	book-exact	
+มาม่ารสอะไร	ma ma rot a rai	mā māˋ rot~ aˇ rai	泡麵什麼口味	book-exact	(book-exact已用引擎重新驗證)
 ยุ่ง	yung	yungˋ	忙	engine-auto	
 ยุ่ง	yung	yungˋ	管（干涉）	engine-auto	
 ยุ่งกับฉัน	yung kap chan	yungˋ gapˇ chanˊ	管我	engine-auto	
@@ -7100,7 +7100,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 อย่าไปยุ่งกับเขา	ya pai yung kap khao	yāˋ bai yungˋ gapˇ kāuˊ	別去管他	engine-auto	
 กำลังยุ่งอยู่	kam lang yung yu	gam lang yungˋ yūˋ	正在忙	engine-auto	
 เดี๋ยวโทรกลับ	dieo tho klap	dhīauˊ tōn glapˇ	等一下回撥	engine-auto	
-แน่นอน	nae non	nɛ̅ ˋnɔ̅ n	當然（一定）	book-exact	
+แน่นอน	nae non	nɛ̄ˋ nɔ̄n	當然（一定）	book-exact	(book-exact已用引擎重新驗證)
 ยังไม่แน่นอน	yang mai nae non	yang maiˋ nɛ̄ˋ nɔ̄n	還不確定	engine-auto	
 ยังไม่แน่	yang mai nae	yang maiˋ nɛ̄ˋ	還不確定（簡略）	engine-auto	
 ศูนย์คะแนน	soon khanaen	sūnˊ ka~ nɛ̄n	零分	engine-auto	
@@ -7138,28 +7138,28 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 รู้สึกเสียดาย	roo seuk sia dai	rū~ sɯkˇ sīaˊ dhāi	覺得可惜	engine-auto	
 รู้สึกเหม็น	roo seuk men	rū~ sɯkˇ menˊ	覺得臭	engine-auto	
 แปลก	bplaek	blɛ̄kˇ	奇怪	engine-auto	
-รสชาติ	rot chat	rot~ chātˋ	味道	book-exact	
+รสชาติ	rot chat	rot~ chātˋ	味道	book-exact	(book-exact已用引擎重新驗證)
 วันนี้คุณดูแปลกๆ	wan nee kun doo bplaek bplaek	wan nī~ kun dhū blɛ̄kˇ blɛ̄kˇ	今天你看起來怪怪的	engine-auto	
 คนแปลกหน้า	kon bplaek na	kon blɛ̄kˇ nāˋ	陌生人	engine-auto	
 อย่าเชื่อคนแปลกหน้า	ya cheua kon bplaek na	yāˋ chɯ̄aˋ kon blɛ̄kˇ nāˋ	不要相信陌生人	engine-auto	
-ชินแล้วก็เลยไม่รู้สึก	chin laew gor loey mai roo seuk	chin lɛ̅ u~ gɔ̅ ˋlə̅ i maiˋrū~ sɯkˇ	習慣了所以沒感覺	book-exact	
+ชินแล้วก็เลยไม่รู้สึก	chin laew gor loey mai roo seuk	chin lɛ̄u~ gɔ̄ˋ lə̄i maiˋ rū~ sɯkˇ	習慣了所以沒感覺	book-exact	(book-exact已用引擎重新驗證)
 อยู่ไต้หวันชินหรือยัง	yoo dtai wan chin reu yang	yūˋ daiˋ wanˊ chin rɯ̄ˊ yang	在台灣習慣了嗎	engine-auto	
 อยู่เมืองไทยชินหรือยัง	yoo mueang tai chin reu yang	yūˋ mɯ̄ang tai chin rɯ̄ˊ yang	在泰國習慣了嗎	engine-auto	
 อยู่ 10 ปีแล้วแต่ยังไม่ชิน	yoo sip pee laew dtae yang mai chin	yūˋ 10 bī lɛ̄u~ dɛ̄ˇ yang maiˋ chin	住十年了但還不習慣	engine-auto	
 ใจเย็นๆ เดี๋ยวก็ชิน	jai yen yen diao gor chin	jai yen yen dhīauˊ gɔ̄ˋ chin	冷靜點，等一下就習慣了	engine-auto	
 ต่างกัน	dtang gan	dāngˇ gan	不同	engine-auto	
 สองรุ่นนี้ต่างกันยังไง	song roon nee dtang gan yang ngai	sɔ̄ngˊ runˋ nī~ dāngˇ gan yang ngai	這兩款有什麼不同	engine-auto	
-ราคาต่างกัน	ra ka dtang gan	rā.kā da̅ ngˇgan	價格不同	book-exact	
+ราคาต่างกัน	ra ka dtang gan	rā kā dāngˇ gan	價格不同	book-exact	(book-exact已用引擎重新驗證)
 沒有什麼不同	mai mee arai dtang gan loey	沒有什麼不同	沒什麼不同	engine-auto	
 ต่างกันแค่ราคา	dtang gan kae ra ka	dāngˇ gan kɛ̄ˋ rā kā	只差在價格	engine-auto	
 ราคาต่างกันหนึ่งหมื่นบาท	ra ka dtang gan neung muen baat	rā kā dāngˇ gan nɯngˇ mɯ̄nˇ bhātˇ	價格差一萬銖	engine-auto	
-โรค	rok	rōkˋ- duā	疾病	book-exact	
+โรค	rok	rōkˋ	疾病	book-exact	(book-exact已用引擎重新驗證)
 เขาเป็นโรคอะไร	kao bpen rok arai	kāuˊ ben rōkˋ aˇ rai	他得了什麼病？	engine-auto	
 เขาเป็นโรคเอดส์	kao bpen rok et	kāuˊ ben rōkˋ ētˇ	他得了愛滋病	engine-auto	
 ปู่เป็นโรคเบาหวาน	bpoo bpen rok bao waan	būˇ ben rōkˋ bhāu wānˊ	爺爺有糖尿病	engine-auto	
 โรคหัวใจ	rok hua jai	rōkˋ hūaˊ jai	心臟病	engine-auto	
 เขาเป็นโรคหัวใจ	kao bpen rok hua jai	kāuˊ ben rōkˋ hūaˊ jai	他得了心臟病	engine-auto	
-กรอบ	grop	grɔ̅ pˇ	酥脆	book-exact	
+กรอบ	grop	grɔ̄pˇ	酥脆	book-exact	(book-exact已用引擎重新驗證)
 ไก่ทอดกรอบ	gai tot grop	gaiˇ tɔ̄tˋ grɔ̄pˇ	脆皮炸雞	engine-auto	
 ข้าวหมูกรอบ	kao moo grop	kāuˋ mūˊ grɔ̄pˇ	脆皮燒肉飯	engine-auto	
 ชอบกินข้าวหมูกรอบไหมคะ	chop gin kao moo grop mai ka	chɔ̄pˋ gin kāuˋ mūˊ grɔ̄pˇ maiˊ ka~	你喜歡吃脆皮燒肉飯嗎？	engine-auto	
@@ -7174,7 +7174,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 คิดว่าบุหรี่มีประโยชน์ไหมคะ	kit wa bu ree mee bprayot mai ka	kit~ wāˋ bhuˇ rīˇ mī braˇ yōtˋ maiˊ ka~	你認為香菸有好處嗎？	engine-auto	
 บุหรี่ไม่มีประโยชน์	bu ree mai mee bprayot	bhuˇ rīˇ maiˋ mī braˇ yōtˋ	香菸沒有好處	engine-auto	
 ออกกำลังกายมีประโยชน์ไหมคะ	ok gam lang gai mee bprayot mai ka	ɔ̄kˇ gam lang gāi mī braˇ yōtˋ maiˊ ka~	運動有好處嗎？	engine-auto	
-เหม็น	men	menˊ	臭	book-exact	
+เหม็น	men	menˊ	臭	book-exact	(book-exact已用引擎重新驗證)
 ทุเรียน	tu rian	tu~ rīan	榴槤	engine-auto	
 ทุเรียนเหม็นเกินไป	tu rian men gern bpai	tu~ rīan menˊ gə̄n bai	榴槤太臭了	engine-auto	
 ทุเรียนเหม็นไปหน่อย	tu rian men bpai noi	tu~ rīan menˊ bai nɔ̄iˇ	榴槤臭了點	engine-auto	
@@ -7194,7 +7194,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 กลิ่นปาก	glin bpaak	glinˇ bākˇ	口臭	engine-auto	
 ถ้ากินกระเทียมเยอะเกินไป จะมีกลิ่นปาก	ta gin gra tiam yuh gern bpai ja mee glin bpaak	tāˋ gin graˇ tīam yə~ gə̄n bai jaˇ mī glinˇ bākˇ	如果大蒜吃太多，會有口臭	engine-auto	
 กลิ่นตัว	glin dtua	glinˇ dūa	體味	engine-auto	
-รสชาติ	rot chat	rot~ chātˋ	味道（口味）	book-exact	
+รสชาติ	rot chat	rot~ chātˋ	味道（口味）	book-exact	(book-exact已用引擎重新驗證)
 ดุ	du	dhuˇ	兇	engine-auto	
 พ่อเป็นคนดุ	por bpen kon du	pɔ̄ˋ ben kon dhuˇ	爸爸是很兇的人	engine-auto	
 พ่อของคุณดุไหมคะ	por kong kun du mai ka	pɔ̄ˋ kɔ̄ngˊ kun dhuˇ maiˊ ka~	你爸爸兇嗎？	engine-auto	
@@ -7226,7 +7226,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ร้องเพลง	rong pleng	rɔ̄ng~ plēng	唱歌	engine-auto	
 คนบ้าร้องเพลงทั้งวัน	kon ba rong pleng tang wan	kon bhāˋ rɔ̄ng~ plēng tang~ wan	瘋子整天唱歌	engine-auto	
 คนบ้างาน	kon ba ngan	kon bhāˋ ngān	工作狂	engine-auto	
-แน่นอน	nae non	nɛ̅ ˋnɔ̅ n	肯定 / 一定	book-exact	
+แน่นอน	nae non	nɛ̄ˋ nɔ̄n	肯定 / 一定	book-exact	(book-exact已用引擎重新驗證)
 ถ้าเมียจับได้ ตายแน่นอน	ta mia jap dai dtai nae non	tāˋ mīa japˇ dhaiˋ dāi nɛ̄ˋ nɔ̄n	如果老婆抓到一定死定了	engine-auto	
 แน่ๆ	nae nae	nɛ̄ˋ nɛ̄ˋ	肯定（口語）	engine-auto	
 ถ้าเมียจับได้ ตายแน่ๆ	ta mia jap dai dtai nae nae	tāˋ mīa japˇ dhaiˋ dāi nɛ̄ˋ nɛ̄ˋ	如果老婆抓到一定死定了（口語）	engine-auto	
@@ -7238,17 +7238,17 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ต้องเข้าคิว	dtong kao cue	dɔ̄ngˋ kāuˋ kiw	要排隊	engine-auto	
 อย่าแซงคิว	ya saeng cue	yāˋ sɛ̄ng kiw	不要插隊	engine-auto	
 ถึงคิวที่เท่าไหร่แล้ว	teung cue tee tao rai laew	tɯngˊ kiw tīˋ tāuˋ raiˇ lɛ̄u~	輪到幾號了	engine-auto	
-เป็น	pen	ben	是/活著的	book-exact	
+เป็น	pen	ben	是/活著的	book-exact	(book-exact已用引擎重新驗證)
 เป็นโรคอะไร	pen rok arai	ben rōkˋ aˇ rai	得到什麼病？	engine-auto	
 เป็นอะไร	pen arai	ben aˇ rai	怎麼了？	engine-auto	
 ไม่สบายหรือเปล่า	mai sabai rue plao	maiˋ saˇ bhāi rɯ̄ˊ blāuˇ	是不舒服嗎？	engine-auto	
 เป็นอะไร ทำไมไม่มาทำงาน	pen arai thammai mai ma tham ngan	ben aˇ rai tam mai maiˋ mā tam ngān	怎麼了？為什麼沒來上班？	engine-auto	
 เป็นอะไร ทำไมไม่พูดกับฉัน	pen arai thammai mai phut kap chan	ben aˇ rai tam mai maiˋ pūtˋ gapˇ chanˊ	怎麼了？為什麼不跟我說話？	engine-auto	
-เป็นยังไง	pen yang ngai	ben yang ngai ?	怎麼樣？	book-exact	
+เป็นยังไง	pen yang ngai	ben yang ngai	怎麼樣？	book-exact	(book-exact已用引擎重新驗證)
 อยู่เมืองไทยเป็นยังไง สบายดีไหม	yu mueang thai pen yang ngai sabai di mai	yūˋ mɯ̄ang tai ben yang ngai saˇ bhāi dhī maiˊ	在泰國怎麼樣？過得好嗎？	engine-auto	
 เรียนภาษาไทยเป็นยังไง	rian phasa thai pen yang ngai	rīan pā sāˊ tai ben yang ngai	學泰文覺得怎麼樣？	engine-auto	
 เป็นไปได้	pen pai dai	ben bai dhaiˋ	有可能	engine-auto	
-เป็นไปไม่ได้	pen pai mai dai	ben bai maiˋḍaiˋ	不可能	book-exact	
+เป็นไปไม่ได้	pen pai mai dai	ben bai maiˋ dhaiˋ	不可能	book-exact	(book-exact已用引擎重新驗證)
 พรุ่งนี้ไต้หวันหิมะตก เป็นไปได้หรือเป็นไปไม่ได้	phrung ni tai wan hima tok pen pai dai rue pen pai mai dai	prungˋ nī~ daiˋ wanˊ hiˇ ma~ dokˇ ben bai dhaiˋ rɯ̄ˊ ben bai maiˋ dhaiˋ	明天台灣下雪，有可能還是不可能？	engine-auto	
 ทำ	tam	tam	做	engine-auto	
 ทำหน้าเครียด	tam na khriat	tam nāˋ krīatˋ	擺臭臉	engine-auto	
@@ -7281,7 +7281,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ร้องเพลง	rong pleng	rɔ̄ng~ plēng	唱歌	engine-auto	
 คนบ้าร้องเพลงทั้งวัน	kon ba rong pleng tang wan	kon bhāˋ rɔ̄ng~ plēng tang~ wan	瘋子整天唱歌	engine-auto	
 คนบ้างาน	kon ba ngan	kon bhāˋ ngān	工作狂	engine-auto	
-แน่นอน	nae non	nɛ̅ ˋnɔ̅ n	肯定 / 一定	book-exact	
+แน่นอน	nae non	nɛ̄ˋ nɔ̄n	肯定 / 一定	book-exact	(book-exact已用引擎重新驗證)
 ถ้าเมียจับได้ ตายแน่นอน	ta mia jap dai dtai nae non	tāˋ mīa japˇ dhaiˋ dāi nɛ̄ˋ nɔ̄n	如果老婆抓到一定死定了	engine-auto	
 แน่ๆ	nae nae	nɛ̄ˋ nɛ̄ˋ	肯定（口語）	engine-auto	
 ถ้าเมียจับได้ ตายแน่ๆ	ta mia jap dai dtai nae nae	tāˋ mīa japˇ dhaiˋ dāi nɛ̄ˋ nɛ̄ˋ	如果老婆抓到一定死定了（口語）	engine-auto	
@@ -7318,7 +7318,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 เป็นพิเศษ	bpen pi set	ben pi~ sētˇ	特別的	engine-auto	
 อร่อยเป็นพิเศษ	aroi bpen pi set	aˇ rɔ̄iˋ ben pi~ sētˇ	特別好吃	engine-auto	
 แพงเป็นพิเศษ	paeng bpen pi set	pɛ̄ng ben pi~ sētˇ	特別貴	engine-auto	
-น่า	Na	nāˋ	令人.../值得...	book-exact	
+น่า	Na	nāˋ	令人.../值得...	book-exact	(book-exact已用引擎重新驗證)
 น่ารัก	Na rak	nāˋ rak~	可愛	engine-auto	
 หมาน่ารัก	Ma na rak	māˊ nāˋ rak~	狗狗很可愛	engine-auto	
 น่ากิน	Na kin	nāˋ gin	看起來好吃	engine-auto	
@@ -7370,15 +7370,15 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 เป็นอะไร	Pen arai	ben aˇ rai	怎麼了	engine-auto	
 เป็นอะไร ทำไมดูแปลกๆ	Pen arai thammai du plaek plaek	ben aˇ rai tam mai dhū blɛ̄kˇ blɛ̄kˇ	怎麼了，為什麼看起來怪怪的	engine-auto	
 เป็นอะไร ไม่สบายหรือเปล่า	Pen arai mai sabai rue plao	ben aˇ rai maiˋ saˇ bhāi rɯ̄ˊ blāuˇ	怎麼了，是不是不舒服呢	engine-auto	
-เป็นยังไง	Pen yang ngai	ben yang ngai ?	怎麼樣	book-exact	
+เป็นยังไง	Pen yang ngai	ben yang ngai	怎麼樣	book-exact	(book-exact已用引擎重新驗證)
 เป็นยังไงบ้าง	Pen yang ngai bang	ben yang ngai bhāngˋ	最近怎麼樣	engine-auto	
 ไม่เจอกันนาน	Mai choe kan nan	maiˋ jə̄ gan nān	好久不見	engine-auto	
 ไม่เจอกันนาน เป็นยังไงบ้าง	Mai choe kan nan pen yang ngai bang	maiˋ jə̄ gan nān ben yang ngai bhāngˋ	好久不見，最近怎麼樣	engine-auto	
 สบายดีไหม	Sabai di mai	saˇ bhāi dhī maiˊ	你好嗎	engine-auto	
 คิดถึงจังเลย	Khit thueng chang loei	kit~ tɯngˊ jang lə̄i	真想你	engine-auto	
-รู้สึกแปลกจัง	Rusuek plaek chang	rū~sɯkˇ blɛ̅ kˇjang	感覺真奇怪	book-exact	
+รู้สึกแปลกจัง	Rusuek plaek chang	rū~ sɯkˇ blɛ̄kˇ jang	感覺真奇怪	book-exact	(book-exact已用引擎重新驗證)
 เป็นไปได้	Pen pai dai	ben bai dhaiˋ	有可能	engine-auto	
-เป็นไปไม่ได้	Pen pai mai dai	ben bai maiˋḍaiˋ	不可能	book-exact	
+เป็นไปไม่ได้	Pen pai mai dai	ben bai maiˋ dhaiˋ	不可能	book-exact	(book-exact已用引擎重新驗證)
 พรุ่งนี้หิมะจะตก เป็นไปได้ หรือ เป็นไปไม่ได้	Phrungni hima cha tok pen pai dai rue pen pai mai dai	prungˋ nī~ hiˇ ma~ jaˇ dokˇ ben bai dhaiˋ rɯ̄ˊ ben bai maiˋ dhaiˋ	明天下雪是有可能還是不可能	engine-auto	
 เป็นหวัด	pen wat	ben watˇ	感冒	engine-auto	
 เป็นหวัดกี่วันแล้ว	pen wat ki wan laeo	ben watˇ gīˇ wan lɛ̄u~	感冒幾天了	engine-auto	
@@ -7435,7 +7435,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 เครียด	Kried	krīatˋ	壓力	engine-auto	
 ทำหน้าเครียด	Tham na kried	tam nāˋ krīatˋ	臉看起來很有壓力	engine-auto	
 เป็นหนี้เยอะก็เลยเครียด	Pen nee yuer kor loei kried	ben nīˋ yə~ gɔ̄ˋ lə̄i krīatˋ	負債很多所以有壓力	engine-auto	
-อากาศ	akat	ā.gātˇ	天氣	book-exact	
+อากาศ	akat	ā gātˇ	天氣	book-exact	(book-exact已用引擎重新驗證)
 ปีหนึ่ง	pi nueng	bī nɯngˇ	一年	engine-auto	
 1 ปี	nueng pi	1 bī	一年（正式）	engine-auto	
 อบอ้าว	op ao	opˇ āuˋ	悶熱	engine-auto	
@@ -7451,7 +7451,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ผลิ	phli	pliˇ	綻放、發芽	engine-auto	
 หน้าทุเรียน	na thu rian	nāˋ tu~ rīan	榴槤季	engine-auto	
 หน้าลำไย	na lam yai	nāˋ lam yai	龍眼季	engine-auto	
-อากาศ	akat	ā.gātˇ	天氣	book-exact	
+อากาศ	akat	ā gātˇ	天氣	book-exact	(book-exact已用引擎重新驗證)
 ปีหนึ่ง	pi nueng	bī nɯngˇ	一年	engine-auto	
 1 ปี	nueng pi	1 bī	一年（正式）	engine-auto	
 อบอ้าว	op ao	opˇ āuˋ	悶熱	engine-auto	
@@ -7467,8 +7467,8 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ผลิ	phli	pliˇ	綻放、發芽	engine-auto	
 หน้าทุเรียน	na thu rian	nāˋ tu~ rīan	榴槤季	engine-auto	
 หน้าลำไย	na lam yai	nāˋ lam yai	龍眼季	engine-auto	
-แผ่นดินไหว	phaen din wai	pɛ̅ nˇḍin waiˊ	地震	book-exact	
-ภูเขาไฟระเบิด	phu khao fai ra boet	pu̅ .kauˊfai ra.ḅə̅ tˇ	火山爆發	book-exact	
+แผ่นดินไหว	phaen din wai	pɛ̄nˇ dhin waiˊ	地震	book-exact	(book-exact已用引擎重新驗證)
+ภูเขาไฟระเบิด	phu khao fai ra boet	pū kāuˊ fai ra~ bhə̄tˇ	火山爆發	book-exact	(book-exact已用引擎重新驗證)
 ภูเขา	phu khao	pū kāuˊ	山	engine-auto	
 ระเบิด	ra boet	ra~ bhə̄tˇ	爆發/炸彈	engine-auto	
 ไฟไหม้	fai mai	fai maiˋ	火災	engine-auto	
@@ -7478,9 +7478,9 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 แดด	daet	dhɛ̄tˇ	陽光	engine-auto	
 ไม่มีแดด	mai mi daet	maiˋ mī dhɛ̄tˇ	沒有陽光	engine-auto	
 ตากเสื้อ	tak suea	dākˇ sɯ̄aˋ	晾衣服	engine-auto	
-พระอาทิตย์	phra athit	pra~ā.tit~	太陽	book-exact	
+พระอาทิตย์	phra athit	pra~ ā tit~	太陽	book-exact	(book-exact已用引擎重新驗證)
 ดูพระอาทิตย์ขึ้น	du phra athit khuen	dhū pra~ ā tit~ kɯnˋ	看日出	engine-auto	
-พระจันทร์	phra chan	pra~ jan	月亮	book-exact	
+พระจันทร์	phra chan	pra~ jan	月亮	book-exact	(book-exact已用引擎重新驗證)
 สีเหลือง	si lueang	sīˊ lɯ̄angˊ	黃色	engine-auto	
 เต็ม	tem	dem	滿	engine-auto	
 ดาวตก	dao tok	dhāu dokˇ	流星	engine-auto	
@@ -7518,7 +7518,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ก็จะหยุดเรียนหยุดงาน	ko cha yut rian yut ngan	gɔ̄ˋ jaˇ yutˇ rīan yutˇ ngān	就會停課停班	engine-auto	
 กลัวแผ่นดินไหวไหม	klua phaendin wai mai	glūa pɛ̄nˇ dhin waiˊ maiˊ	怕地震嗎	engine-auto	
 แผ่นดินไหวครั้งนี้แรงมาก	phaendin wai khrang ni raeng mak	pɛ̄nˇ dhin waiˊ krang~ nī~ rɛ̄ng mākˋ	這次地震非常強烈	engine-auto	
-ภูเขาไฟระเบิด	phukhaofai raboet	pu̅ .kauˊfai ra.ḅə̅ tˇ	火山爆發	book-exact	
+ภูเขาไฟระเบิด	phukhaofai raboet	pū kāuˊ fai ra~ bhə̄tˇ	火山爆發	book-exact	(book-exact已用引擎重新驗證)
 ไม่อยากเจอ	mai yak choe	maiˋ yākˋ jə̄	不想遇到	engine-auto	
 ข้างหน้ามีรถระเบิด	khang na mi rot raboet	kāngˋ nāˋ mī rot~ ra~ bhə̄tˇ	前面有車子爆炸	engine-auto	
 แปลกจังทำไมมีระเบิด	plaek chang thammai mi raboet	blɛ̄kˇ jang tam mai mī ra~ bhə̄tˇ	真奇怪為什麼有爆炸	engine-auto	
@@ -7559,7 +7559,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 เขาหลอกฉัน	khao lok chan	kāuˊ lɔ̄kˇ chanˊ	他騙我	engine-auto	
 ตายแน่	tai nae	dāi nɛ̄ˋ	死定了	engine-auto	
 ถ้าคุณหลอกฉันตายแน่ๆ	tha khun lok chan tai nae nae	tāˋ kun lɔ̄kˇ chanˊ dāi nɛ̄ˋ nɛ̄ˋ	如果你騙我死定了	engine-auto	
-คุณแน่ใจ	khun nae chai	khun nɛ̅ ˋjai ? / chua	你確定嗎	book-exact	
+คุณแน่ใจ	khun nae chai	kun nɛ̄ˋ jai	你確定嗎	book-exact	(book-exact已用引擎重新驗證)
 ฉันแน่ใจ	chan nae chai	chanˊ nɛ̄ˋ jai	我確定	engine-auto	
 ชัวร์	chua	chūa	確定	engine-auto	
 จะแต่งงานชัวร์ยัง	cha taeng ngan chua yang	jaˇ dɛ̄ngˇ ngān chūa yang	確定要結婚了嗎	engine-auto	
@@ -7567,12 +7567,12 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ไม่แน่ใจ	mai nae chai	maiˋ nɛ̄ˋ jai	不確定	engine-auto	
 ไม่ชัวร์	mai chua	maiˋ chūa	不確定	engine-auto	
 ตกใจ	tok chai	dokˇ jai	嚇一跳	engine-auto	
-ตกใจหมดเลย	tok chai mot loei	dokˇjai motˇlǝ̅ i	嚇死我了	book-exact	
+ตกใจหมดเลย	tok chai mot loei	dokˇ jai motˇ lə̄i	嚇死我了	book-exact	(book-exact已用引擎重新驗證)
 คิดมาก	khit mak	kit~ mākˋ	想太多	engine-auto	
 อย่าไปคิดมาก	ya pai khit mak	yāˋ bai kit~ mākˋ	別想太多	engine-auto	
 เบียร์ต้องแช่เย็น	bia tong chae yen	bhīa dɔ̄ngˋ chɛ̄ˋ yen	啤酒必須冷藏	engine-auto	
 ไม่อย่างนั้น	mai yang nan	maiˋ yāngˋ nan~	否則	engine-auto	
-ไม่อย่างนั้นไม่อร่อย	mai yang nan mai aroi	maiˋyāngˇnan~ maiˋa.roiˇ	否則不好吃	book-exact	
+ไม่อย่างนั้นไม่อร่อย	mai yang nan mai aroi	maiˋ yāngˋ nan~ maiˋ aˇ rɔ̄iˋ	否則不好吃	book-exact	(book-exact已用引擎重新驗證)
 เลือดไหล	lueat lai	lɯ̄atˋ laiˊ	流血	engine-auto	
 อากาศร้อนมาก	akat ron mak	ā gātˇ rɔ̄n~ mākˋ	天氣很熱	engine-auto	
 เหงื่อ	nguea	ngɯ̄aˇ	汗	engine-auto	
@@ -7604,13 +7604,13 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 อาบน้ำ	ap nam	āpˇ nām~	洗澡	engine-auto	
 อาบน้ำวันละ 2 ครั้ง	ap nam wan la song khrang	āpˇ nām~ wan la~ 2 krang~	一天洗兩次澡	engine-auto	
 แปรงฟัน	praeng fan	brɛ̄ng fan	刷牙	engine-auto	
-หวีผม	wi phom	wīˊpomˊ	梳頭髮	book-exact	
-แต่งตัว	taeng tua	dɛ̅ ngˇdua	打扮	book-exact	
-แต่งหน้า	taeng na	dɛ̅ ngˇnāˋ	化妝	book-exact	
-รีบออกจากบ้าน	rip ok chak ban	rīpˋɔ̅ kˇjākˇḅānˋ	趕快出門	book-exact	
+หวีผม	wi phom	wīˊ pomˊ	梳頭髮	book-exact	(book-exact已用引擎重新驗證)
+แต่งตัว	taeng tua	dɛ̄ngˇ dūa	打扮	book-exact	(book-exact已用引擎重新驗證)
+แต่งหน้า	taeng na	dɛ̄ngˇ nāˋ	化妝	book-exact	(book-exact已用引擎重新驗證)
+รีบออกจากบ้าน	rip ok chak ban	rīpˋ ɔ̄kˇ jākˇ bhānˋ	趕快出門	book-exact	(book-exact已用引擎重新驗證)
 วิ่ง	wing	wingˋ	跑	engine-auto	
-วิ่งขึ้นรถ	wing khuen rot	wingˋkɯnˋrot~	跑上車	book-exact	
-โชคดีที่มาทัน	chok di thi ma than	chōkˋḍī tīˋmā tan	幸好趕上	book-exact	
+วิ่งขึ้นรถ	wing khuen rot	wingˋ kɯnˋ rot~	跑上車	book-exact	(book-exact已用引擎重新驗證)
+โชคดีที่มาทัน	chok di thi ma than	chō ka~ dhī tīˋ mā tan	幸好趕上	book-exact	(book-exact已用引擎重新驗證)
 แต่งบ้าน	taeng ban	dɛ̄ngˇ bhānˋ	佈置家裡	engine-auto	
 แต่งรถ	taeng rot	dɛ̄ngˇ rot~	改裝車	engine-auto	
 ตกแต่ง	tok taeng	dokˇ dɛ̄ngˇ	裝飾	engine-auto	
@@ -7658,7 +7658,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 อุ๊ยเจ็บจังเลย	ui chep chang loei	ui~ jepˇ jang lə̄i	哎呀好痛	engine-auto	
 ไม่อย่างนั้น	mai yang nan	maiˋ yāngˋ nan~	否則	engine-auto	
 ต้องกินทันที	tong kin than thi	dɔ̄ngˋ gin tan tī	必須馬上吃	engine-auto	
-ไม่อย่างนั้นไม่อร่อย	mai yang nan mai aroi	maiˋyāngˇnan~ maiˋa.roiˇ	否則不好吃	book-exact	
+ไม่อย่างนั้นไม่อร่อย	mai yang nan mai aroi	maiˋ yāngˋ nan~ maiˋ aˇ rɔ̄iˋ	否則不好吃	book-exact	(book-exact已用引擎重新驗證)
 ต้องจองก่อน	tong chong kon	dɔ̄ngˋ jɔ̄ng gɔ̄nˇ	必須先訂位	engine-auto	
 ไม่อย่างนั้นรอนานแน่นอน	mai yang nan ro nan naenon	maiˋ yāngˋ nan~ rɔ̄ nān nɛ̄ˋ nɔ̄n	否則一定等很久	engine-auto	
 เลือดไหล	lueat lai	lɯ̄atˋ laiˊ	流血	engine-auto	
@@ -7699,7 +7699,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ตกแต่ง	tok taeng	dokˇ dɛ̄ngˇ	裝飾	engine-auto	
 ตกแต่งต้องใช้เวลา	tok taeng tong chai wela	dokˇ dɛ̄ngˇ dɔ̄ngˋ chai~ wē lā	裝潢需要時間	engine-auto	
 ใช้เวลาประมาณสามอาทิตย์	chai wela praman sam athit	chai~ wē lā braˇ mān sāmˊ ā tit~	大約需要三個星期	engine-auto	
-แต่งหน้า	taeng na	dɛ̅ ngˇnāˋ	化妝	book-exact	
+แต่งหน้า	taeng na	dɛ̄ngˇ nāˋ	化妝	book-exact	(book-exact已用引擎重新驗證)
 แต่งหน้าเข้ม	taeng na khem	dɛ̄ngˇ nāˋ kēmˋ	化濃妝	engine-auto	
 ชอบผู้หญิงแต่งหน้าเข้ม	chop phuying taeng na khem	chɔ̄pˋ pūˋ yingˊ dɛ̄ngˇ nāˋ kēmˋ	喜歡化濃妝的女生	engine-auto	
 ผมไม่ค่อยชอบผู้หญิงแต่งหน้าเข้ม	phom mai khoi chop phuying taeng na khem	pomˊ maiˋ kɔ̄iˋ chɔ̄pˋ pūˋ yingˊ dɛ̄ngˇ nāˋ kēmˋ	我不怎麼喜歡化濃妝的女生	engine-auto	
@@ -7707,7 +7707,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ไม่แต่งหน้าก็สวย	mai taeng na ko suai	maiˋ dɛ̄ngˇ nāˋ gɔ̄ˋ sūayˊ	不化妝也漂亮	engine-auto	
 ทำไม่เป็น	tham mai pen	tam maiˋ ben	不會做	engine-auto	
 แต่งหน้าเค้ก	taeng na khek	dɛ̄ngˇ nāˋ kēk~	裝飾蛋糕	engine-auto	
-แต่งตัว	taeng tua	dɛ̅ ngˇdua	打扮	book-exact	
+แต่งตัว	taeng tua	dɛ̄ngˇ dūa	打扮	book-exact	(book-exact已用引擎重新驗證)
 แต่งตัวสุภาพ	taeng tua suphap	dɛ̄ngˇ dūa suˇ pāpˋ	穿著端莊	engine-auto	
 ไปวัดต้องแต่งตัวสุภาพ	pai wat tong taeng tua suphap	bai wat~ dɔ̄ngˋ dɛ̄ngˇ dūa suˇ pāpˋ	去寺廟必須穿著端莊	engine-auto	
 ไปวัดห้ามแต่งตัวเซ็กซี่	pai wat ham taeng tua seksi	bai wat~ hāmˋ dɛ̄ngˇ dūa sek~ sīˋ	去寺廟禁止穿著性感	engine-auto	
@@ -7747,7 +7747,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 วิ่งตามไม่ทัน	wing tam mai than	wingˋ dām maiˋ tan	追不上	engine-auto	
 ฉันวิ่งตามเค้าไม่ทัน	chan wing tam khao mai than	chanˊ wingˋ dām kāu~ maiˋ tan	我跑得追不上他	engine-auto	
 โอเคมั้ยคะ	o khe mai kha	ō kē mai~ ka~	可以嗎	engine-auto	
-เห็น	hen	henˊ	看見	book-exact	
+เห็น	hen	henˊ	看見	book-exact	(book-exact已用引擎重新驗證)
 ขอบคุณมากค่ะ	khop khun mak kha	kɔ̄pˇ kun mākˋ kaˋ	非常感謝	engine-auto	
 เดี๋ยวนะคะ	diao na kha	dhīauˊ na~ ka~	等一下喔	engine-auto	
 เคยไปแล้ว	khoei pai laeo	kə̄i bai lɛ̄u~	曾經去過了	engine-auto	
@@ -7757,18 +7757,18 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 พันทิพย์พลาซ่าประตูน้ำ	phan thip phla sa pra tu nam	pan tip~ plā sāˋ braˇ dū nām~	潘提普廣場水門店	engine-auto	
 ตอบนะ	top na	dɔ̄pˇ na~	回答喔	engine-auto	
 มากันนะ	ma kan na	mā gan na~	一起來喔	engine-auto	
-ถนนข้าวสาร	tha non khao san	tha.nonˊkāoˋsānˊ	考山路	book-exact	
+ถนนข้าวสาร	tha non khao san	taˇ non kāuˋ sānˊ	考山路	book-exact	(book-exact已用引擎重新驗證)
 เคยไปค่ะ	khoei pai kha	kə̄i bai kaˋ	曾經去過	engine-auto	
 ไปตอนไหน	pai ton nai	bai dɔ̄n naiˊ	什麼時候去的	engine-auto	
 ยาวที่สุดนะคะ	yao thi sut na kha	yāu tīˋ sutˇ na~ ka~	最長的喔	engine-auto	
 ไปทำไม	pai tham mai	bai tam mai	去做什麼	engine-auto	
 ซื้อทองใหม่	suea thong mai	sɯ̄~ tɔ̄ng maiˇ	買新黃金	engine-auto	
 เยาวราช	yao wa rat	yāuu rātˋ	耀華力路（唐人街）	engine-auto	
-อนุสาวรีย์	a nu sa wa ri	a.nu~sāˊwa.rī	紀念碑	book-exact	
+อนุสาวรีย์	a nu sa wa ri	aˇ nu~ sāuˊ rī	紀念碑	book-exact	(book-exact已用引擎重新驗證)
 อ้าไปไหนพี่	a pai nai phi	āˋ bai naiˊ pīˋ	哥哥/姐姐去哪裡	engine-auto	
 ประเทศ	pra thet	braˇ tētˋ	國家	engine-auto	
 คะแนน	kha naen	ka~ nɛ̄n	分數	engine-auto	
-สถานีขนส่ง	sa tha ni khon song	sa.tāˊnī khonˊsongˇ	客運站	book-exact	
+สถานีขนส่ง	sa tha ni khon song	saˇ tāˊ nī konˊ songˇ	客運站	book-exact	(book-exact已用引擎重新驗證)
 ไปเหนือ	pai nuea	bai nɯ̄aˊ	往北部	engine-auto	
 แม่น้ำเจ้าพระยา	mae nam chao phra ya	mɛ̄ˋ nām~ jāuˋ pra~ yā	昭披耶河	engine-auto	
 นั่งเรือในน้ำเจ้าพระยาไง	nang ruea nai nam chao phra ya ngai	nangˋ rɯ̄a nai nām~ jāuˋ pra~ yā ngai	在昭披耶河搭船啊	engine-auto	
@@ -7777,7 +7777,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 แม่น	maen	mɛ̄nˋ	準確	engine-auto	
 รอ	ro	rɔ̄	等待	engine-auto	
 สะพานตากสิน	sa phan tak sin	saˇ pān dākˇ sinˊ	達信橋	engine-auto	
-พิพิธภัณฑ์	phi phit tha phan	pi~pit~ta pan	博物館	book-exact	
+พิพิธภัณฑ์	phi phit tha phan	pi~ pit~ pan	博物館	book-exact	(book-exact已用引擎重新驗證)
 วัด	wat	wat~	寺廟	engine-auto	
 มอง	mong	mɔ̄ng	看	engine-auto	
 ใครไปคะ	khrai pai kha	krai bai ka~	誰去的	engine-auto	
@@ -7786,7 +7786,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ซอยสุเทพ	soi su thep	sɔ̄i suˇ tēpˋ	素貼巷	engine-auto	
 อาบน้ำให้นะคะ	ap nam hai na kha	āpˇ nām~ haiˋ na~ ka~	幫忙洗澡喔	engine-auto	
 ตลาดน้ำ	ta lat nam	daˇ lātˋ nām~	水上市場	engine-auto	
-ตลาดรถไฟ	ta lat rot fai	da.lātˇrot~fai	火車夜市	book-exact	
+ตลาดรถไฟ	ta lat rot fai	daˇ lātˋ rot~ fai	火車夜市	book-exact	(book-exact已用引擎重新驗證)
 รถไฟ	rot fai	rot~ fai	火車	engine-auto	
 เจดีย์	che di	jē dhī	佛塔	engine-auto	
 เขา	khao	kāuˊ	他 / 山	engine-auto	
@@ -7812,13 +7812,13 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ไปหน่อย	Pai noi	bai nɔ̄iˇ	有點...、稍微...	engine-auto	
 กลิ่นเหม็นไปหน่อย	Klin men pai noi	glinˇ menˊ bai nɔ̄iˇ	氣味有點臭	engine-auto	
 รวย	Ruay	rūay	富有	engine-auto	
-จน	Chon	jon	窮、貧窮	book-exact	
+จน	Chon	jon	窮、貧窮	book-exact	(book-exact已用引擎重新驗證)
 ถ้าไม่อยากแก่ต้องออกกำลังกาย	Tha mai yak kae tong ok kamlang kai	tāˋ maiˋ yākˋ gɛ̄ˇ dɔ̄ngˋ ɔ̄kˇ gam lang gāi	如果不想老就要運動	engine-auto	
 คนแก่เหนื่อยง่าย	Khon kae nueai ngai	kon gɛ̄ˇ nɯ̄aiˇ ngāiˋ	老人容易累	engine-auto	
 เร็ว	rew	rew	快 / 早	engine-auto	
 แท็กซี่ขับรถเร็ว ฉันกลัว	thek si khap rot rew chan klua	tɛk~ sīˋ kapˇ rot~ rew chanˊ glūa	計程車開太快了，我害怕。	engine-auto	
 คุณพูดเร็วเกินไป ฉันฟังไม่เข้าใจ	khun phut rew koen pai chan fang mai khao chai	kun pūtˋ rew gə̄n bai chanˊ fang maiˋ kāuˋ jai	你說得太快了，我聽不懂。	engine-auto	
-ช้า	cha	chā~	慢	book-exact	
+ช้า	cha	chā~	慢	book-exact	(book-exact已用引擎重新驗證)
 ช่วยพูดช้าๆ หน่อย	chuai phut cha cha noi	chūayˋ pūtˋ chā~ chā~ nɔ̄iˇ	請說慢一點。	engine-auto	
 ทำไมอาหารช้าอย่างนี้	tham mai a han cha yang ni	tam mai ā hānˊ chā~ yāngˋ nī~	為什麼菜這麼慢？	engine-auto	
 ทำให้ตัวสูงขึ้นอย่างไร	tham hai tua sung khuen yang rai	tam haiˋ dūa sūngˊ kɯnˋ yāngˋ rai	如何讓身體變高？	engine-auto	
@@ -7827,11 +7827,11 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ตัวเตี้ย	tua tia	dūa dīaˋ	矮	engine-auto	
 พี่ชายเตี้ยกว่าน้องชาย	phi chai tia kwa nong chai	pīˋ chāi dīaˋ gwāˇ nɔ̄ng~ chāi	哥哥比弟弟矮。	engine-auto	
 ต่ำ	tam	damˇ	低	engine-auto	
-ผอม	phom	pɔ̅ mˊ	瘦	book-exact	
+ผอม	phom	pɔ̄mˊ	瘦	book-exact	(book-exact已用引擎重新驗證)
 ผอมลง 3 กิโล	phom long sam ki lo	pɔ̄mˊ long 3 giˇ lō	瘦了三公斤	engine-auto	
 ทำยังไงก็ไม่ผอมลง	tham yang ngai ko mai phom long	tam yang ngai gɔ̄ˋ maiˋ pɔ̄mˊ long	怎麼做都不會瘦	engine-auto	
 ฉันคิดว่าเธอหุ่นดีกว่าเมื่อก่อน	chan khit wa thoe hun di kwa muea kon	chanˊ kit~ wāˋ tə̄ hunˇ dhī gwāˇ mɯ̄aˋ gɔ̄nˇ	我覺得妳身材比以前好	engine-auto	
-ทั้งเตี้ยทั้งอ้วน	thang tia thang uan	tang~ ḍīaˋ tang~ uanˋ	又矮又胖	book-exact	
+ทั้งเตี้ยทั้งอ้วน	thang tia thang uan	tang~ dīaˋ tang~ ūanˋ	又矮又胖	book-exact	(book-exact已用引擎重新驗證)
 อากาศทั้งร้อนทั้งอบอ้าว	akat thang ron thang op ao	ā gātˇ tang~ rɔ̄n~ tang~ opˇ āuˋ	天氣又熱又悶	engine-auto	
 ร้องเพลงเป็นแต่เต้นไม่เป็น	rong phleng pen tae ten mai pen	rɔ̄ng~ plēng ben dɛ̄ˇ dēnˋ maiˋ ben	會唱歌但不會跳舞	engine-auto	
 เค้าเต้นเหมือนคนบ้าเลย	khao ten muean khon ba loei	kāu~ dēnˋ mɯ̄anˊ kon bhāˋ lə̄i	他跳起舞來像瘋子一樣	engine-auto	
@@ -7870,9 +7870,9 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 บุหรี่อันตรายไหมคะ	buri antrai mai kha	bhuˇ rīˇ an drāi maiˊ ka~	香菸危險嗎？	engine-auto	
 คุณคิดว่าบุหรี่อันตรายไหมคะ	khun khit wa buri antrai mai kha	kun kit~ wāˋ bhuˇ rīˇ an drāi maiˊ ka~	你覺得香菸危險嗎？	engine-auto	
 ระเบิด	raboet	ra~ bhə̄tˇ	炸彈	engine-auto	
-ภูเขาไฟระเบิด	phukhao fai raboet	pu̅ .kauˊfai ra.ḅə̅ tˇ	火山爆發	book-exact	
+ภูเขาไฟระเบิด	phukhao fai raboet	pū kāuˊ fai ra~ bhə̄tˇ	火山爆發	book-exact	(book-exact已用引擎重新驗證)
 ระเบิดอันตรายไหม	raboet antrai mai	ra~ bhə̄tˇ an drāi maiˊ	炸彈危險嗎？	engine-auto	
-พัดลม	phat lom	pat~ lom	電風扇	book-exact	
+พัดลม	phat lom	pat~ lom	電風扇	book-exact	(book-exact已用引擎重新驗證)
 หน้ามืด	na muet	nāˋ mɯ̄tˋ	暈眩 / 昏頭	engine-auto	
 เคยหน้ามืดไหมคะ	khoei na muet mai kha	kə̄i nāˋ mɯ̄tˋ maiˊ ka~	曾經暈眩過嗎？	engine-auto	
 ผมไม่เคยหน้ามืดครับ	phom mai khoei na muet khrap	pomˊ maiˋ kə̄i nāˋ mɯ̄tˋ krap~	我不曾暈眩。	engine-auto	
@@ -7914,11 +7914,11 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 อย่าบ้าเกินไป	ya ba koen pai	yāˋ bhāˋ gə̄n bai	別太瘋狂	engine-auto	
 อย่าบ้ามากเกินไป	ya ba mak koen pai	yāˋ bhāˋ mākˋ gə̄n bai	別太過分瘋狂	engine-auto	
 ถ้ามียาบ้า โดนจับแน่นอน	tha mi ya ba don chap naenon	tāˋ mī yā bhāˋ dhōn japˇ nɛ̄ˋ nɔ̄n	如果有毒品一定被抓	engine-auto	
-โรค	rok	rōkˋ- duā	病	book-exact	
+โรค	rok	rōkˋ	病	book-exact	(book-exact已用引擎重新驗證)
 เขาเป็นโรคอะไร	khao pen rok arai	kāuˊ ben rōkˋ aˇ rai	他生什麼病？	engine-auto	
 ไม่รู้เขาเป็นโรคอะไร	mai ru khao pen rok arai	maiˋ rū~ kāuˊ ben rōkˋ aˇ rai	不知道他生什麼病	engine-auto	
 เขามีโรคอะไร	khao mi rok arai	kāuˊ mī rōkˋ aˇ rai	他有什麼病？	engine-auto	
-เป็นโรคเบาหวาน	pen rok bao wan	ben rōkˋ bau wānˊ/ ma.reng / AIDS	患有糖尿病	book-exact	
+เป็นโรคเบาหวาน	pen rok bao wan	ben rōkˋ bhāu wānˊ	患有糖尿病	book-exact	(book-exact已用引擎重新驗證)
 หึงแน่นอน	hueng naenon	hɯngˊ nɛ̄ˋ nɔ̄n	一定吃醋	engine-auto	
 โมโหแน่นอน	moho naenon	mō hōˊ nɛ̄ˋ nɔ̄n	一定生氣	engine-auto	
 อยากเป็นคนเก่ง	yak pen khon keng	yākˋ ben kon gēngˇ	想成為厲害的人	engine-auto	
@@ -7953,14 +7953,14 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ไปว่ายน้ำ	pai wai nam	bai wāiˋ nām~	去游泳	engine-auto	
 กินอาหารไขมันต่ำ	kin ahan khai man tam	gin ā hānˊ kaiˊ man damˇ	吃低脂食物	engine-auto	
 เต้นแอโรบิก	ten aeropik	dēnˋ ɛ̄ rō bhikˇ	跳有氧舞蹈	engine-auto	
-ไปฟิตเนส	pai fitnet	bai fit~ nesˇ	去健身房	book-exact	
+ไปฟิตเนส	pai fitnet	bai fit~ nētˋ	去健身房	book-exact	(book-exact已用引擎重新驗證)
 ไข่ต้ม	khai tom	kaiˇ domˋ	水煮蛋	engine-auto	
 ไข่เจียว	khai chiao	kaiˇ jīau	煎蛋	engine-auto	
 กินได้มั้ย	kin dai mai	gin dhaiˋ mai~	可以吃嗎	engine-auto	
 กินได้	kin dai	gin dhaiˋ	可以吃	engine-auto	
 ไม่เป็นไร	mai pen rai	maiˋ ben rai	沒關係	engine-auto	
 ของทอด	khong thot	kɔ̄ngˊ tɔ̄tˋ	炸物	engine-auto	
-ไม่ได้	mai dai	maiˋḍaiˋ-	不行	book-exact	
+ไม่ได้	mai dai	maiˋ dhaiˋ	不行	book-exact	(book-exact已用引擎重新驗證)
 เรื่องพรุ่งนี้	rueang phrung ni	rɯ̄angˋ prungˋ nī~	明天的事	engine-auto	
 มีวิธีอะไรบ้าง	mi withi arai bang	mī wi~ tī aˇ rai bhāngˋ	有什麼方法	engine-auto	
 เล่นหุ้น	len hun	lēnˋ hunˋ	玩股票	engine-auto	
@@ -7972,10 +7972,10 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 เล่นกีตาร์	len kita	lēnˋ gī dā	彈吉他	engine-auto	
 เล่นเกม	len kem	lēnˋ gēm	玩遊戲	engine-auto	
 ทำธุรกิจ	tham thurakit	tam tun gitˇ	做生意	engine-auto	
-ธุรกิจ	thurakit	tu~ra~gitˇ	生意	book-exact	
+ธุรกิจ	thurakit	tun gitˇ	生意	book-exact	(book-exact已用引擎重新驗證)
 ทำธุรกิจที่ไหน	tham thurakit thi nai	tam tun gitˇ tīˋ naiˊ	在哪裡做生意	engine-auto	
 ทำธุรกิจอะไร	tham thurakit arai	tam tun gitˇ aˇ rai	做什麼生意	engine-auto	
-เมื่อก่อน	muea kon	mɯaˋgɔ̅ nˇ- ḍiauˊnī~ -	以前	book-exact	
+เมื่อก่อน	muea kon	mɯ̄aˋ gɔ̄nˇ	以前	book-exact	(book-exact已用引擎重新驗證)
 แต่เดี๋ยวนี้	tae diao ni	dɛ̄ˇ dhīauˊ nī~	但現在	engine-auto	
 แต่เดี๋ยวนี้ผอม	tae diao ni phom	dɛ̄ˇ dhīauˊ nī~ pɔ̄mˊ	但現在瘦	engine-auto	
 รวย	ruai	rūay	有錢	engine-auto	
@@ -8023,7 +8023,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 คะแนน	kha naen	ka~ nɛ̄n	分數	engine-auto	
 คะแนนสูง	kha naen sung	ka~ nɛ̄n sūngˊ	分數高	engine-auto	
 คะแนนต่ำ	kha naen tam	ka~ nɛ̄n damˇ	分數低	engine-auto	
-ราคา	ra kha	rā.kā/ IQ / EQ -	價格	book-exact	
+ราคา	ra kha	rā kā	價格	book-exact	(book-exact已用引擎重新驗證)
 ราคาสูง	ra kha sung	rā kā sūngˊ	價格高	engine-auto	
 ราคาต่ำ	ra kha tam	rā kā damˇ	價格低	engine-auto	
 ไอคิวต่ำ	ai khiu tam	ai kiw damˇ	智商低	engine-auto	
@@ -8044,9 +8044,9 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ได้เท่าไหร่	dai thao rai	dhaiˋ tāuˋ raiˇ	得到多少	engine-auto	
 ได้คะแนนเท่าไหร่	dai kha naen thao rai	dhaiˋ ka~ nɛ̄n tāuˋ raiˇ	得到幾分	engine-auto	
 ได้เงินเท่าไหร่	dai ngoen thao rai	dhaiˋ ngə̄n tāuˋ raiˇ	得到多少錢	engine-auto	
-ช้า	cha	chā~	慢	book-exact	
+ช้า	cha	chā~	慢	book-exact	(book-exact已用引擎重新驗證)
 เร็ว	rew	rew	快	engine-auto	
-ขับรถ	khap rot	kapˇrot~ -	開車	book-exact	
+ขับรถ	khap rot	kapˇ rot~	開車	book-exact	(book-exact已用引擎重新驗證)
 ขับรถเร็ว	khap rot rew	kapˇ rot~ rew	開車快	engine-auto	
 ขับรถช้า	khap rot cha	kapˇ rot~ chā~	開車慢	engine-auto	
 เดินช้า	doen cha	dhə̄n chā~	走得慢	engine-auto	
@@ -8076,7 +8076,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 แก่เร็ว	kae rew	gɛ̄ˇ rew	老得快	engine-auto	
 ห้ามกินดึก	ham kin duek	hāmˋ gin dhɯkˇ	禁止太晚吃	engine-auto	
 ความเร็ว	khwam rew	kwām rew	速度	engine-auto	
-แต่งงานเร็ว	taeng ngan rew	dɛngˇngān reu / chā~	早結婚	book-exact	
+แต่งงานเร็ว	taeng ngan rew	dɛ̄ngˇ ngān rew	早結婚	book-exact	(book-exact已用引擎重新驗證)
 แต่งงานช้า	taeng ngan cha	dɛ̄ngˇ ngān chā~	晚結婚	engine-auto	
 มีลูก	mi luk	mī lūkˋ	有小孩	engine-auto	
 มีลูกเร็ว	mi luk rew	mī lūkˋ rew	這麼早有小孩	engine-auto	
@@ -8104,11 +8104,11 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 เมื่อย	mueai	mɯ̄aiˋ	痠痛	engine-auto	
 เมื่อยง่าย	mueai ngai	mɯ̄aiˋ ngāiˋ	容易痠痛	engine-auto	
 ตรงเวลา	trong we la	drong wē lā	準時	engine-auto	
-ไม่ตรงเวลา	mai trong we la	maiˋdrong we̅ .la	不準時	book-exact	
+ไม่ตรงเวลา	mai trong we la	maiˋ drong wē lā	不準時	book-exact	(book-exact已用引擎重新驗證)
 กินข้าวตรงเวลา	kin khao trong we la	gin kāuˋ drong wē lā	準時吃飯	engine-auto	
 ทำงานตรงเวลา	tham ngan trong we la	tam ngān drong wē lā	準時工作	engine-auto	
 มาเรียนภาษาไทยตรงเวลา	ma rian phasa thai trong we la	mā rīan pā sāˊ tai drong wē lā	準時來學泰語	engine-auto	
-ผอม	phom	pɔ̅ mˊ	瘦	book-exact	
+ผอม	phom	pɔ̄mˊ	瘦	book-exact	(book-exact已用引擎重新驗證)
 อยากผอม	yak phom	yākˋ pɔ̄mˊ	想變瘦	engine-auto	
 คนไทยอยากผอม	khon thai yak phom	kon tai yākˋ pɔ̄mˊ	泰國人想變瘦	engine-auto	
 ก็อยาก	ko yak	gɔ̄ˋ yākˋ	也想	engine-auto	
@@ -8127,7 +8127,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 อ่อนกว่า	on kwa	ɔ̄nˇ gwāˇ	比較年輕（臉）	engine-auto	
 หนุ่มกว่า	num kwa	numˇ gwāˇ	比較年輕（男）	engine-auto	
 สาวกว่า	sao kwa	sāuˊ gwāˇ	比較年輕（女）	engine-auto	
-ทั้งเตี้ยทั้งอ้วน	thang tia thang uan	tang~ ḍīaˋ tang~ uanˋ	又矮又胖	book-exact	
+ทั้งเตี้ยทั้งอ้วน	thang tia thang uan	tang~ dīaˋ tang~ ūanˋ	又矮又胖	book-exact	(book-exact已用引擎重新驗證)
 ทั้งสวยทั้งเก่ง	thang suai thang keng	tang~ sūayˊ tang~ gēngˇ	又漂亮又厲害	engine-auto	
 ทั้งรวยทั้งหล่อ	thang ruai thang lo	tang~ rūay tang~ lɔ̄ˇ	又有錢又帥	engine-auto	
 ทั้งไม่สวยทั้งไม่เก่ง	thang mai suai thang mai keng	tang~ maiˋ sūayˊ tang~ maiˋ gēngˇ	既不漂亮也不厲害	engine-auto	
@@ -8140,7 +8140,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ทั้งถูกทั้งของเยอะ	thang thuk thang khong yoe	tang~ tūkˇ tang~ kɔ̄ngˊ yə~	既便宜東西又多	engine-auto	
 คิดว่า	khit wa	kit~ wāˋ	認為	engine-auto	
 ฉันคิดว่า	chan khit wa	chanˊ kit~ wāˋ	我認為	engine-auto	
-ไม่มี	mai mi	maiˋmī -	沒有	book-exact	
+ไม่มี	mai mi	maiˋ mī	沒有	book-exact	(book-exact已用引擎重新驗證)
 ตัวเอง	tua eng	dūa ēng	自己	engine-auto	
 ฉันคิดว่าตัวเองสวย	chan khit wa tua eng suai	chanˊ kit~ wāˋ dūa ēng sūayˊ	我認為自己漂亮	engine-auto	
 ฉันคิดว่าตัวเองผอม	chan khit wa tua eng phom	chanˊ kit~ wāˋ dūa ēng pɔ̄mˊ	我認為自己瘦	engine-auto	
@@ -8168,20 +8168,20 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 แพงไปหน่อย	phaeng pai noi	pɛ̄ng bai nɔ̄iˇ	貴了一點	engine-auto	
 รถไฟความเร็วสูง	rot fai khwam rew sung	rot~ fai kwām rew sūngˊ	高鐵	engine-auto	
 นั่งรถไฟความเร็วสูง	nang rot fai khwam rew sung	nangˋ rot~ fai kwām rew sūngˊ	搭高鐵	engine-auto	
-นั่ง	nang	nangˋ	坐	book-exact	
-ตั้งใจ	tang chai	dangˋjai	專心	book-exact	
+นั่ง	nang	nangˋ	坐	book-exact	(book-exact已用引擎重新驗證)
+ตั้งใจ	tang chai	dangˋ jai	專心	book-exact	(book-exact已用引擎重新驗證)
 ตั้งใจทำอะไร	tang chai tham arai	dangˋ jai tam aˇ rai	專心做什麼	engine-auto	
 ตั้งใจเรียน	tang chai rian	dangˋ jai rīan	專心學習	engine-auto	
 วันนี้จะตั้งใจกลับบ้านเร็ว	wan ni cha tang chai klap ban rew	wan nī~ jaˇ dangˋ jai glapˇ bhānˋ rew	今天會用心早點回家	engine-auto	
 ตั้งใจหางาน	tang chai ha ngan	dangˋ jai hāˊ ngān	用心找工作	engine-auto	
 ตั้งใจสอน	tang chai son	dangˋ jai sɔ̄nˊ	用心教	engine-auto	
-ลูก	luk	lūkˋ-	孩子	book-exact	
+ลูก	luk	lūkˋ	孩子	book-exact	(book-exact已用引擎重新驗證)
 ลูกชาย	luk chai	lūkˋ chāi	兒子	engine-auto	
 ลูกสาว	luk sao	lūkˋ sāuˊ	女兒	engine-auto	
 มีลูกไหม	mi luk mai	mī lūkˋ maiˊ	有小孩嗎	engine-auto	
 มีลูกชาย	mi luk chai	mī lūkˋ chāi	有兒子	engine-auto	
 มีลูกสาวมั้ย	mi luk sao mai	mī lūkˋ sāuˊ mai~	有女兒嗎	engine-auto	
-ขยัน	khayan	ka.yanˊ	勤勞	book-exact	
+ขยัน	khayan	kaˇ yanˊ	勤勞	book-exact	(book-exact已用引擎重新驗證)
 ทำการบ้าน	tham kan ban	tam gān bhānˋ	寫作業	engine-auto	
 น่า รัก จัง	na rak chang	nāˋ rak~ jang	很可愛	engine-auto	
 อิ่ม จัง	im chang	imˇ jang	很飽	engine-auto	
@@ -8207,7 +8207,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 วัน แต่ง งาน	wan taeng ngan	wan dɛ̄ngˇ ngān	結婚日	engine-auto	
 เรื่อง สำคัญ	rueang samkhan	rɯ̄angˋ samˊ kan	重要的事	engine-auto	
 มี เรื่อง สำคัญ	mi rueang samkhan	mī rɯ̄angˋ samˊ kan	有重要的事	engine-auto	
-เอกสาร	ek kasan	ekˇga.sānˊ-	文件	book-exact	
+เอกสาร	ek kasan	ēkˇ sānˊ	文件	book-exact	(book-exact已用引擎重新驗證)
 คน สำคัญ	khon samkhan	kon samˊ kan	重要的人	engine-auto	
 มี ใคร บ้าง	mi khrai bang	mī krai bhāngˋ	有誰呢	engine-auto	
 พ่อ แม่	pho mae	pɔ̄ˋ mɛ̄ˋ	父母	engine-auto	
@@ -8316,14 +8316,14 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 เวลา ต่าง กัน	wela tang kan	wē lā dāngˇ gan	時差	engine-auto	
 กี่ ชั่วโมง	ki chuamong	gīˇ chūaˋ mōng	幾個小時	engine-auto	
 เวลา ต่าง กัน กี่ ชั่วโมง	wela tang kan ki chuamong	wē lā dāngˇ gan gīˇ chūaˋ mōng	時差幾個小時	engine-auto	
-โรค	rok	rōkˋ- duā	疾病	book-exact	
+โรค	rok	rōkˋ	疾病	book-exact	(book-exact已用引擎重新驗證)
 เป็น โรค อะไร	pen rok arai	ben rōkˋ aˇ rai	得什麼病	engine-auto	
 โรค เอดส์	rok et	rōkˋ ētˇ	愛滋病	engine-auto	
 โรค มะเร็ง	rok mareng	rōkˋ ma~ reng	癌症	engine-auto	
 โรค เบา หวาน	rok bao wan	rōkˋ bhāu wānˊ	糖尿病	engine-auto	
 เป็น อะไร	pen arai	ben aˇ rai	怎麼了	engine-auto	
-เป็น ยัง ไง	pen yang ngai	ben yang ngai ?	怎麼樣	book-exact	
-เป็น ไป ไม่ ได้	pen pai mai dai	ben bai maiˋḍaiˋ	不可能	book-exact	
+เป็น ยัง ไง	pen yang ngai	ben yang ngai	怎麼樣	book-exact	(book-exact已用引擎重新驗證)
+เป็น ไป ไม่ ได้	pen pai mai dai	ben bai maiˋ dhaiˋ	不可能	book-exact	(book-exact已用引擎重新驗證)
 เป็น ไป ได้	pen pai dai	ben bai dhaiˋ	可能	engine-auto	
 เครียด	khriat	krīatˋ	壓力大	engine-auto	
 รู้ สึก เครียด มาก	ru suek khriat mak	rū~ sɯkˇ krīatˋ mākˋ	覺得壓力很大	engine-auto	
@@ -8381,7 +8381,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 เรียน ที่ ไหน	rian thi nai	rīan tīˋ naiˊ	在哪裡學的	engine-auto	
 น่า อาย	na ai	nāˋ āi	丟臉（不好意思）	engine-auto	
 น่า เสีย ดาย	na sia dai	nāˋ sīaˊ dhāi	可惜	engine-auto	
-อากาศ	akat	ā.gātˇ	天氣	book-exact	
+อากาศ	akat	ā gātˇ	天氣	book-exact	(book-exact已用引擎重新驗證)
 เดี๋ยว ร้อน เดี๋ยว หนาว	diao ron diao nao	dhīauˊ rɔ̄n~ dhīauˊ nāuˊ	忽冷忽熱	engine-auto	
 หน้า ร้อน	na ron	nāˋ rɔ̄n~	夏天	engine-auto	
 หน้า หนาว	na nao	nāˋ nāuˊ	冬天	engine-auto	
@@ -8398,11 +8398,11 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ระวัง	rawang	ra~ wang	小心	engine-auto	
 ระวัง เป็น ไข้	rawang pen khai	ra~ wang ben kaiˋ	小心發燒	engine-auto	
 ระวัง เป็น หวัด	rawang pen wat	ra~ wang ben watˇ	小心感冒	engine-auto	
-พายุ	phayu	pā.yu~	暴風雨	book-exact	
+พายุ	phayu	pā yu~	暴風雨	book-exact	(book-exact已用引擎重新驗證)
 ใต้ ฝุ่น	taifun	daiˋ funˇ	颱風	engine-auto	
-แผ่น ดิน ไหว	phaendin wai	pɛ̅ nˇḍin waiˊ	地震	book-exact	
-ภู เขา ไฟ ระเบิด	phukhaofai raboet	pu̅ .kauˊfai ra.ḅə̅ tˇ	火山爆發	book-exact	
-พระ อาทิตย์	phra athit	pra~ā.tit~	太陽	book-exact	
+แผ่น ดิน ไหว	phaendin wai	pɛ̄nˇ dhin waiˊ	地震	book-exact	(book-exact已用引擎重新驗證)
+ภู เขา ไฟ ระเบิด	phukhaofai raboet	pū kāuˊ fai ra~ bhə̄tˇ	火山爆發	book-exact	(book-exact已用引擎重新驗證)
+พระ อาทิตย์	phra athit	pra~ ā tit~	太陽	book-exact	(book-exact已用引擎重新驗證)
 พระ อาทิตย์ ขึ้น	phra athit khuen	pra~ ā tit~ kɯnˋ	日出	engine-auto	
 พระ อาทิตย์ ตก	phra athit tok	pra~ ā tit~ dokˇ	日落	engine-auto	
 ทิศ	thit	tit~	方向	engine-auto	
@@ -8411,7 +8411,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ทิศ ใต้	thit tai	tit~ daiˋ	南方	engine-auto	
 ตะวัน ตก	tawan tok	daˇ wan dokˇ	西方	engine-auto	
 ทิศ ตะวัน ตก	thit tawan tok	tit~ daˇ wan dokˇ	西方（方向）	engine-auto	
-พระ จันทร์	phra chan	pra~ jan	月亮	book-exact	
+พระ จันทร์	phra chan	pra~ jan	月亮	book-exact	(book-exact已用引擎重新驗證)
 ฟ้า ร้อง	fa rong	fā~ rɔ̄ng~	打雷	engine-auto	
 ฟ้า ผ่า	fa pha	fā~ pāˇ	閃電（劈下）	engine-auto	
 หิมะ	hima	hiˇ ma~	雪	engine-auto	
@@ -8432,10 +8432,10 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ระวัง ถูก หลอก	rawang thuk lok	ra~ wang tūkˇ lɔ̄kˇ	小心被騙	engine-auto	
 ชัวร์	chua	chūa	確定	engine-auto	
 ไม่ ชัวร์	mai chua	maiˋ chūa	不確定	engine-auto	
-ตก ใจ หมด เลย	tok chai mot loei	dokˇjai motˇlǝ̅ i	嚇死我了	book-exact	
+ตก ใจ หมด เลย	tok chai mot loei	dokˇ jai motˇ lə̄i	嚇死我了	book-exact	(book-exact已用引擎重新驗證)
 คิด มาก	khit mak	kit~ mākˋ	想太多	engine-auto	
 อย่า คิด มาก	ya khit mak	yāˋ kit~ mākˋ	別想太多	engine-auto	
-เลือด	lueat	laiˊ          lɯatˋ -	血	book-exact	
+เลือด	lueat	lɯ̄atˋ	血	book-exact	(book-exact已用引擎重新驗證)
 เลือด ไหล	lueat lai	lɯ̄atˋ laiˊ	流血	engine-auto	
 เหงื่อ	nguea	ngɯ̄aˇ	汗	engine-auto	
 เหงื่อ ไหล	nguea lai	ngɯ̄aˇ laiˊ	流汗	engine-auto	
@@ -8453,14 +8453,14 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ทำ งาน หนัก	tham ngan nak	tam ngān nakˇ	工作繁重	engine-auto	
 ทำ งาน ข้าง นอก	tham ngan khang nok	tam ngān kāngˋ nɔ̄kˋ	在外面工作	engine-auto	
 ข้าง บ้าน	khang ban	kāngˋ bhānˋ	隔壁	engine-auto	
-เมื่อ ก่อน	muea kon	mɯaˋgɔ̅ nˇ- ḍiauˊnī~ -	以前	book-exact	
+เมื่อ ก่อน	muea kon	mɯ̄aˋ gɔ̄nˇ	以前	book-exact	(book-exact已用引擎重新驗證)
 แช่ เย็น	chae yen	chɛ̄ˋ yen	冷藏	engine-auto	
 ตู้ เย็น	tu yen	dūˋ yen	冰箱	engine-auto	
 ไม่ อย่าง นั้น	mai yang nan	maiˋ yāngˋ nan~	否則	engine-auto	
 ไม่ อร่อย	mai aroi	maiˋ aˇ rɔ̄iˋ	不好吃	engine-auto	
 เกลือ	kluea	glɯ̄a	鹽	engine-auto	
 แกง จืด	kaeng chuet	gɛ̄ng jɯ̄tˇ	清湯	engine-auto	
-รส ชาติ	rot chat	rot~ chātˋ	味道	book-exact	
+รส ชาติ	rot chat	rot~ chātˋ	味道	book-exact	(book-exact已用引擎重新驗證)
 ต่าง กัน	tang kan	dāngˇ gan	不同	engine-auto	
 เผ็ด นิด หน่อย	phet nit noi	petˇ nit~ nɔ̄iˇ	有點辣	engine-auto	
 พริก 1 เม็ด	phrik nueng met	prik~ 1 met~	一顆辣椒	engine-auto	
@@ -8474,18 +8474,18 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ทำ แบบ นี้	tham baep ni	tam bhɛ̄pˇ nī~	這樣做	engine-auto	
 ตื่น นอน	tuen non	dɯ̄nˇ nɔ̄n	起床	engine-auto	
 แปรง ฟัน	praeng fan	brɛ̄ng fan	刷牙	engine-auto	
-หวี ผม	wi phom	wīˊpomˊ	梳頭髮	book-exact	
+หวี ผม	wi phom	wīˊ pomˊ	梳頭髮	book-exact	(book-exact已用引擎重新驗證)
 แต่ง ตัว สวย	taeng tua suai	dɛ̄ngˇ dūa sūayˊ	打扮漂亮	engine-auto	
-แต่ง หน้า	taeng na	dɛ̅ ngˇnāˋ	化妝	book-exact	
-รีบ ออก จาก บ้าน	rip ok chak ban	rīpˋɔ̅ kˇjākˇḅānˋ	趕快出門	book-exact	
-วิ่ง ขึ้น รถ	wing khuen rot	wingˋkɯnˋrot~	跑上車	book-exact	
-โชค ดี ที่ มา ทัน	chok di thi ma than	chōkˋḍī tīˋmā tan	幸好趕上	book-exact	
+แต่ง หน้า	taeng na	dɛ̄ngˇ nāˋ	化妝	book-exact	(book-exact已用引擎重新驗證)
+รีบ ออก จาก บ้าน	rip ok chak ban	rīpˋ ɔ̄kˇ jākˇ bhānˋ	趕快出門	book-exact	(book-exact已用引擎重新驗證)
+วิ่ง ขึ้น รถ	wing khuen rot	wingˋ kɯnˋ rot~	跑上車	book-exact	(book-exact已用引擎重新驗證)
+โชค ดี ที่ มา ทัน	chok di thi ma than	chōkˋ dhī tīˋ mā tan	幸好趕上	book-exact	(book-exact已用引擎重新驗證)
 แต่ง บ้าน	taeng ban	dɛ̄ngˇ bhānˋ	佈置家裡	engine-auto	
 แต่ง รถ	taeng rot	dɛ̄ngˇ rot~	改裝車	engine-auto	
 แต่ง หน้า อ่อน	taeng na on	dɛ̄ngˇ nāˋ ɔ̄nˇ	化淡妝	engine-auto	
 แต่ง หน้า เข้ม	taeng na khem	dɛ̄ngˇ nāˋ kēmˋ	化濃妝	engine-auto	
 แต่ง หน้า จัด	taeng na chat	dɛ̄ngˇ nāˋ jatˇ	化大濃妝	engine-auto	
-แต่ง ตัว	taeng tua	dɛ̅ ngˇdua	打扮	book-exact	
+แต่ง ตัว	taeng tua	dɛ̄ngˇ dūa	打扮	book-exact	(book-exact已用引擎重新驗證)
 แต่ง ตัว เปรี้ยว	taeng tua priao	dɛ̄ngˇ dūa brīauˋ	穿著火辣	engine-auto	
 แต่ง ตัว เซ็กซี่	taeng tua seksi	dɛ̄ngˇ dūa sek~ sīˋ	穿著性感	engine-auto	
 แต่ง ตัว เชย	taeng tua choei	dɛ̄ngˇ dūa chə̄i	穿著俗氣	engine-auto	
@@ -8503,11 +8503,11 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 แช่ ตู้ เย็น	chae tu yen	chɛ̄ˋ dūˋ yen	放冰箱	engine-auto	
 อาหาร แช่ แข็ง	ahan chae khaeng	ā hānˊ chɛ̄ˋ kɛngˊ	冷凍食品	engine-auto	
 กรุงเทพ	krung thep	grung tēpˋ	曼谷	engine-auto	
-ถนน ข้าว สาร	thanon khao san	tha.nonˊkāoˋsānˊ	考山路	book-exact	
+ถนน ข้าว สาร	thanon khao san	taˇ non kāuˋ sānˊ	考山路	book-exact	(book-exact已用引擎重新驗證)
 เยาวราช	yaowarat	yāuu rātˋ	耀華力路（唐人街）	engine-auto	
-สถานี ขน ส่ง	sathani khon song	sa.tāˊnī khonˊsongˇ	客運站	book-exact	
+สถานี ขน ส่ง	sathani khon song	saˇ tāˊ nī konˊ songˇ	客運站	book-exact	(book-exact已用引擎重新驗證)
 แม่ น้ำ	mae nam	mɛ̄ˋ nām~	河流	engine-auto	
-สะพาน	saphan	sa.phān	橋	book-exact	
+สะพาน	saphan	saˇ pān	橋	book-exact	(book-exact已用引擎重新驗證)
 ตลาด น้ำ	talat nam	daˇ lātˋ nām~	水上市場	engine-auto	
 น้ำ ตก	nam tok	nām~ dokˇ	瀑布	engine-auto	
 ทะเล	thale	ta~ lē	海（海灘）	engine-auto	
@@ -8519,12 +8519,12 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ขายดีไหม	khai di mai	kāiˊ dhī maiˊ	賣得好嗎？	engine-auto	
 ขายไม่ค่อยดี	khai mai khoi di	kāiˊ maiˋ kɔ̄iˋ dhī	賣得不太好	engine-auto	
 เป็นไปได้	pen pai dai	ben bai dhaiˋ	有可能	engine-auto	
-เป็นไปไม่ได้	pen pai mai dai	ben bai maiˋḍaiˋ	不可能	book-exact	
+เป็นไปไม่ได้	pen pai mai dai	ben bai maiˋ dhaiˋ	不可能	book-exact	(book-exact已用引擎重新驗證)
 พรุ่งนี้ไทเปหิมะจะตกเป็นไปได้ไหม	phrung ni thai pe hi ma cha tok pen pai dai mai	prungˋ nī~ tai bē hiˇ ma~ jaˇ dokˇ ben bai dhaiˋ maiˊ	明天台北下雪有可能嗎？	engine-auto	
-ภูเขาไฟระเบิด	phu khao fai ra boet	pu̅ .kauˊfai ra.ḅə̅ tˇ	火山爆發	book-exact	
+ภูเขาไฟระเบิด	phu khao fai ra boet	pū kāuˊ fai ra~ bhə̄tˇ	火山爆發	book-exact	(book-exact已用引擎重新驗證)
 ถ้าพรุ่งนี้ภูเขาไฟระเบิดเป็นไปได้ไหมคะ	tha phrung ni phu khao fai ra boet pen pai dai mai kha	tāˋ prungˋ nī~ pū kāuˊ fai ra~ bhə̄tˇ ben bai dhaiˋ maiˊ ka~	如果明天火山爆發有可能嗎？	engine-auto	
 อะไรอะไรก็เป็นไปได้	a rai a rai ko pen pai dai	aˇ rai aˇ rai gɔ̄ˋ ben bai dhaiˋ	什麼都有可能	engine-auto	
-แผ่นดินไหว	phaen din wai	pɛ̅ nˇḍin waiˊ	地震	book-exact	
+แผ่นดินไหว	phaen din wai	pɛ̄nˇ dhin waiˊ	地震	book-exact	(book-exact已用引擎重新驗證)
 พรุ่งนี้แผ่นดินไหวเป็นไปได้ไหม	phrung ni phaen din wai pen pai dai mai	prungˋ nī~ pɛ̄nˇ dhin waiˊ ben bai dhaiˋ maiˊ	明天地震有可能嗎？	engine-auto	
 ที่ไหนไหนเป็นไปได้	thi nai nai pen pai dai	tīˋ naiˊ naiˊ ben bai dhaiˋ	哪裡都有可能	engine-auto	
 เป็นไข้กี่วันแล้ว	pen khai ki wan laeo	ben kaiˋ gīˇ wan lɛ̄u~	發燒幾天了？	engine-auto	
@@ -8586,7 +8586,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ตัดเสื้อ	Tat suea	datˇ sɯ̄aˋ	裁衣服	engine-auto	
 ตากเสื้อ	Tak suea	dākˇ sɯ̄aˋ	曬衣服	engine-auto	
 ถึงเวลาเรียนต่อแล้วนะคะ	Thueng wela rian to laeo na kha	tɯngˊ wē lā rīan dɔ̄ˇ lɛ̄u~ na~ ka~	該上課了	engine-auto	
-โรง	Rong	rōng	大空間/場所	book-exact	
+โรง	Rong	rōng	大空間/場所	book-exact	(book-exact已用引擎重新驗證)
 โรงเรียน	Rong rian	rōng rīan	學校	engine-auto	
 โรงเรียนชื่ออะไร	Rong rian chue arai	rōng rīan chɯ̄ˋ aˇ rai	你的學校叫什麼名字？	engine-auto	
 รถโรงเรียน	Rot rong rian	rot~ rōng rīan	校車	engine-auto	
@@ -8606,29 +8606,29 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 จองโรงแรมที่ Agoda	Chong rong raem thi Agoda	jɔ̄ng rōng rɛ̄m tīˋ Agoda	在 Agoda 訂飯店	engine-auto	
 จองโรงแรมใน Agoda	Chong rong raem nai Agoda	jɔ̄ng rōng rɛ̄m nai Agoda	在 Agoda 訂飯店 (in)	engine-auto	
 จองโรงแรมที่ Booking.com	Chong rong raem thi Booking.com	jɔ̄ng rōng rɛ̄m tīˋ Booking.com	在 Booking.com 訂飯店	engine-auto	
-พยาบาล	Phayaban	pa.yā.ḅān	照料/護理	book-exact	
+พยาบาล	Phayaban	pa~ yā bhān	照料/護理	book-exact	(book-exact已用引擎重新驗證)
 โรงหนัง	Rong nang	rōng nangˊ	電影院	engine-auto	
 โรงเบียร์	Rong bia	rōng bhīa	啤酒屋（音樂餐廳）	engine-auto	
 ไปโรงเบียร์กันไหม	Pai rong bia kan mai	bai rōng bhīa gan maiˊ	要去啤酒屋嗎？	engine-auto	
-ซ่อม	Som	sɔmˋ	維修/修理	book-exact	
+ซ่อม	Som	sɔ̄mˋ	維修/修理	book-exact	(book-exact已用引擎重新驗證)
 ซ่อมเครื่องบิน	Som khrueangbin	sɔ̄mˋ krɯ̄angˋ bhin	修飛機	engine-auto	
 ซ่อมนาฬิกา	Som nalika	sɔ̄mˋ nā li~ gā	修手錶	engine-auto	
 ซ่อมคอมพิวเตอร์	Som khomphiutoe	sɔ̄mˋ kɔ̄m piw də̄	修電腦	engine-auto	
 โรงซ่อม	Rong som	rōng sɔ̄mˋ	維修場	engine-auto	
 โรงซ่อมรถ	Rong som rot	rōng sɔ̄mˋ rot~	修車廠	engine-auto	
 ร้านซ่อม	Ran som	rān~ sɔ̄mˋ	維修店	engine-auto	
-ร้าน	Ran	rān~ -	店舖	book-exact	
+ร้าน	Ran	rān~	店舖	book-exact	(book-exact已用引擎重新驗證)
 ร้านซ่อมนาฬิกา	Ran som nalika	rān~ sɔ̄mˋ nā li~ gā	手錶維修店	engine-auto	
 ร้านซ่อมรองเท้า	Ran som rongthao	rān~ sɔ̄mˋ rɔ̄ng tāu~	修鞋店	engine-auto	
 ร้านซ่อมมือถือ	Ran som mue thue	rān~ sɔ̄mˋ mɯ̄ tɯ̄ˊ	手機維修店	engine-auto	
 โรงพัก	Rong phak	rōng pak~	派出所	engine-auto	
-พัก	Phak	pak~	休息	book-exact	
+พัก	Phak	pak~	休息	book-exact	(book-exact已用引擎重新驗證)
 พักห้านาที	Phak ha nathi	pak~ hāˋ nā tī	休息五分鐘	engine-auto	
 โรงพิมพ์	Rong phim	rōng pim	印刷廠	engine-auto	
 หนังสือพิมพ์	Nang sue phim	nangˊ sɯ̄ˊ pim	報紙	engine-auto	
 โรงพิมพ์เล็ก	Rong phim lek	rōng pim lek~	小印刷廠	engine-auto	
 โรงพิมพ์ใหญ่	Rong phim yai	rōng pim yaiˇ	大印刷廠	engine-auto	
-คลินิก	Khlinik	clī.nikˇ	診所	book-exact	
+คลินิก	Khlinik	kli~ nik~	診所	book-exact	(book-exact已用引擎重新驗證)
 คลินิกหมอฟัน	Khlinik mo fan	kli~ nik~ mɔ̄ˊ fan	牙醫診所	engine-auto	
 คลินิกฟัน	Khlinik fan	kli~ nik~ fan	牙科診所	engine-auto	
 คลินิกหมอตา	Khlinik mo ta	kli~ nik~ mɔ̄ˊ dā	眼科診所（醫生）	engine-auto	
@@ -8641,7 +8641,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 เรียนพิเศษ	Rian phiset	rīan pi~ sētˇ	補習	engine-auto	
 เคยไปเรียนพิเศษไหมคะ	Khoei pai rian phiset mai kha	kə̄i bai rīan pi~ sētˇ maiˊ ka~	有去過補習嗎？	engine-auto	
 สอบ	Sop	sɔ̄pˇ	考試	engine-auto	
-เข้า	Khao	hāmˋ          - kauˋ                 -	進入	book-exact	
+เข้า	Khao	kāuˋ	進入	book-exact	(book-exact已用引擎重新驗證)
 สอบกลางเทอม	Sop klang thoem	sɔ̄pˇ glāng tə̄m	期中考	engine-auto	
 สอบติด	Sop tit	sɔ̄pˇ ditˇ	考上	engine-auto	
 สอบผ่าน	Sop phan	sɔ̄pˇ pānˇ	考試通過	engine-auto	
@@ -8649,7 +8649,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 มีการสอบ	Mi kan sop	mī gān sɔ̄pˇ	有考試	engine-auto	
 ข้อสอบ	Kho sop	kɔ̄ˋ sɔ̄pˇ	考題	engine-auto	
 ข้อสอบยาก	Kho sop yak	kɔ̄ˋ sɔ̄pˇ yākˋ	考題很難	engine-auto	
-ปริญญา	Parinya	ba.rin.yā	學位	book-exact	
+ปริญญา	Parinya	brin yā	學位	book-exact	(book-exact已用引擎重新驗證)
 ปริญญาตรี	Parinya tri	brin yā drī	學士學位	engine-auto	
 ปริญญาโท	Parinya tho	brin yā tō	碩士學位	engine-auto	
 ปริญญาเอก	Parinya ek	brin yā ēkˇ	博士學位	engine-auto	
@@ -8661,16 +8661,16 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 โท	Tho	tō	碩士（簡稱）	engine-auto	
 คิดจะ	Khit cha	kit~ jaˇ	打算	engine-auto	
 ไปเรียน	Pai rian	bai rīan	去唸書	engine-auto	
-เอก	Ek	ēkˇ tō         drī	博士（簡稱）	book-exact	
+เอก	Ek	ēkˇ	博士（簡稱）	book-exact	(book-exact已用引擎重新驗證)
 เมืองนอก	Mueang nok	mɯ̄ang nɔ̄kˋ	國外	engine-auto	
-คิดจะไปเรียนเอกที่เมืองนอก	Khit cha pai rian ek thi mueang nok	kit~jaˇbai rian ēkˇ tīˋmɯang nɔ̅kˋ	打算去國外唸博士	book-exact	
+คิดจะไปเรียนเอกที่เมืองนอก	Khit cha pai rian ek thi mueang nok	kit~ jaˇ bai rīan ēkˇ tīˋ mɯ̄ang nɔ̄kˋ	打算去國外唸博士	book-exact	(book-exact已用引擎重新驗證)
 ผู้จัดการ	Phu chat kan	pūˋ jatˇ gān	經理	engine-auto	
 ผู้จัดการเข้าโรงงานตอนไหน	Phu chat kan khao rong ngan ton nai	pūˋ jatˇ gān kāuˋ rōng ngān dɔ̄n naiˊ	經理什麼時候進工廠？	engine-auto	
 อาการหนัก	Akan nak	ā gān nakˇ	症狀嚴重	engine-auto	
 ชั้น	Chan	chan~	層/年級	engine-auto	
 ชั้น 8	Chan paet	chan~ 8	第八層	engine-auto	
 ตอนนี้เรียนอยู่ชั้นอะไร	Ton ni rian yu chan arai	dɔ̄n nī~ rīan yūˋ chan~ aˇ rai	現在讀幾年級？	engine-auto	
-ปีที่เท่าไหร่	Pi thi thaorai	bī tīˋtauˋ raiˇ?	第幾年（大學用）	book-exact	
+ปีที่เท่าไหร่	Pi thi thaorai	bī tīˋ tāuˋ raiˇ	第幾年（大學用）	book-exact	(book-exact已用引擎重新驗證)
 ตอนนี้เรียนปีที่เท่าไหร่	Ton ni rian pi thi thaorai	dɔ̄n nī~ rīan bī tīˋ tāuˋ raiˇ	現在讀（大學）幾年級？	engine-auto	
 อีกสองอาทิตย์เจอกันนะคะ	Ik song athit choe kan na kha	īkˇ sɔ̄ngˊ ā tit~ jə̄ gan na~ ka~	兩週後見	engine-auto	
 ฉันเดินไปโรงเรียน	chan doen pai rong rian	chanˊ dhə̄n bai rōng rīan	我走路去學校	engine-auto	
@@ -8697,12 +8697,12 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 อาการหนักต้องนอนโรงบาล	a kan nak tong non rong ban	ā gān nakˇ dɔ̄ngˋ nɔ̄n rōng bhān	症狀嚴重必須住院（口語）	engine-auto	
 แถวนี้มีโรงบาลมั้ย	thaeo ni mi rong ban mai	tɛ̄uˊ nī~ mī rōng bhān mai~	這附近有醫院嗎？（口語）	engine-auto	
 ให้ทาง	hai thang	haiˋ tāng	讓路	engine-auto	
-พยาบาล	pha ya ban	pa.yā.ḅān	護士 / 護理師	book-exact	
+พยาบาล	pha ya ban	pa~ yā bhān	護士 / 護理師	book-exact	(book-exact已用引擎重新驗證)
 พาเพื่อนไปหาหมอ	pha phuean pai ha mo	pā pɯ̄anˋ bai hāˊ mɔ̄ˊ	帶朋友去看醫生	engine-auto	
 เพื่อนฉันอาการเป็นยังไงบ้างคะ	phuean chan a kan pen yang ngai bang kha	pɯ̄anˋ chanˊ ā gān ben yang ngai bhāngˋ ka~	我朋友的狀況怎麼樣？（女性問）	engine-auto	
 เพื่อนคุณอาการหนักมาก	phuean khun a kan nak mak	pɯ̄anˋ kun ā gān nakˇ mākˋ	你朋友的症狀非常嚴重	engine-auto	
 อาการไม่หนัก	a kan mai nak	ā gān maiˋ nakˇ	症狀不嚴重	engine-auto	
-คลินิก	khli nik	clī.nikˇ	診所	book-exact	
+คลินิก	khli nik	kli~ nik~	診所	book-exact	(book-exact已用引擎重新驗證)
 คลินิกฟัน	khli nik fan	kli~ nik~ fan	牙科診所	engine-auto	
 คลินิกเด็ก	khli nik dek	kli~ nik~ dhekˇ	小兒科診所	engine-auto	
 โรงหนัง	rong nang	rōng nangˊ	電影院	engine-auto	
@@ -8720,7 +8720,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ซ่อมไม่เป็นเลย	som mai pen loei	sɔ̄mˋ maiˋ ben lə̄i	完全不會修	engine-auto	
 ซ่อมไม่ได้แล้ว ต้องซื้อใหม่	som mai dai laeo tong sue mai	sɔ̄mˋ maiˋ dhaiˋ lɛ̄u~ dɔ̄ngˋ sɯ̄~ maiˇ	修不好了，必須買新的	engine-auto	
 โรงพิมพ์	rong phim	rōng pim	印刷廠	engine-auto	
-พิมพ์	phim	pim	打字	book-exact	
+พิมพ์	phim	pim	打字	book-exact	(book-exact已用引擎重新驗證)
 ฉันพิมพ์ภาษาจีนช้ามาก	chan phim pha sa chin cha mak	chanˊ pim pā sāˊ jīn chā~ mākˋ	我打中文很慢	engine-auto	
 พิมพ์ภาษาจีนช้าไหม	phim pha sa chin cha mai	pim pā sāˊ jīn chā~ maiˊ	你打中文很慢嗎？	engine-auto	
 ฉันพิมพ์ภาษาไทยไม่เป็น	chan phim pha sa thai mai pen	chanˊ pim pā sāˊ tai maiˋ ben	我不會打泰文字	engine-auto	
@@ -8743,7 +8743,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ผู้จัดการดารา	phu chat kan da ra	pūˋ jatˇ gān dhā rā	明星的經紀人	engine-auto	
 นักร้อง	nak rong	nak~ rɔ̄ng~	歌手	engine-auto	
 ผู้จัดการนักร้อง	phu chat kan nak rong	pūˋ jatˇ gān nak~ rɔ̄ng~	歌手的經紀人	engine-auto	
-ปริญญา	pa rin ya	ba.rin.yā	學位 / 學歷	book-exact	
+ปริญญา	pa rin ya	brin yā	學位 / 學歷	book-exact	(book-exact已用引擎重新驗證)
 เริ่ม	roem	rə̄mˋ	開始	engine-auto	
 เริ่มงาน	roem ngan	rə̄mˋ ngān	開始工作 / 上班	engine-auto	
 เริ่มงานกี่โมง	roem ngan ki mong	rə̄mˋ ngān gīˇ mōng	幾點開始工作？	engine-auto	
@@ -8787,7 +8787,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ลางาน	la ngan	lā ngān	請假（工作）	engine-auto	
 ลางานสองอาทิตย์	la ngan song a thit	lā ngān sɔ̄ngˊ ā tit~	請假兩個星期	engine-auto	
 ลากิจ	la kit	lā gitˇ	請事假	engine-auto	
-ธุรกิจ	thu ra kit	tu~ra~gitˇ	生意	book-exact	
+ธุรกิจ	thu ra kit	tun gitˇ	生意	book-exact	(book-exact已用引擎重新驗證)
 ลาแต่งงาน	la taeng ngan	lā dɛ̄ngˇ ngān	請婚假	engine-auto	
 ลาป่วย	la puai	lā būayˇ	請病假	engine-auto	
 ป่วย	puai	būayˇ	生病	engine-auto	
@@ -8806,7 +8806,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 จ่ายสด	chai sot	jāiˇ sotˇ	付現	engine-auto	
 ต้องจ่ายสดค่ะ	tong chai sot kha	dɔ̄ngˋ jāiˇ sotˇ kaˋ	必須付現	engine-auto	
 จ่ายเช็ค	chai chek	jāiˇ chek~	付支票	engine-auto	
-ค่า	kha	kāˋ	費用	book-exact	
+ค่า	kha	kāˋ	費用	book-exact	(book-exact已用引擎重新驗證)
 จ่ายค่าน้ำ	chai kha nam	jāiˇ kāˋ nām~	付水費	engine-auto	
 จ่ายค่าไฟ	chai kha fai	jāiˇ kāˋ fai	付電費	engine-auto	
 จ่ายค่าไฟเท่าไหร่คะ	chai kha fai thao rai kha	jāiˇ kāˋ fai tāuˋ raiˇ ka~	電費多少錢？	engine-auto	
@@ -8854,7 +8854,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 รถประจำทาง	rot pra cham thang	rot~ braˇ jam tāng	公車（正式）	engine-auto	
 รถเมล์	rot me	rot~ mē	公車（口語）	engine-auto	
 เคยนั่งรถประจำทางไหมคะ	khoei nang rot pra cham thang mai kha	kə̄i nangˋ rot~ braˇ jam tāng maiˊ ka~	曾搭過公車嗎？	engine-auto	
-โรค	rok	rōkˋ- duā	疾病	book-exact	
+โรค	rok	rōkˋ	疾病	book-exact	(book-exact已用引擎重新驗證)
 โรคเบาหวาน	rok bao wan	rōkˋ bhāu wānˊ	糖尿病	engine-auto	
 โรคหัวใจ	rok hua chai	rōkˋ hūaˊ jai	心臟病	engine-auto	
 โรคมะเร็ง	rok ma reng	rōkˋ ma~ reng	癌症	engine-auto	
@@ -8862,7 +8862,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ยาประจำบ้าน	ya pra cham ban	yā braˇ jam bhānˋ	家庭常備藥	engine-auto	
 ที่บ้านของคุณมียาประจำบ้านไหมคะ	thi ban khon khun mi ya pra cham ban mai kha	tīˋ bhānˋ kɔ̄ngˊ kun mī yā braˇ jam bhānˋ maiˊ ka~	你家有家庭常備藥嗎？	engine-auto	
 บ้านผมมียาประจำบ้านครับ	ban phom mi ya pra cham ban khrap	bhānˋ pomˊ mī yā braˇ jam bhānˋ krap~	我家有家庭常備藥（男性自稱）	engine-auto	
-สุขภาพ	suk kha phap	sukˇka.pāpˋ	健康	book-exact	
+สุขภาพ	suk kha phap	sukˇ pāpˋ	健康	book-exact	(book-exact已用引擎重新驗證)
 ขอให้สุขภาพแข็งแรง	kho hai suk kha phap khaeng raeng	kɔ̄ˊ haiˋ sukˇ pāpˋ kɛngˊ rɛ̄ng	祝你身體健康	engine-auto	
 ลูกค้าประจำ	luk kha pra cham	lūkˋ kā~ braˇ jam	常客	engine-auto	
 ร้านประจำ	ran pra cham	rān~ braˇ jam	常去的店	engine-auto	
@@ -8887,7 +8887,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 คำนี้หมายความว่าอะไร	kham ni mai khwam wa a rai	kam nī~ māiˊ kwām wāˋ aˇ rai	這個字是什麼意思？	engine-auto	
 ไว้	wai	wai~	著（置於動詞後）	engine-auto	
 ทิ้งไว้	thing wai	ting~ wai~	丟著（在某處）	engine-auto	
-ก่อน	kon	gɔ̅ nˇ V/N.	先 / 以前	book-exact	
+ก่อน	kon	gɔ̄nˇ	先 / 以前	book-exact	(book-exact已用引擎重新驗證)
 นอนหลับฝันดีนะคะ อาทิตย์หน้าเจอกันค่ะ ขอบคุณนะคะ	non lap fan di na kha a thit na choe kan kha khop khun na kha	nɔ̄n lapˇ fanˊ dhī na~ ka~ ā tit~ nāˋ jə̄ gan kaˋ kɔ̄pˇ kun na~ ka~	祝大家有個好夢，下週見，謝謝大家	engine-auto	
 โรงเรียน	rong rian	rōng rīan	學校	engine-auto	
 โรงแรม	rong raem	rōng rɛ̄m	飯店	engine-auto	
@@ -9009,7 +9009,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 ลิ้นชักซ้ายบน	lin chak sai bon	lin~ chak~ sāi~ bhon	左上的抽屜	engine-auto	
 อยู่ในลิ้นชักขวาล่าง	yu nai lin chak khwa lang	yūˋ nai lin~ chak~ kwāˊ lāngˋ	在右下的抽屜裡	engine-auto	
 หยิบ	yip	yipˇ	拿	engine-auto	
-เอา	ao	au ….. ma	拿 / 要	book-exact	
+เอา	ao	au	拿 / 要	book-exact	(book-exact已用引擎重新驗證)
 ไปเอาโต๊ะ	pai ao to	bai au do~	去拿桌子	engine-auto	
 ไปเอาเก้าอี้	pai ao kao i	bai au gāuˋ īˋ	去拿椅子	engine-auto	
 หยิบของ	yip khong	yipˇ kɔ̄ngˊ	拿東西	engine-auto	
@@ -9246,7 +9246,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 อาหารไต้หวันมีอะไรอร่อยบ้าง	ahan taiwan mi arai aroi bang	ā hānˊ daiˋ wanˊ mī aˇ rai aˇ rɔ̄iˋ bhāngˋ	台灣食物有什麼好吃的	engine-auto	
 ดีกันนะ	di kan na	dhī gan na~	和好吧	engine-auto	
 ตั้งตัว	tang tua	dangˋ dūa	立足	engine-auto	
-ตั้งใจ	tang chai	dangˋjai	專心用心	book-exact	
+ตั้งใจ	tang chai	dangˋ jai	專心用心	book-exact	(book-exact已用引擎重新驗證)
 ตั้งโรงงาน	tang rong ngan	dangˋ rōng ngān	設立工廠	engine-auto	
 เขาไปตั้งโรงงานที่เมืองไทย	khao pai tang rong ngan thi mueang thai	kāuˊ bai dangˋ rōng ngān tīˋ mɯ̄ang tai	他去泰國設立工廠	engine-auto	
 ตั้งนาฬิกา	tang nalika	dangˋ nā li~ gā	設鬧鐘	engine-auto	
@@ -9281,7 +9281,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 แล้วก็	laeo ko	lɛ̄u~ gɔ̄ˋ	然後	engine-auto	
 แล้วค่อย	laeo khoi	lɛ̄u~ kɔ̄iˋ	然後才	engine-auto	
 กินข้าวแล้วค่อยไปอาบน้ำ	กินข้าวแล้วค่อยไปอาบน้ำ	gin kāuˋ lɛ̄u~ kɔ̄iˋ bai āpˇ nām~	吃飯然後才去洗澡	engine-auto	
-เรื่องนี้อธิบายยากนะ	rueang ni athibai yak na	rɯangˋnī~ a.ti~ḅāi yākˋna~	這件事很難解釋	book-exact	
+เรื่องนี้อธิบายยากนะ	rueang ni athibai yak na	rɯ̄angˋ nī~ aˇ ti~ bhāi yākˋ na~	這件事很難解釋	book-exact	(book-exact已用引擎重新驗證)
 แบบ	baep	bhɛ̄pˇ	款式樣式這樣	engine-auto	
 จำได้	cham dai	jam dhaiˋ	記得	engine-auto	
 อยาก	yak	yākˋ	想要	engine-auto	
@@ -9358,7 +9358,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 แพ้ท้องหนัก	phae thong nak	pɛ̄~ tɔ̄ng~ nakˇ	害喜很嚴重	engine-auto	
 แพ้ท้องหนัก 3 เดือน	phae thong nak sam duean	pɛ̄~ tɔ̄ng~ nakˇ 3 dhɯ̄an	嚴重害喜三個月	engine-auto	
 แพ้น้ำตาผู้หญิง	phae nam ta phuying	pɛ̄~ nām~ dā pūˋ yingˊ	對女人的眼淚沒轍	engine-auto	
-สู้ๆ	su su	sūˋsūˋ	加油	book-exact	
+สู้ๆ	su su	sūˋ sūˋ	加油	book-exact	(book-exact已用引擎重新驗證)
 อย่ายอมแพ้นะ	ya yom phae na	yāˋ yɔ̄m pɛ̄~ na~	別認輸喔 / 別放棄喔	engine-auto	
 ยังไม่ยอมแพ้	yang mai yom phae	yang maiˋ yɔ̄m pɛ̄~	還沒認輸 / 還沒放棄	engine-auto	
 หวังว่า	wang wa	wangˊ wāˋ	希望	engine-auto	
@@ -9402,7 +9402,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 ไว้ใจไม่ได้	wai chai mai dai	wai~ jai maiˋ dhaiˋ	不可信任	engine-auto	
 ถักเปียเป็น	thak pia pen	takˇ bīa ben	會綁辮子	engine-auto	
 ฉันรับรองว่า	chan rap rong wa	chanˊ rap~ rɔ̄ng wāˋ	我保證...	engine-auto	
-เขาเป็นคนไว้ใจได้	khao pen khon wai chai dai	kauˊbēn khon wai~ jai ḍaiˋ	他是個可以信任的人	book-exact	
+เขาเป็นคนไว้ใจได้	khao pen khon wai chai dai	kāuˊ ben kon wai~ jai dhaiˋ	他是個可以信任的人	book-exact	(book-exact已用引擎重新驗證)
 ไปเช้าเย็นกลับ	pai chao yen klap	bai chāu~ yen glapˇ	當天來回	engine-auto	
 ไปเช้าเย็นกลับได้ค่ะ ไม่เสียเวลาค่ะ	pai chao yen klap dai kha mai sia wela kha	bai chāu~ yen glapˇ dhaiˋ kaˋ maiˋ sīaˊ wē lā kaˋ	可以當天來回，不浪費時間	engine-auto	
 คนหาเช้ากินค่ำ	khon ha chao kin kham	kon hāˊ chāu~ gin kamˋ	朝不保夕的人 / 靠打零工度日	engine-auto	
@@ -9486,7 +9486,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 ฝากซื้อหน่อยได้ไหม	fak suea noi dai mai	fākˇ sɯ̄~ nɔ̄iˇ dhaiˋ maiˊ	可以幫忙買嗎	engine-auto	
 นี่ของฝากจากไต้หวัน	ni khong fak chak taiwan	nīˋ kɔ̄ngˊ fākˇ jākˇ daiˋ wanˊ	這是來自台灣的伴手禮	engine-auto	
 ฉันซื้อมาฝากคุณ	chan suea ma fak khun	chanˊ sɯ̄~ mā fākˇ kun	我買來送你的（女）	engine-auto	
-เสาร์นี้ว่างไหม	sao ni wang mai	A :	這個星期六有空嗎	book-exact	
+เสาร์นี้ว่างไหม	sao ni wang mai	sāuˊ nī~ wāngˋ maiˊ	這個星期六有空嗎	book-exact	(book-exact已用引擎重新驗證)
 เสาร์นี้ไม่ได้	sao ni mai dai	sāuˊ nī~ maiˋ dhaiˋ	這個星期六不行	engine-auto	
 ลูกใกล้จะสอบแล้ว	luk klai cha sop laeo	lūkˋ glaiˋ jaˇ sɔ̄pˇ lɛ̄u~	孩子快要考試了	engine-auto	
 แต่เสาร์หน้าว่างนะ	tae sao na wang na	dɛ̄ˇ sāuˊ nāˋ wāngˋ na~	但下個星期六有空喔	engine-auto	
@@ -9501,11 +9501,11 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 ไต้หวันบ้านราคาแพงจะตาย	taiwan ban rakha phaeng cha tai	daiˋ wanˊ bhānˋ rā kā pɛ̄ng jaˇ dāi	台灣的房子貴得要命	engine-auto	
 ฝันไปเถอะ	fan pai thoe	fanˊ bai təˇ	作夢吧	engine-auto	
 ใครจะไปซื้อไหว	khrai cha pai suea wai	krai jaˇ bai sɯ̄~ waiˊ	誰買得起啊	engine-auto	
-ซื้อราคาเท่าไหร่ล่ะ	suea rakha thao rai la	B :	買多少錢呢	book-exact	
+ซื้อราคาเท่าไหร่ล่ะ	suea rakha thao rai la	sɯ̄~ rā kā tāuˋ raiˇ laˋ	買多少錢呢	book-exact	(book-exact已用引擎重新驗證)
 ประมาณ 5 ล้านกว่า	praman ha lan kwa	braˇ mān 5 lān~ gwāˇ	大約五百多萬	engine-auto	
 พร้อมเข้าอยู่ได้ทันที	phrom khao yu dai than thi	prɔ̄m~ kāuˋ yūˋ dhaiˋ tan tī	可以馬上入住	engine-auto	
 มีไมโครเวฟกับตู้เย็นแถมให้ด้วยนะคะ	mi mai khro wef kap tu yen thaem hai duai na kha	mī mai krō wēpˋ gapˇ dūˋ yen tɛ̄mˊ haiˋ dhūayˋ na~ ka~	有微波爐，連同冰箱也有送喔	engine-auto	
-โหย เยี่ยมมากเลย	hoi yiam mak loei	B :	哇，非常棒	book-exact	
+โหย เยี่ยมมากเลย	hoi yiam mak loei	hōiˊ yīamˋ mākˋ lə̄i	哇，非常棒	book-exact	(book-exact已用引擎重新驗證)
 โหย แพงมากเลย	hoi phaeng mak loei	hōiˊ pɛ̄ng mākˋ lə̄i	哇，非常貴	engine-auto	
 โหย น่ารักมากเลย	hoi na rak mak loei	hōiˊ nāˋ rak~ mākˋ lə̄i	哇，非常可愛	engine-auto	
 มีรถประจำทาง	mi rot pracham thang	mī rot~ braˇ jam tāng	有公車	engine-auto	
@@ -9664,7 +9664,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 คนหาเช้ากินค่ำ	khon ha chao kin kham	kon hāˊ chāu~ gin kamˋ	日薪族 / 勉強糊口的人	engine-auto	
 ชีวิตลำบาก	chiwit lambak	chī wit~ lam bhākˇ	生活艱難	engine-auto	
 เช่น	chen	chēnˋ	例如	engine-auto	
-แม่บ้าน	mae ban	mɛ̅ ˋbānˋ       -	清潔工 / 打雜阿姨	book-exact	
+แม่บ้าน	mae ban	mɛ̄ˋ bhānˋ	清潔工 / 打雜阿姨	book-exact	(book-exact已用引擎重新驗證)
 เช่นแม่บ้าน	chen mae ban	chēnˋ mɛ̄ˋ bhānˋ	例如清潔工	engine-auto	
 คนขับแท็กซี่	khon khap thaeksi	kon kapˇ tɛk~ sīˋ	計程車司機	engine-auto	
 ยาม	yam	yām	警衛 / 保全	engine-auto	
@@ -9737,7 +9737,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 โรงพัก	rongphak	rōng pak~	派出所	engine-auto	
 เมื่อก่อนของหายต้องไปโรงพัก	muea kon khong hai tong pai rongphak	mɯ̄aˋ gɔ̄nˇ kɔ̄ngˊ hāiˊ dɔ̄ngˋ bai rōng pak~	以前東西不見必須去派出所	engine-auto	
 แต่เดี๋ยวนี้ไม่ต้องไปโรงพักก็ได้	tae diao ni mai tong pai rongphak ko dai	dɛ̄ˇ dhīauˊ nī~ maiˋ dɔ̄ngˋ bai rōng pak~ gɔ̄ˋ dhaiˋ	但是現在不用去派出所也可以	engine-auto	
-ปริญญา	parinya	ba.rin.yā	學歷	book-exact	
+ปริญญา	parinya	brin yā	學歷	book-exact	(book-exact已用引擎重新驗證)
 ก็ไปเรียนต่อปริญญาโท	ko pai rian tor parinya tho	gɔ̄ˋ bai rīan dɔ̄ˇ brin yā tō	就去繼續唸碩士	engine-auto	
 ปริญญาโท	parinya tho	brin yā tō	碩士學位	engine-auto	
 เรียนต่อปริญญาโทที่เมืองนอก	rian tor parinya tho thi mueang nok	rīan dɔ̄ˇ brin yā tō tīˋ mɯ̄ang nɔ̄kˋ	在國外繼續唸碩士	engine-auto	
@@ -9831,7 +9831,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 รับฟรีของแถม 3 ชิ้น	rap fri khong thaem sam chin	rap~ frī kɔ̄ngˊ tɛ̄mˊ 3 chin~	免費獲得 3 件贈品	engine-auto	
 ตั้งโรงงาน	ttang rong ngan	dangˋ rōng ngān	設立工廠	engine-auto	
 ความฝันของยูจุนคืออะไรคะ	khwam fan khong yu jun khue a rai kha	kwām fanˊ kɔ̄ngˊ yū jun kɯ̄ aˇ rai ka~	你的夢想是什麼呢	engine-auto	
-ตั้งใจ	ttang chai	dangˋjai	認真	book-exact	
+ตั้งใจ	ttang chai	dangˋ jai	認真	book-exact	(book-exact已用引擎重新驗證)
 ตั้งนาฬิกา	ttang na li ka	dangˋ nā li~ gā	設定鬧鐘	engine-auto	
 ตีห้า	ti ha	dī hāˋ	凌晨五點	engine-auto	
 เจ็ดโมงเช้า	chet mong chao	jetˇ mōng chāu~	早上七點	engine-auto	
@@ -9846,7 +9846,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 ออกแบบ	ok baep	ɔ̄kˇ bhɛ̄pˇ	設計	engine-auto	
 ออกแบบเยี่ยมมาก	ok baep yiam mak	ɔ̄kˇ bhɛ̄pˇ yīamˋ mākˋ	設計得非常讚	engine-auto	
 ออกแบบก่อนแล้วค่อยผลิต	ok baep kon laeo khoi pha lit	ɔ̄kˇ bhɛ̄pˇ gɔ̄nˇ lɛ̄u~ kɔ̄iˋ paˇ lit~	先設計然後再生產	engine-auto	
-ขับรถ	khap rot	kapˇrot~ -	開車	book-exact	
+ขับรถ	khap rot	kapˇ rot~	開車	book-exact	(book-exact已用引擎重新驗證)
 ตั้งแต่วันแรกที่เจอเขา	ttang tae wan raek thi cheo khao	dangˋ dɛ̄ˇ wan rɛ̄kˋ tīˋ jə̄ kāuˊ	從遇到他的第一天起	engine-auto	
 ลองชิมดู ผมรับรองว่าคุณจะติดใจ	long chim du phom rap rong wa khun cha tit chai	lɔ̄ng chim dhū pomˊ rap~ rɔ̄ng wāˋ kun jaˇ ditˇ jai	試吃看看，我保證你會上癮	engine-auto	
 ฉันรับรองว่าเขาเป็นคนไว้ใจได้	chan rap rong wa khao pen khon wai chai dai	chanˊ rap~ rɔ̄ng wāˋ kāuˊ ben kon wai~ jai dhaiˋ	我保證他是值得信任的人	engine-auto	
@@ -9859,12 +9859,12 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 สู้ๆ นะ	su su na	sūˋ sūˋ na~	加油喔	engine-auto	
 สู้ๆ นะ อย่ายอมแพ้ ค่ะ	su su na ya yom phae kha	sūˋ sūˋ na~ yāˋ yɔ̄m pɛ̄~ kaˋ	加油喔，不要放棄（女性敬語）	engine-auto	
 แพ้	phae	pɛ̄~	輸 / 過敏	engine-auto	
-ยา	ya	yā - ḅānˋ	藥	book-exact	
+ยา	ya	yā	藥	book-exact	(book-exact已用引擎重新驗證)
 แพ้ยา	phae ya	pɛ̄~ yā	對藥過敏	engine-auto	
 แพ้ยาอะไรมั้ยคะ	phae ya a rai mai ka	pɛ̄~ yā aˇ rai mai~ ka~	對什麼藥過敏嗎？	engine-auto	
 ไม่มีค่ะ	mai mi ka	maiˋ mī kaˋ	沒有	engine-auto	
 ไม่แพ้ค่ะ	mai phae ka	maiˋ pɛ̄~ kaˋ	不會過敏	engine-auto	
-อากาศ	a kat	ā.gātˇ	天氣 / 空氣	book-exact	
+อากาศ	a kat	ā gātˇ	天氣 / 空氣	book-exact	(book-exact已用引擎重新驗證)
 แพ้อากาศ	phae a kat	pɛ̄~ ā gātˇ	對天氣過敏	engine-auto	
 แพ้อากาศค่ะ	phae a kat ka	pɛ̄~ ā gātˇ kaˋ	對天氣過敏（女性敬語）	engine-auto	
 ธูป	thup	tūpˋ	香（線香）	engine-auto	
@@ -9887,7 +9887,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 จาก	chak	jākˇ	來自 / 從	engine-auto	
 เมืองไทย	mueang thai	mɯ̄ang tai	泰國	engine-auto	
 ไต้หวัน	tai wan	daiˋ wanˊ	台灣	engine-auto	
-รสชาติ	rot chat	rot~ chātˋ	味道 / 風味	book-exact	
+รสชาติ	rot chat	rot~ chātˋ	味道 / 風味	book-exact	(book-exact已用引擎重新驗證)
 หวัง	wang	wangˊ	希望	engine-auto	
 ผิดหวัง	phit wang	pitˇ wangˊ	失望	engine-auto	
 คุณทำให้ฉันผิดหวัง	khun tham hai chan phit wang	kun tam haiˋ chanˊ pitˇ wangˊ	你讓我失望	engine-auto	
@@ -9938,7 +9938,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 ขึ้น	khuen	kɯnˋ	上	engine-auto	
 ขึ้นเครื่องบิน	khuen khrueang bin	kɯnˋ krɯ̄angˋ bhin	上飛機	engine-auto	
 ขึ้นไปข้างบน	khuen pai khang bon	kɯnˋ bai kāngˋ bhon	上去樓上	engine-auto	
-ลง	long	long	下	book-exact	
+ลง	long	long	下	book-exact	(book-exact已用引擎重新驗證)
 ลงบันได	long ban dai	long bhan dhai	下樓梯	engine-auto	
 ออก	ok	ɔ̄kˇ	出 / 看得出來	engine-auto	
 อ่านออกไหม	an ok mai	ānˇ ɔ̄kˇ maiˊ	讀得出嗎	engine-auto	
@@ -9946,7 +9946,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 ทำนา	tham na	tam nā	務農 / 做田	engine-auto	
 ขึ้นเวที	khuen we thi	kɯnˋ wē tī	上台	engine-auto	
 ขึ้นเขา	khuen khao	kɯnˋ kāuˊ	上山	engine-auto	
-ขับรถ	khap rot	kapˇrot~ -	開車	book-exact	
+ขับรถ	khap rot	kapˇ rot~	開車	book-exact	(book-exact已用引擎重新驗證)
 เดินเขา	doen khao	dhə̄n kāuˊ	爬山 / 健行	engine-auto	
 เดินขึ้นเขา	doen khuen khao	dhə̄n kɯnˋ kāuˊ	步行上山	engine-auto	
 นั่งแท็กซี่	nang thaeksi	nangˋ tɛk~ sīˋ	坐計程車	engine-auto	
@@ -9971,9 +9971,9 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 ไม่สูงขึ้นแล้ว	mai sung khuen laeo	maiˋ sūngˊ kɯnˋ lɛ̄u~	已經沒有變高了	engine-auto	
 สบายใจขึ้น	sabai chai khuen	saˇ bhāi jai kɯnˋ	心情輕鬆起來	engine-auto	
 ตอนนี้ยากขึ้น	ton ni yak khuen	dɔ̄n nī~ yākˋ kɯnˋ	現在變難了	engine-auto	
-ลง	long	long	下 / 降 / 降下	book-exact	
+ลง	long	long	下 / 降 / 降下	book-exact	(book-exact已用引擎重新驗證)
 ลงทุน	long thun	long tun	投資	engine-auto	
-ทุน	thun	long     - tun          -	資金 / 資本 / 本錢	book-exact	
+ทุน	thun	tun	資金 / 資本 / 本錢	book-exact	(book-exact已用引擎重新驗證)
 ลงทุนซื้อหุ้น	long thun su hun	long tun sɯ̄~ hunˋ	投資買股票	engine-auto	
 ลงทุนเปิดร้าน	long thun poet ran	long tun bə̄tˇ rān~	投資開店	engine-auto	
 ถ้ามีเงิน คุณจะลงทุนอะไร	tha mi ngoen khun cha long thun arai	tāˋ mī ngə̄n kun jaˇ long tun aˇ rai	如果有錢，你要投資什麼	engine-auto	
@@ -10061,7 +10061,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 ตกลงจะไปมั้ย	tok long cha pai mai	dokˇ long jaˇ bai mai~	到底要去嗎	engine-auto	
 ตกลงจะกินอะไร	tok long cha kin arai	dokˇ long jaˇ gin aˇ rai	到底要吃什麼	engine-auto	
 รัฐบาลออกข่าว	rat tha ban ok khao	rat~ bhān ɔ̄kˇ kāuˇ	政府發布新聞	engine-auto	
-รัฐบาลออกกฎหมายใหม่	rat tha ban ok kot mai mai	rat~ta.ḅān ɔ̅ kˇgotˇmāiˊmaiˇ	政府頒布新法律	book-exact	
+รัฐบาลออกกฎหมายใหม่	rat tha ban ok kot mai mai	rat~ bhān ɔ̄kˇ gotˇ māiˊ maiˇ	政府頒布新法律	book-exact	(book-exact已用引擎重新驗證)
 รับ	rap	rap~	接／收	engine-auto	
 คนขับรถ	khon khap rot	kon kapˇ rot~	司機	engine-auto	
 ยาม	yam	yām	警衛	engine-auto	
@@ -10121,7 +10121,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 เสิร์ฟลูกเทนนิส	soep luk tennis	sə̄pˇ lūkˋ tēn nit~	發網球	engine-auto	
 ฝากเงิน	fak ngoen	fākˇ ngə̄n	存錢	engine-auto	
 เปิดบัญชี	poet banchi	bə̄tˇ bhan chī	開戶	engine-auto	
-ครัว	khrua	krua	廚房／廚	book-exact	
+ครัว	khrua	krūa	廚房／廚	book-exact	(book-exact已用引擎重新驗證)
 แม่ครัว	mae khrua	mɛ̄ˋ krūa	女廚師	engine-auto	
 แม่ครัวฝีมือดี	mae khrua fi mue di	mɛ̄ˋ krūa fīˊ mɯ̄ dhī	女廚師手藝很好	engine-auto	
 ครอบครัว	khrop khrua	krɔ̄pˋ krūa	家庭	engine-auto	
@@ -10143,7 +10143,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 กำลังจะปิด	kamlang cha pit	gam lang jaˇ bitˇ	即將關門	engine-auto	
 ห้างกำลังจะปิดแล้ว	hang kamlang cha pit laeo	hāngˋ gam lang jaˇ bitˇ lɛ̄u~	百貨公司快關門了	engine-auto	
 ประกาศห้างกำลังจะปิดแล้ว	prakat hang kamlang cha pit laeo	braˇ gātˇ hāngˋ gam lang jaˇ bitˇ lɛ̄u~	廣播百貨公司快關門了	engine-auto	
-ค้า	kha	kā~	買賣／交易	book-exact	
+ค้า	kha	kā~	買賣／交易	book-exact	(book-exact已用引擎重新驗證)
 ยาบ้า	ya ba	yā bhāˋ	安非他命	engine-auto	
 สินค้า	sinkha	sinˊ kā~	商品	engine-auto	
 สินค้านำเข้า	sinkha nam khao	sinˊ kā~ nam kāuˋ	進口商品	engine-auto	
@@ -10243,7 +10243,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 ผืน	phuen	pɯ̄nˊ	條／幅	engine-auto	
 แพ็ก	phaek	pɛk~	組／包	engine-auto	
 มาม่าหนึ่งแพ็กมีหกซอง	mama nueng phaek mi hok song	mā māˋ nɯngˇ pɛk~ mī hokˇ sɔ̄ng	一組泡麵有六包	engine-auto	
-เครื่อง	khrueang	krɯangˋ	台	book-exact	
+เครื่อง	khrueang	krɯ̄angˋ	台	book-exact	(book-exact已用引擎重新驗證)
 คอมพิวเตอร์หนึ่งเครื่อง	khom phiw toe nueng khrueang	kɔ̄m piw də̄ nɯngˇ krɯ̄angˋ	一台電腦	engine-auto	
 ผมมีคอมพิวเตอร์หนึ่งเครื่องครับ	phom mi khom phiw toe nueng khrueang khrap	pomˊ mī kɔ̄m piw də̄ nɯngˇ krɯ̄angˋ krap~	我有一台電腦（男性禮貌）	engine-auto	
 มือถือสองเครื่อง	mue thue song khrueang	mɯ̄ tɯ̄ˊ sɔ̄ngˊ krɯ̄angˋ	兩支手機	engine-auto	
