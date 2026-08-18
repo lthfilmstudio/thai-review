@@ -975,9 +975,9 @@
 มือถือ	mue thue	mɯ̄ tɯ̄ˊ	手機	engine-auto	
 ถือ	theu	tɯ̄ˊ	提、拿	engine-auto	
 ถืออะไร	theu arai	tɯ̄ˊ aˇ rai	拿什麼？	engine-auto	
-โทรศัพท์	thoo ra sap	tōn sapˇ	電話	engine-auto	
-โทรศัพท์มือถือ	thoo ra sap mue thue	tōn sapˇ mɯ̄ tɯ̄ˊ	手機 (正式說法)	engine-auto	
-โทรศัพท์บ้าน	thoo ra sap baan	tōn sapˇ bhānˋ	家用電話	engine-auto	
+โทรศัพท์	thoo ra sap	tō ra~ sapˇ	電話	engine-auto	
+โทรศัพท์มือถือ	thoo ra sap mue thue	tō ra~ sapˇ mɯ̄ tɯ̄ˊ	手機 (正式說法)	engine-auto	
+โทรศัพท์บ้าน	thoo ra sap baan	tō ra~ sapˇ bhānˋ	家用電話	engine-auto	
 มือสอง	mue song	mɯ̄ sɔ̄ngˊ	二手	engine-auto	
 มือสองถูกมาก	mue song thook mak	mɯ̄ sɔ̄ngˊ tūkˇ mākˋ	二手很便宜	engine-auto	
 รถมือสอง	rot mue song	rot~ mɯ̄ sɔ̄ngˊ	二手車	engine-auto	
@@ -1167,7 +1167,7 @@
 ขอ	kho	kɔ̄ˊ	請、要	engine-auto	
 ขอเมนู	kho menu	kɔ̄ˊ mē nū	要菜單	engine-auto	
 ขอไลน์	kho line	kɔ̄ˊ lai	要Line	engine-auto	
-ขอเบอร์โทร	kho ber thoo	kɔ̄ˊ bhə̄ tōn	要電話號碼	engine-auto	
+ขอเบอร์โทร	kho ber thoo	kɔ̄ˊ bhə̄ tō	要電話號碼	engine-auto	
 ขอให้	kho hai	kɔ̄ˊ haiˋ	祝、祝福	engine-auto	
 ขอให้มีแฟนสวยๆ	kho hai mii faen suai suai	kɔ̄ˊ haiˋ mī fɛ̄n sūayˊ sūayˊ	祝你有漂亮的女朋友	engine-auto	
 ขอให้มีแฟนหล่อๆ	kho hai mii faen lor lor	kɔ̄ˊ haiˋ mī fɛ̄n lɔ̄ˇ lɔ̄ˇ	祝你有帥氣的男朋友	engine-auto	
@@ -1206,8 +1206,8 @@
 ดูทีวี	duu tii wii	dhū tī wī	看電視	engine-auto	
 ไปหาหมอดู	pai haa mor duu	bai hāˊ mɔ̄ˊ dhū	去找算命師	engine-auto	
 โชคไม่ดี	chok mai dii	chōkˋ maiˋ dhī	運氣不好	engine-auto	
-โทร	thoo	tōn	打電話	engine-auto	
-โทรไปจอง	thoo pai jong	tōn bai jɔ̄ng	打電話去預約/訂	engine-auto	
+โทร	thoo	tō	打電話	engine-auto	
+โทรไปจอง	thoo pai jong	tō bai jɔ̄ng	打電話去預約/訂	engine-auto	
 จอง	jong	jɔ̄ng	訂、預約	engine-auto	
 ยินดี	yin dii	yin dhī	高興	engine-auto	
 ยินดีด้วย	yin dii duay	yin dhī dhūayˋ	恭喜	engine-auto	
@@ -1291,7 +1291,7 @@
 เมื่อยหลัง	muey lang	mɯ̄aiˋ langˊ	背痠	engine-auto	
 ก็เลยเมื่อยหลัง	gloeey muey lang	gɔ̄ˋ lə̄i mɯ̄aiˋ langˊ	所以背痠	engine-auto	
 ให้	hai	haiˋ	給	engine-auto	
-ซื้อโทรศัพท์มือถือให้แฟน	seu torasap mue thue hai faen	sɯ̄~ tōn sapˇ mɯ̄ tɯ̄ˊ haiˋ fɛ̄n	買手機給男/女朋友	engine-auto	
+ซื้อโทรศัพท์มือถือให้แฟน	seu torasap mue thue hai faen	sɯ̄~ tō ra~ sapˇ mɯ̄ tɯ̄ˊ haiˋ fɛ̄n	買手機給男/女朋友	engine-auto	
 วันเกิดของเขา	wan geurt khong kao	wan gə̄tˇ kɔ̄ngˊ kāuˊ	他的生日	engine-auto	
 ซื้อรถให้เมีย	seu rot hai mia	sɯ̄~ rot~ haiˋ mīa	買車給老婆	engine-auto	
 เอาเงินให้แม่	ao ngern hai mae	au ngə̄n haiˋ mɛ̄ˋ	拿錢給媽媽	engine-auto	
@@ -1355,13 +1355,13 @@
 หมอดูเก่งมาก	mor du geng mak	mɔ̄ˊ dhū gēngˇ mākˋ	算命師很厲害	engine-auto	
 หมอดูคนนี้	mor du khon ni	mɔ̄ˊ dhū kon nī~	這位算命師	engine-auto	
 หมอดูคนนี้เก่งมาก	mor du khon ni geng mak	mɔ̄ˊ dhū kon nī~ gēngˇ mākˋ	這位算命師很厲害	engine-auto	
-โทร	tho	tōn	打電話	engine-auto	
+โทร	tho	tō	打電話	engine-auto	
 จอง	jong	jɔ̄ng	訂位、預約	engine-auto	
-โทรไปจองร้านอาหาร	tho bpai jong ran a-han	tōn bai jɔ̄ng rān~ ā hānˊ	打電話去訂餐廳	engine-auto	
+โทรไปจองร้านอาหาร	tho bpai jong ran a-han	tō bai jɔ̄ng rān~ ā hānˊ	打電話去訂餐廳	engine-auto	
 ที่นั่ง	thi nang	tīˋ nangˋ	座位	engine-auto	
-โทรไปจองที่นั่ง	tho bpai jong thi nang	tōn bai jɔ̄ng tīˋ nangˋ	打電話去訂位	engine-auto	
-โทรไปหาเพื่อน	tho bpai ha pheuan	tōn bai hāˊ pɯ̄anˋ	打電話給朋友	engine-auto	
-โทรมาทำไม	tho ma tam mai	tōn mā tam mai	打來幹嘛？	engine-auto	
+โทรไปจองที่นั่ง	tho bpai jong thi nang	tō bai jɔ̄ng tīˋ nangˋ	打電話去訂位	engine-auto	
+โทรไปหาเพื่อน	tho bpai ha pheuan	tō bai hāˊ pɯ̄anˋ	打電話給朋友	engine-auto	
+โทรมาทำไม	tho ma tam mai	tō mā tam mai	打來幹嘛？	engine-auto	
 ยินดีต้อนรับ	yin dee ton rap	yin dhī dɔ̄nˋ rap~	歡迎光臨	engine-auto	
 ยินดีที่ได้รู้จัก	yin dee thi dai ru jak	yin dhī tīˋ dhaiˋ rū~ jakˇ	很高興認識你	engine-auto	
 ผมชื่อเบียร์	pom chue beer	pomˊ chɯ̄ˋ bhīa	我叫Beer	engine-auto	
@@ -1827,8 +1827,8 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 ไปรับลูก	pai rap luuk	bai rap~ lūkˋ	去接小孩	engine-auto	
 ไปรับเพื่อน	pai rap phuean	bai rap~ pɯ̄anˋ	去接朋友	engine-auto	
 ไปรับแฟน	pai rap faen	bai rap~ fɛ̄n	去接男/女朋友	engine-auto	
-มารับโทรศัพท์	maa rap thor-ra-sap	mā rap~ tōn sapˇ	來接電話	engine-auto	
-โทรหาใคร	tho ha khrai	tōn hāˊ krai	打電話給誰？	engine-auto	
+มารับโทรศัพท์	maa rap thor-ra-sap	mā rap~ tō ra~ sapˇ	來接電話	engine-auto	
+โทรหาใคร	tho ha khrai	tō hāˊ krai	打電話給誰？	engine-auto	
 เงินเดือน	ngern deuan	ngə̄n dhɯ̄an	薪水	engine-auto	
 รับเงินเดือน	rap ngern deuan	rap~ ngə̄n dhɯ̄an	領薪水	engine-auto	
 ทำงาน	tham ngaan	tam ngān	工作	engine-auto	
@@ -1840,9 +1840,9 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 ดูถูก	duu thuk	dhū tūkˇ	看不起、看輕	engine-auto	
 ไม่ดูถูกเขา	mai duu thuk khao	maiˋ dhū tūkˇ kāuˊ	不要看輕他	engine-auto	
 ดูไม่ออก	duu mai ok	dhū maiˋ ɔ̄kˇ	看不出來	engine-auto	
-โทรทัศน์	tho ra that	tōn tat~	電視 (正式)	engine-auto	
-ดูโทรทัศน์นาน	duu tho ra that naan	dhū tōn tat~ nān	看電視看很久	engine-auto	
-คุยโทรศัพท์	khui tho ra sap	kui tōn sapˇ	講電話	engine-auto	
+โทรทัศน์	tho ra that	tō ra~ tat~	電視 (正式)	engine-auto	
+ดูโทรทัศน์นาน	duu tho ra that naan	dhū tō ra~ tat~ nān	看電視看很久	engine-auto	
+คุยโทรศัพท์	khui tho ra sap	kui tō ra~ sapˇ	講電話	engine-auto	
 คุยกับใคร	khui gap khrai	kui gapˇ krai	跟誰講話？	engine-auto	
 หัวหน้า	hua na	hūaˊ nāˋ	上司	engine-auto	
 คุยกับหัวหน้า	khui gap hua na	kui gapˇ hūaˊ nāˋ	跟上司講話	engine-auto	
@@ -1967,7 +1967,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 ไม่ต้อง	mai dtong	maiˋ dɔ̄ngˋ	不用	engine-auto	
 เกรงใจ	kreng jai	grēng jai	不好意思、客氣	engine-auto	
 มารับ	maa rap	mā rap~	來接	engine-auto	
-รับโทรศัพท์	rap tho-ra-sap	rap~ tōn sapˇ	接電話	engine-auto	
+รับโทรศัพท์	rap tho-ra-sap	rap~ tō ra~ sapˇ	接電話	engine-auto	
 ไปรับลูก	bpai rap look	bai rap~ lūkˋ	去接小孩	engine-auto	
 รับเงินเดือน	rap ngern deuan	rap~ ngə̄n dhɯ̄an	領薪水	engine-auto	
 เรื่อง	reuang	rɯ̄angˋ	事情、部(量詞)	book-exact	(book-exact已用引擎重新驗證)
@@ -2169,7 +2169,7 @@ US ดอลลาร์	US dollar	US dhɔ̄n lā	美金	engine-auto
 ไม่ต้อง	mai dtong	maiˋ dɔ̄ngˋ	不用	engine-auto	
 เกรงใจ	kreng jai	grēng jai	不好意思、客氣	engine-auto	
 มารับ	maa rap	mā rap~	來接	engine-auto	
-รับโทรศัพท์	rap tho-ra-sap	rap~ tōn sapˇ	接電話	engine-auto	
+รับโทรศัพท์	rap tho-ra-sap	rap~ tō ra~ sapˇ	接電話	engine-auto	
 ไปรับลูก	bpai rap look	bai rap~ lūkˋ	去接小孩	engine-auto	
 รับเงินเดือน	rap ngern deuan	rap~ ngə̄n dhɯ̄an	領薪水	engine-auto	
 เรื่อง	reuang	rɯ̄angˋ	事情、部(量詞)	book-exact	(book-exact已用引擎重新驗證)
@@ -2403,8 +2403,8 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 เอาลูกใหญ่หรือลูกเล็ก	ao look yai rue look lek	au lūkˋ yaiˇ rɯ̄ˊ lūkˋ lek~	要大顆的還是小顆的？	engine-auto	
 รับ	rap	rap~	接 / 收	engine-auto	
 มีค่ะ มีค่ะ	mee kha mee kha	mī kaˋ mī kaˋ	有的，有的	engine-auto	
-รับโทรศัพท์	rap tho-ra-sap	rap~ tōn sapˇ	接電話	engine-auto	
-มารับโทรศัพท์	maa rap tho-ra-sap	mā rap~ tōn sapˇ	來接電話	engine-auto	
+รับโทรศัพท์	rap tho-ra-sap	rap~ tō ra~ sapˇ	接電話	engine-auto	
+มารับโทรศัพท์	maa rap tho-ra-sap	mā rap~ tō ra~ sapˇ	來接電話	engine-auto	
 ได้รับแล้ว	dai rap laew	dhaiˋ rap~ lɛ̄u~	收到了	engine-auto	
 รับแล้ว	rap laew	rap~ lɛ̄u~	收到了	engine-auto	
 ดู	duu	dhū	看	engine-auto	
@@ -3571,7 +3571,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 เพิ่งเรียนไม่กี่เดือน	phueng rian mai gi duean	pə̄ngˋ rīan maiˋ gīˇ dhɯ̄an	剛學沒幾個月	engine-auto	
 เพิ่งออกไป	phueng ok pai	pə̄ngˋ ɔ̄kˇ bai	剛出去	engine-auto	
 เพิ่งออกไปข้างนอก	phueng ok pai khang nok	pə̄ngˋ ɔ̄kˇ bai kāngˋ nɔ̄kˋ	剛出去外面	engine-auto	
-เขาเพิ่งโทรมา	khao phueng tho ma	kāuˊ pə̄ngˋ tōn mā	他剛打電話來	engine-auto	
+เขาเพิ่งโทรมา	khao phueng tho ma	kāuˊ pə̄ngˋ tō mā	他剛打電話來	engine-auto	
 เพิ่งซื้อมือถือใหม่	phueng sue mue thue mai	pə̄ngˋ sɯ̄~ mɯ̄ tɯ̄ˊ maiˇ	剛買新手機	engine-auto	
 คิดถึง	khit thueng	kit~ tɯngˊ	想念	engine-auto	
 ผมคิดถึงคุณ	phom khit thueng khun	pomˊ kit~ tɯngˊ kun	我想你 (男)	engine-auto	
@@ -4020,7 +4020,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 บนโต๊ะ	bon dtoh	bhon do~	桌子上	engine-auto	
 บนโต๊ะมีของเยอะ	bon dtoh mee kawng yuh	bhon do~ mī kɔ̄ngˊ yə~	桌子上有很多東西	engine-auto	
 คอมพิวเตอร์	kawm piw dter	kɔ̄m piw də̄	電腦	engine-auto	
-โทรศัพท์	too ra sap	tōn sapˇ	電話	engine-auto	
+โทรศัพท์	too ra sap	tō ra~ sapˇ	電話	engine-auto	
 กระดาษ	gp ra dtaat	graˇ dhātˇ	紙	engine-auto	
 ชั้นบน / ข้างบน	chan bon / kaang bon	chan~ bhon / kāngˋ bhon	樓上	engine-auto	
 ห้องนอนอยู่ชั้นบน	hawng nawn yoo chan bon	hɔ̄ngˋ nɔ̄n yūˋ chan~ bhon	臥房在樓上	engine-auto	
@@ -4091,7 +4091,7 @@ iPhone รุ่นใหม่เท่าไหร่ครับ	iPhone run m
 บนโต๊ะ	bon dtoh	bhon do~	桌子上	engine-auto	
 บนโต๊ะมีของเยอะ	bon dtoh mee kawng yuh	bhon do~ mī kɔ̄ngˊ yə~	桌子上有很多東西	engine-auto	
 คอมพิวเตอร์	kawm piw dter	kɔ̄m piw də̄	電腦	engine-auto	
-โทรศัพท์	too ra sap	tōn sapˇ	電話	engine-auto	
+โทรศัพท์	too ra sap	tō ra~ sapˇ	電話	engine-auto	
 กระดาษ	gp ra dtaat	graˇ dhātˇ	紙	engine-auto	
 ชั้นบน / ข้างบน	chan bon / kaang bon	chan~ bhon / kāngˋ bhon	樓上	engine-auto	
 ห้องนอนอยู่ชั้นบน	hawng nawn yoo chan bon	hɔ̄ngˋ nɔ̄n yūˋ chan~ bhon	臥房在樓上	engine-auto	
@@ -5527,7 +5527,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 จองโต๊ะ	chong toh	jɔ̄ng do~	訂桌	engine-auto	
 จองห้อง	chong hong	jɔ̄ng hɔ̄ngˋ	訂房	engine-auto	
 จองตั๋ว	chong tua	jɔ̄ng dūaˊ	訂票	engine-auto	
-โทรไปจอง	tho pai chong	tōn bai jɔ̄ng	打電話預訂	engine-auto	
+โทรไปจอง	tho pai chong	tō bai jɔ̄ng	打電話預訂	engine-auto	
 จองออนไลน์	chong online	jɔ̄ng ɔ̄n lai	線上預訂	engine-auto	
 จองตั๋วเครื่องบิน	chong tua krueang bin	jɔ̄ng dūaˊ krɯ̄angˋ bhin	訂機票	engine-auto	
 จอด	chot	jɔ̄tˇ	停車、靠岸（交通工具停靠）	engine-auto	
@@ -5855,7 +5855,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ตลอดไป	talot pai	daˇ lɔ̄tˋ bai	永遠 / 一直	derived	
 ไม่มีชีวิตแล้ว	mai mee cheewit laeo	maiˋ mī chī wit~ lɛ̄u~	沒有生命了	engine-auto	
 เสียชีวิตแล้ว	sia cheewit laeo	sīaˊ chī wit~ lɛ̄u~	去世了（正式）	engine-auto	
-พอถึงแล้ว โทรหาฉันทันทีนะคะ	pho thueng laeo tho ha chan than thee na kha	pɔ̄ tɯngˊ lɛ̄u~ tōn hāˊ chanˊ tan tī na~ ka~	到達後請立刻打給我（女）	engine-auto	
+พอถึงแล้ว โทรหาฉันทันทีนะคะ	pho thueng laeo tho ha chan than thee na kha	pɔ̄ tɯngˊ lɛ̄u~ tō hāˊ chanˊ tan tī na~ ka~	到達後請立刻打給我（女）	engine-auto	
 ทันที	than thee	tan tī	立刻 / 馬上	engine-auto	
 ทำทันที	tham than thee	tam tan tī	立刻做	engine-auto	
 กินทันที	gin than thee	gin tan tī	立刻吃	engine-auto	
@@ -5916,7 +5916,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ขอคิดดูก่อน	kho khit du gon	kɔ̄ˊ kit~ dhū gɔ̄nˇ	先考慮看看	engine-auto	
 ขอตัวก่อน	kho dtua gon	kɔ̄ˊ dūa gɔ̄nˇ	先告辭 / 失陪	engine-auto	
 ขอตัวไปห้องน้ำ	kho dtua pai hong nam	kɔ̄ˊ dūa bai hɔ̄ngˋ nām~	先去上廁所	engine-auto	
-ขอตัวไปรับโทรศัพท์	kho dtua pai rap thorasap	kɔ̄ˊ dūa bai rap~ tōn sapˇ	先去接電話	engine-auto	
+ขอตัวไปรับโทรศัพท์	kho dtua pai rap thorasap	kɔ̄ˊ dūa bai rap~ tō ra~ sapˇ	先去接電話	engine-auto	
 เพิ่ง	phueng	pə̄ngˋ	剛...	engine-auto	
 เพิ่งตื่นไม่นาน	phueng dtuean mai nan	pə̄ngˋ dɯ̄nˇ maiˋ nān	剛醒沒多久	engine-auto	
 เขาเพิ่งมา	khao phueng ma	kāuˊ pə̄ngˋ mā	他剛來	engine-auto	
@@ -5967,7 +5967,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 ชีวิตที่เมืองไทยเป็นยังไงบ้าง	Chi wit thi Mueang Thai pen yang ngai bang	chī wit~ tīˋ mɯ̄ang tai ben yang ngai bhāngˋ	在泰國生活如何呢？	engine-auto	
 ขับรถออกไปทันที	Khap rot ok pai than thi	kapˇ rot~ ɔ̄kˇ bai tan tī	立刻開車出去	engine-auto	
 ปิดประตูทันที	Pit pra dtu than thi	bitˇ braˇ dū tan tī	立刻關門	engine-auto	
-รับโทรศัพท์ทันที	Rap tho ra sap than thi	rap~ tōn sapˇ tan tī	立刻接電話	engine-auto	
+รับโทรศัพท์ทันที	Rap tho ra sap than thi	rap~ tō ra~ sapˇ tan tī	立刻接電話	engine-auto	
 รอแป๊บ เดี๋ยวไป	Ro paep dieo pai	rɔ̄ bɛ̄p~ dhīauˊ bai	等一下，等一會兒去	engine-auto	
 เดี๋ยวเจ็บคอ	Dieo jep kho	dhīauˊ jepˇ kɔ̄	等一會兒喉嚨會痛	engine-auto	
 เดี๋ยวช่วยทำความสะอาดให้หน่อย	Dieo chuay tham khwam sa at hai noi	dhīauˊ chūayˋ tam kwām saˇ ātˇ haiˋ nɔ̄iˇ	等一會兒請幫我打掃一下	engine-auto	
@@ -6014,7 +6014,7 @@ TV ไม่ชัด	tee wee mai chat	TV maiˋ chat~	電視畫面不清楚	engi
 คุณไม่คิดดูก่อนเหรอ	Khun mai khit du kon ro	kun maiˋ kit~ dhū gɔ̄nˇ hēˊ rɔ̄	你不先考慮看看嗎？	engine-auto	
 ขอฉันคิดดูก่อน	Kho chan khit du kon	kɔ̄ˊ chanˊ kit~ dhū gɔ̄nˇ	讓我先考慮	engine-auto	
 ขอตัวก่อนนะ	Kho tua kon na	kɔ̄ˊ dūa gɔ̄nˇ na~	先失陪一下	engine-auto	
-ขอตัวไปรับโทรศัพท์ก่อนนะ	Kho tua pai rap tho ra sap kon na	kɔ̄ˊ dūa bai rap~ tōn sapˇ gɔ̄nˇ na~	先失陪去接電話	engine-auto	
+ขอตัวไปรับโทรศัพท์ก่อนนะ	Kho tua pai rap tho ra sap kon na	kɔ̄ˊ dūa bai rap~ tō ra~ sapˇ gɔ̄nˇ na~	先失陪去接電話	engine-auto	
 ขอตัวไปห้องน้ำก่อนนะ	Kho tua pai hong nam kon na	kɔ̄ˊ dūa bai hɔ̄ngˋ nām~ gɔ̄nˇ na~	先失陪去洗手間	engine-auto	
 หลังจากวันนี้จะไม่ตื่นสาย	Lang chak wan ni ja mai dtuen sai	langˊ jākˇ wan nī~ jaˇ maiˋ dɯ̄nˇ sāiˊ	從今天起我不會晚起床	engine-auto	
 หลังจากวันนี้จะไม่ขี้เกียจ	Lang chak wan ni ja mai khi kiat	langˊ jākˇ wan nī~ jaˇ maiˋ kīˋ gīatˇ	從今天起不懶惰	engine-auto	
@@ -6767,7 +6767,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ดูเฉยๆ	Du Choei Choei	dhū chə̄iˊ chə̄iˊ	只是看看	engine-auto	
 คิดเฉยๆ	Khit Choei Choei	kit~ chə̄iˊ chə̄iˊ	只是想想	engine-auto	
 อยู่เฉยๆ	Yu Choei Choei	yūˋ chə̄iˊ chə̄iˊ	乖乖待著 / 不要動	engine-auto	
-โทรหาเฉยๆ	Tho Ha Choei Choei	tōn hāˊ chə̄iˊ chə̄iˊ	只是打電話來（找某人）	engine-auto	
+โทรหาเฉยๆ	Tho Ha Choei Choei	tō hāˊ chə̄iˊ chə̄iˊ	只是打電話來（找某人）	engine-auto	
 เดินเล่นเฉยๆ	Doen Len Choei Choei	dhə̄n lēnˋ chə̄iˊ chə̄iˊ	只是散散步	engine-auto	
 ทำหน้าเฉยๆ	Tham Na Choei Choei	tam nāˋ chə̄iˊ chə̄iˊ	面無表情 / 做一個沒反應的臉	engine-auto	
 น่าเบื่อ	Na Buea	nāˋ bhɯ̄aˇ	好無聊 / 令人覺得無聊	engine-auto	
@@ -7099,7 +7099,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 อย่ามายุ่งกับผม	ya ma yung kap phom	yāˋ mā yungˋ gapˇ pomˊ	別來管我	engine-auto	
 อย่าไปยุ่งกับเขา	ya pai yung kap khao	yāˋ bai yungˋ gapˇ kāuˊ	別去管他	engine-auto	
 กำลังยุ่งอยู่	kam lang yung yu	gam lang yungˋ yūˋ	正在忙	engine-auto	
-เดี๋ยวโทรกลับ	dieo tho klap	dhīauˊ tōn glapˇ	等一下回撥	engine-auto	
+เดี๋ยวโทรกลับ	dieo tho klap	dhīauˊ tō glapˇ	等一下回撥	engine-auto	
 แน่นอน	nae non	nɛ̄ˋ nɔ̄n	當然（一定）	book-exact	(book-exact已用引擎重新驗證)
 ยังไม่แน่นอน	yang mai nae non	yang maiˋ nɛ̄ˋ nɔ̄n	還不確定	engine-auto	
 ยังไม่แน่	yang mai nae	yang maiˋ nɛ̄ˋ	還不確定（簡略）	engine-auto	
@@ -7534,7 +7534,7 @@ EQ ต่ำ	EQ tam	EQ damˇ	EQ 低	engine-auto
 ไฟไหม้บ้าน	fai mai ban	fai maiˋ bhānˋ	房子失火	engine-auto	
 ไฟไหม้ห้าง	fai mai hang	fai maiˋ hāngˋ	百貨公司失火	engine-auto	
 ถ้าไฟไหม้	tha fai mai	tāˋ fai maiˋ	如果失火	engine-auto	
-ต้องโทรหนึ่งเก้าเก้า	tong tho nueng kao kao	dɔ̄ngˋ tōn nɯngˇ gāuˋ gāuˋ	必須打一九九	engine-auto	
+ต้องโทรหนึ่งเก้าเก้า	tong tho nueng kao kao	dɔ̄ngˋ tō nɯngˇ gāuˋ gāuˋ	必須打一九九	engine-auto	
 ยี่สิบปีที่แล้ว	yi sip pi thi laeo	yīˋ sipˇ bī tīˋ lɛ̄u~	二十年前	engine-auto	
 ที่ภูเก็ต	thi phuket	tīˋ pū getˇ	在普吉島	engine-auto	
 เคยเกิดสึนามิ	khoei koet su na mi	kə̄i gə̄tˇ sɯˇ nā mi~	曾經發生過海嘯	engine-auto	
@@ -7846,7 +7846,7 @@ EQ สูงสำคัญมากนะคะ	EQ sung sam khan mak na kha	EQ 
 อาการของย่าหนักแค่ไหน	akan khong ya nak khae nai	ā gān kɔ̄ngˊ yāˋ nakˇ kɛ̄ˋ naiˊ	奶奶的病多嚴重	engine-auto	
 ระวังถูกหลอก	rawang thuk lok	ra~ wang tūkˇ lɔ̄kˇ	小心被騙	engine-auto	
 เหนื่อยเป็นพิเศษ	nueai pen phiset	nɯ̄aiˇ ben pi~ sētˇ	特別累	engine-auto	
-ถ้ามีปัญหาอะไร โทรมาได้ทุกเวลานะ	Tha mi pan ha a rai tho ma dai thuk we la na	tāˋ mī ban hāˊ aˇ rai tōn mā dhaiˋ tuk~ wē lā na~	如果有任何問題，隨時都可以打電話來哦	engine-auto	
+ถ้ามีปัญหาอะไร โทรมาได้ทุกเวลานะ	Tha mi pan ha a rai tho ma dai thuk we la na	tāˋ mī ban hāˊ aˇ rai tō mā dhaiˋ tuk~ wē lā na~	如果有任何問題，隨時都可以打電話來哦	engine-auto	
 คุณตั้งใจทำให้ผมตกใจ	Khun tang jai tham hai phom tok jai	kun dangˋ jai tam haiˋ pomˊ dokˇ jai	你故意讓我嚇到了	engine-auto	
 คุณตั้งใจทำให้ฉันตกใจ	Khun tang jai tham hai chan tok jai	kun dangˋ jai tam haiˋ chanˊ dokˇ jai	你故意讓我嚇到了 (女)	engine-auto	
 คุณตั้งใจหลอกฉัน	Khun tang jai lok chan	kun dangˋ jai lɔ̄kˇ chanˊ	你故意欺騙我	engine-auto	
@@ -9516,7 +9516,7 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 ตอนนี้ต้องไปเรียนพิเศษทุกวันเลย	ton ni tong pai rian phiset thuk wan loei	dɔ̄n nī~ dɔ̄ngˋ bai rīan pi~ sētˇ tuk~ wan lə̄i	現在每天都要去補習	engine-auto	
 เวลาผ่านไปเร็วเนอะ	wela phan pai rew noe	wē lā pānˇ bai rew nē aˇ	時間過得很快捏	engine-auto	
 ตกลงจะย้ายวันไหน	tok long cha yai wan nai	dokˇ long jaˇ yāi~ wan naiˊ	決定哪天搬家	engine-auto	
-ก็โทรมานัดอีกทีแล้วกัน	ko tho ma nat ik thi laeo kan	gɔ̄ˋ tōn mā nat~ īkˇ tī lɛ̄u~ gan	那就再打電話來約吧	engine-auto	
+ก็โทรมานัดอีกทีแล้วกัน	ko tho ma nat ik thi laeo kan	gɔ̄ˋ tō mā nat~ īkˇ tī lɛ̄u~ gan	那就再打電話來約吧	engine-auto	
 เราจะได้เตรียมลางานไว้ก่อน	rao cha dai triam la ngan wai kon	rāu jaˇ dhaiˋ drīam lā ngān wai~ gɔ̄nˇ	我們才能先準備請假	engine-auto	
 ขอบใจนะ	khop chai na	kɔ̄pˇ jai na~	謝謝喔	engine-auto	
 หวังว่าจะไม่ผิดนัดนะ	wang wa cha mai phit nat na	wangˊ wāˋ jaˇ maiˋ pitˇ nat~ na~	希望不會爽約喔	engine-auto	
@@ -10013,8 +10013,8 @@ A สู้ B ไม่ได้	A su B mai dai	A sūˋ B maiˋ dhaiˋ	A比不�
 ไปกินข้าวกัน	pai kin khao kan	bai gin kāuˋ gan	一起去吃飯	engine-auto	
 คุณไม่ต้องออกเงิน	khun mai tong ok ngoen	kun maiˋ dɔ̄ngˋ ɔ̄kˇ ngə̄n	你不用出錢	engine-auto	
 ฉันออกเงินเอง	chan ok ngoen eng	chanˊ ɔ̄kˇ ngə̄n ēng	我自己出錢	engine-auto	
-ออกโทรทัศน์	ok thorathat	ɔ̄kˇ tōn tat~	上電視	engine-auto	
-เคยออกโทรทัศน์มั้ยคะ	khey ok thorathat mai kha	kə̄i ɔ̄kˇ tōn tat~ mai~ ka~	有曾經上過電視嗎	engine-auto	
+ออกโทรทัศน์	ok thorathat	ɔ̄kˇ tō ra~ tat~	上電視	engine-auto	
+เคยออกโทรทัศน์มั้ยคะ	khey ok thorathat mai kha	kə̄i ɔ̄kˇ tō ra~ tat~ mai~ ka~	有曾經上過電視嗎	engine-auto	
 วันนี้ออกจากบ้านแล้ว	wan ni ok chak ban laew	wan nī~ ɔ̄kˇ jākˇ bhānˋ lɛ̄u~	今天出門了	engine-auto	
 ออกไปทำอะไร	ok pai tham arai	ɔ̄kˇ bai tam aˇ rai	出去幹嘛	engine-auto	
 ออกไปทำงาน	ok pai tham ngan	ɔ̄kˇ bai tam ngān	出去工作	engine-auto	
