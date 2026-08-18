@@ -22,3 +22,8 @@ __pycache__/
 
 # wrangler 本地狀態
 .wrangler/
+
+# Google service account 金鑰（不該進 repo，一律放 ~/.config/thai-review/）
+gen-lang-client-*.json
+*service-account*.json
+*sheets-key*.json
