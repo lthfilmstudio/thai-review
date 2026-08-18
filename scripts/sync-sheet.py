@@ -34,7 +34,7 @@ DEFAULT_PUB_URL = (
 # ── 欄位別名（跟 src/data.js COL_ALIASES 對齊） ────────────────────
 COL_ALIASES = {
     "thai":      ["泰文", "thai", "th"],
-    "karaoke":   ["泰式karaoke拼音", "karaoke拼音", "拼音", "karaoke", "pronunciation"],
+    "karaoke":   ["泰式karaoke拼音", "karaoke拼音", "目的達拼音", "拼音", "karaoke", "pronunciation"],
     "zh":        ["中文", "中文翻譯", "翻譯", "zh", "chinese", "cn"],
     "type":      ["類型", "type", "分類"],
     "note":      ["備註", "note", "說明"],

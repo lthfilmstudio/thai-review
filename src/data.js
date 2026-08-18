@@ -34,7 +34,7 @@ export function parseCsv(text) {
 /* 欄位別名：第一個命中的 header 就用。中文在先因為使用者的 Sheet 大多是中文 header。 */
 const COL_ALIASES = {
   thai:      ['泰文', 'thai', 'th'],
-  karaoke:   ['泰式karaoke拼音', 'karaoke拼音', '拼音', 'karaoke', 'pronunciation'],
+  karaoke:   ['泰式karaoke拼音', 'karaoke拼音', '目的達拼音', '拼音', 'karaoke', 'pronunciation'],
   zh:        ['中文', '中文翻譯', '翻譯', 'zh', 'chinese', 'cn'],
   type:      ['類型', 'type', '分類'],
   note:      ['備註', 'note', '說明'],
