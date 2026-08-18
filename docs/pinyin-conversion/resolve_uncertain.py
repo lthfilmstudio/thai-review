@@ -39,6 +39,20 @@ SYL_FIX['ผล'] = 'p' + V('o', False) + 'n' + T('high', 'live')
 SYL_FIX['ส่ง'] = 's' + V('o', False) + 'ng' + T('high', 'live', mark='ek')
 # ลม lom 風：ล low + final ม(live) + 隱藏短o
 SYL_FIX['ลม'] = 'l' + V('o', False) + 'm' + T('low', 'live')
+
+# ---- 260724 課堂新字，pythainlp 切出的音節查不到規則，來源：目的達課堂講義截圖（job 260724）----
+# งบ ngop~ 預算：ง low + final บ->p(dead) + 隱藏短o；聲調跟講義給的 ~ 一致
+SYL_FIX['งบ'] = 'ng' + V('o', False) + 'p' + T('low', 'dead', False)
+# รมณ์（อารมณ์ 心情/情緒 的第二音節，ณ์ 是消音字母）rom：ร low + final ม(live) + 隱藏短o；
+# strip_final_garan 只會把 รมณ์ 化簡成 รม，但 รม 本身仍是「無母音符號的隱藏母音」型態，
+# 一般規則猜不出來，所以直接在原始 token（含 ณ์）上補
+SYL_FIX['รมณ์'] = 'r' + V('o', False) + 'm' + T('low', 'live')
+# ปฏิ（ปฏิเสธ 拒絕 的前兩個音節）ba di：ปฏ 不是合法複合聲母（合法表見 VALID_CLUSTERS），
+# 要拆成 ป(mid)+隱藏短a 跟 ฏ(mid)+短i 兩個獨立音節。機械規則本來會判中音字母死音節一律
+# 低調(2)，但目的達課堂講義截圖（job 260724，260724-2.mp4 約23:40）清楚拍到 ba/di 這兩個
+# 前綴弱化音節實際不標調（只有最後的 set 標低調），這是老師教學上對 Pali/Sanskrit 借詞
+# 前綴弱化音節的簡化讀法，直接照講義為準，不套一般規則。
+SYL_FIX['ปฏิ'] = 'b' + V('a', False) + ' ' + 'd' + V('i', False)
 # คม kʰom 銳利：ค low + final ม(live) + 隱藏短o
 SYL_FIX['คม'] = 'k' + V('o', False) + 'm' + T('low', 'live')
 # ยก yók 舉起：ย low + final ก->k(dead) + 隱藏短o
