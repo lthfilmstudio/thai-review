@@ -17,6 +17,8 @@ playwright-report/
 *.log
 tmp/
 out/
+__pycache__/
+*.pyc
 
 # wrangler 本地狀態
 .wrangler/

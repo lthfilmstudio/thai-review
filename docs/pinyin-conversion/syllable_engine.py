@@ -7,8 +7,9 @@
 看不懂的音節結構回傳 None（呼叫端要能分辨「處理不了」跟「處理結果」）。
 """
 import re
+import os
 import sys
-sys.path.insert(0, "/private/tmp/claude-501/-Users-lth-Downloads-00-NalinAgent/4323c4e7-f2a5-4428-9dea-8ee2e3ba0580/scratchpad/thai-book")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tone_calc import tone_number, TONE_MARK
 
 # ---------------- 子音表 ----------------
@@ -327,6 +328,8 @@ def _match_vowel(leading, core, final_char, c1, shortened=False):
             return ('īa', True, None)
         if core == SARA_UEE + 'อ':  # เ-ือ ɯa 雙母音（如 เดือน）
             return ('ɯ̄a', True, None)
+        if core == SARA_AA + SARA_A:  # เ-าะ short ɔ 雙母音（如 เกาะ เพราะ เงาะ）
+            return ('ɔ', False, None)
         return None
 
     if leading == SARA_AE:
@@ -361,6 +364,11 @@ def _match_vowel(leading, core, final_char, c1, shortened=False):
         if core == SARA_UEE + 'อ':
             return ('ɯ̄a', True, None) if has_final else ('ɯ̄', True, None)
         if core == MAI_HAN_AKAT + 'ว':
+            return ('ūa', True, None)
+        if core == 'ว' and has_final:
+            # 沒有 ั 記號、直接「聲母+ว+尾子音」代表 ua 母音（跟 ัว 同一家族的另一種
+            # 拼寫慣例，例如 พวก ช่วง ส่วน ปวด ขวด ดวง ม่วง ห่วง ง่วง รวม สวน），
+            # 跟 pilot/handout_dict 對照過確認拼法一致
             return ('ūa', True, None)
         if core == 'วย':
             return ('ūay', True, None)  # สวย ด้วย 這種沒有 ั 記號的 uai 雙母音
