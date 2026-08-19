@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10231d">
+  <title>清心安神｜每日練習測試頁</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Noto+Serif+TC:wght@500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #10231d;
+      --ink-2: #19372c;
+      --cream: #f4efe5;
+      --paper: #fbf8f1;
+      --line: rgba(16, 35, 29, .12);
+      --muted: #6c746a;
+      --gold: #c49755;
+      --gold-soft: #ead9b9;
+      --coral: #cc7965;
+      --shadow: 0 18px 55px rgba(16, 35, 29, .14);
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--cream); }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 80% -10%, rgba(212, 171, 104, .22), transparent 30rem),
+        linear-gradient(135deg, #f6f0e5 0%, #eee7da 100%);
+      font-family: 'Noto Sans TC', sans-serif;
+    }
+
+    body.dark-mode {
+      --ink: #0b1712;
+      --ink-2: #17372b;
+      --cream: #e8eee7;
+      --paper: #1b2b23;
+      --line: rgba(232, 238, 231, .13);
+      --muted: #9aa89e;
+      --gold: #d3ad6c;
+      --gold-soft: #e6ca92;
+      --coral: #d88973;
+      background: radial-gradient(circle at 78% -12%, rgba(111, 82, 39, .24), transparent 28rem), linear-gradient(135deg, #0d1d16 0%, #14291f 100%);
+      color: var(--cream);
+    }
+    body.dark-mode .mini-streak,
+    body.dark-mode .icon-button { color: var(--cream); background: rgba(232, 238, 231, .07); }
+    body.dark-mode .mini-protection { color: #e4c98d; background: rgba(108, 77, 34, .3); border-color: rgba(211, 173, 108, .38); }
+    body.dark-mode .panel { background: rgba(27, 43, 35, .9); }
+    body.dark-mode .weekly-track { background: rgba(232, 238, 231, .12); }
+    body.dark-mode .weekly-goal-head strong { color: var(--cream); }
+    body.dark-mode .weekly-note { color: var(--cream); background: rgba(211, 173, 108, .14); }
+    body.dark-mode .task { border-color: rgba(232, 238, 231, .1); }
+    body.dark-mode .task-status { border-color: rgba(232, 238, 231, .16); color: var(--muted); }
+    body.dark-mode .task-icon,
+    body.dark-mode .task:nth-child(2) .task-icon,
+    body.dark-mode .task:nth-child(3) .task-icon { color: var(--gold-soft); background: rgba(211, 173, 108, .12); }
+    body.dark-mode .task.done .task-icon { color: var(--gold-soft); background: rgba(211, 173, 108, .18); }
+    body.dark-mode .task.done .task-status { color: var(--gold-soft); background: rgba(211, 173, 108, .14); }
+    body.dark-mode .task-mode { color: var(--gold-soft); background: rgba(211, 173, 108, .12); }
+    body.dark-mode .task-status:hover { border-color: rgba(211, 173, 108, .55); color: var(--gold-soft); }
+    body.dark-mode .primary-button { color: var(--cream); background: rgba(211, 173, 108, .38); border: 1px solid rgba(211, 173, 108, .52); }
+    body.dark-mode .primary-button:hover { background: rgba(211, 173, 108, .5); box-shadow: 0 7px 18px rgba(0, 0, 0, .16); }
+    body.dark-mode .flame { color: var(--gold-soft); }
+    body.dark-mode .course-chip .course-dot { background: var(--gold-soft); }
+    body.dark-mode .weekly-fill,
+    body.dark-mode .weekly-fill.gold,
+    body.dark-mode .weekly-fill.coral { background: rgba(211, 173, 108, .68); }
+    body.dark-mode .weekly-fill.gold { opacity: .82; }
+    body.dark-mode .weekly-fill.coral { opacity: .62; }
+    body.dark-mode .weekly-note { color: rgba(232, 238, 231, .72); background: rgba(211, 173, 108, .1); border: 1px solid rgba(211, 173, 108, .14); }
+    body.dark-mode .weekly-note strong { color: var(--gold-soft); }
+    body.dark-mode .stat-detail,
+    body.dark-mode .panel-link { color: var(--muted); }
+
+    button { font: inherit; }
+    .shell { max-width: 1180px; margin: 0 auto; padding: 22px 34px 52px; }
+
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 22px; margin-bottom: 48px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid rgba(196, 151, 85, .7); border-radius: 50%; color: var(--gold); }
+    .brand-mark svg { width: 18px; height: 18px; }
+    .brand-name { font-family: 'Noto Serif TC', serif; font-weight: 700; letter-spacing: .16em; font-size: 15px; }
+    .brand-caption { color: var(--muted); font-size: 11px; letter-spacing: .08em; margin-top: 3px; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .mini-streak { display: flex; align-items: center; gap: 7px; padding: 9px 13px; border: 1px solid var(--line); border-radius: 999px; background: rgba(251, 248, 241, .52); color: var(--ink-2); font-size: 12px; }
+    .flame { color: var(--gold); font-size: 15px; }
+    .flame, .shield { display: inline-grid; place-items: center; }
+    .flame svg, .shield svg { width: 16px; height: 16px; }
+    .mini-protection { display: flex; align-items: center; gap: 7px; padding: 9px 13px; border: 1px solid rgba(196, 151, 85, .36); border-radius: 999px; color: #806035; background: rgba(234, 217, 185, .42); font-size: 12px; }
+    .shield { color: var(--gold); }
+    .icon-button { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 50%; background: rgba(251, 248, 241, .45); color: var(--ink-2); cursor: pointer; transition: .2s ease; }
+    .icon-button:hover { background: var(--paper); transform: translateY(-1px); }
+
+    .hero { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(250px, .8fr); gap: 32px; padding: 34px 36px 31px; border-radius: 26px; color: var(--cream); background: var(--ink); box-shadow: var(--shadow); }
+    .hero::after { content: ''; position: absolute; width: 360px; height: 360px; right: -140px; top: -180px; border: 1px solid rgba(234, 217, 185, .2); border-radius: 50%; box-shadow: 0 0 0 28px rgba(234, 217, 185, .04), 0 0 0 58px rgba(234, 217, 185, .03); pointer-events: none; }
+    .hero-copy { position: relative; z-index: 1; }
+    .hero-topline { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .hero-date { color: rgba(244, 239, 229, .56); font-size: 12px; letter-spacing: .12em; }
+    .hero-kicker { color: var(--gold-soft); font-size: 11px; letter-spacing: .14em; }
+    .kicker-icon { display: inline-grid; width: 15px; height: 15px; margin-right: 4px; vertical-align: -3px; }
+    .kicker-icon svg { width: 15px; height: 15px; }
+    .course-chip { display: inline-flex; align-items: center; gap: 8px; margin-top: 13px; padding: 6px 10px; border: 1px solid rgba(234, 217, 185, .28); border-radius: 999px; color: var(--gold-soft); background: rgba(255, 255, 255, .05); font-size: 11px; }
+    .course-chip strong { color: var(--cream); font-weight: 600; }
+    .course-chip .course-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--gold); }
+    .hero-title { margin: 20px 0 11px; font-family: 'Noto Serif TC', serif; font-size: clamp(30px, 4vw, 48px); font-weight: 600; line-height: 1.25; letter-spacing: .02em; }
+    .hero-description { max-width: 470px; color: rgba(244, 239, 229, .66); font-size: 13px; line-height: 1.8; }
+    .hero-action { display: flex; align-items: center; gap: 15px; margin-top: 25px; }
+    .primary-button { border: 0; padding: 13px 20px; border-radius: 999px; color: var(--ink); background: var(--gold-soft); font-size: 13px; font-weight: 700; cursor: pointer; transition: .2s ease; }
+    .primary-button:hover { background: #f2dfba; transform: translateY(-2px); box-shadow: 0 7px 18px rgba(0,0,0,.2); }
+    .hero-meta { color: rgba(244, 239, 229, .52); font-size: 11px; }
+    .hero-progress { position: relative; z-index: 1; align-self: center; padding: 21px 22px; border: 1px solid rgba(244, 239, 229, .13); border-radius: 18px; background: rgba(255, 255, 255, .045); }
+    .progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+    .progress-label { color: rgba(244, 239, 229, .6); font-size: 11px; }
+    .progress-number { font-family: 'Noto Serif TC', serif; font-size: 31px; }
+    .progress-track { height: 7px; margin: 16px 0 15px; overflow: hidden; border-radius: 99px; background: rgba(244, 239, 229, .13); }
+    .progress-fill { width: 33%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--gold), #e4c486); transition: width .4s ease; }
+    .progress-foot { display: flex; justify-content: space-between; color: rgba(244, 239, 229, .51); font-size: 11px; }
+
+    .content-grid { display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(280px, .82fr); gap: 22px; margin-top: 22px; }
+    .panel { border: 1px solid var(--line); border-radius: 22px; background: rgba(251, 248, 241, .72); }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 22px 24px 16px; }
+    .panel-title { font-family: 'Noto Serif TC', serif; font-size: 18px; font-weight: 600; }
+    .panel-link { border: 0; padding: 5px 8px; border-radius: 8px; color: var(--muted); background: transparent; font-size: 11px; cursor: pointer; }
+    .panel-link:hover { color: var(--ink); }
+    .tasks { padding: 0 13px 14px; }
+    .task { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 13px; padding: 15px 11px; border-top: 1px solid var(--line); transition: .2s ease; }
+    .task:first-child { border-top: 0; }
+    .task:hover { padding-left: 15px; padding-right: 7px; }
+    .task-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 13px; color: #806035; background: rgba(196, 151, 85, .16); font-size: 17px; }
+    .task-icon svg { width: 20px; height: 20px; }
+    .task:nth-child(2) .task-icon,
+    .task:nth-child(3) .task-icon { color: #806035; background: rgba(196, 151, 85, .16); }
+    .task-title { font-size: 14px; font-weight: 600; }
+    .task-mode { display: inline-block; margin-left: 6px; padding: 2px 6px; border-radius: 999px; color: #806035; background: rgba(234, 217, 185, .52); font-size: 9px; font-weight: 500; vertical-align: 2px; }
+    .task-subtitle { margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .task-status { padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: transparent; font-size: 11px; cursor: pointer; white-space: nowrap; }
+    .task-status:hover { border-color: var(--ink); color: var(--ink); }
+    .task.done .task-icon { color: var(--cream); background: var(--ink-2); }
+    .task.done .task-title { text-decoration: line-through; color: var(--muted); }
+    .task.done .task-status { border-color: transparent; color: var(--ink-2); background: rgba(196, 151, 85, .2); }
+
+    .week-panel { padding-bottom: 20px; }
+    .weekly-goals { display: grid; gap: 17px; padding: 2px 24px 19px; }
+    .weekly-goal { display: grid; gap: 8px; }
+    .weekly-goal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; color: var(--muted); font-size: 11px; }
+    .weekly-goal-head strong { color: var(--ink-2); font-size: 13px; font-weight: 600; }
+    .weekly-track { height: 8px; overflow: hidden; border-radius: 99px; background: rgba(16, 35, 29, .09); }
+    .weekly-fill { height: 100%; border-radius: inherit; background: var(--gold); }
+    .weekly-fill.gold { background: var(--gold); opacity: .82; }
+    .weekly-fill.coral { background: var(--gold); opacity: .62; }
+    .week-chart { display: flex; justify-content: space-between; gap: 9px; padding: 0 24px 20px; }
+    .day { flex: 1; text-align: center; }
+    .day-name { color: var(--muted); font-size: 10px; }
+    .day-dot { position: relative; display: grid; place-items: center; width: 32px; height: 32px; margin: 8px auto 7px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); font-size: 11px; background: rgba(251, 248, 241, .52); }
+    .day.done .day-dot { border-color: var(--ink-2); color: var(--cream); background: var(--ink-2); }
+    .day.current .day-dot { border: 2px solid var(--gold); color: var(--ink); background: var(--gold-soft); }
+    .day.current .day-dot::after { content: ''; position: absolute; right: -3px; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--coral); }
+    .day-minutes { color: var(--muted); font-size: 9px; }
+    .weekly-note { margin: 0 24px; padding: 14px 15px; border-radius: 14px; color: var(--ink-2); background: rgba(234, 217, 185, .44); font-size: 12px; line-height: 1.7; }
+    .weekly-note strong { color: var(--ink); }
+    .weekly-mark { display: inline-grid; width: 15px; height: 15px; margin-right: 5px; vertical-align: -3px; color: var(--gold); }
+    .weekly-mark svg { width: 15px; height: 15px; }
+
+    .small-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 22px; }
+    .stat-card { padding: 22px 24px; }
+    .stat-label { color: var(--muted); font-size: 11px; }
+    .stat-value { margin-top: 8px; font-family: 'Noto Serif TC', serif; font-size: 28px; }
+    .stat-detail { margin-top: 6px; color: var(--muted); font-size: 11px; }
+    .quote-card { position: relative; overflow: hidden; padding: 22px 24px; background: var(--ink-2); color: var(--cream); }
+    .quote-card::before { content: '“'; position: absolute; right: 19px; top: 2px; color: rgba(234, 217, 185, .16); font-family: Georgia, serif; font-size: 90px; line-height: 1; }
+    .quote-label { color: var(--gold-soft); font-size: 11px; letter-spacing: .1em; }
+    .quote-text { position: relative; margin-top: 14px; font-family: 'Noto Serif TC', serif; font-size: 17px; line-height: 1.6; }
+    .quote-translation { margin-top: 10px; color: rgba(244, 239, 229, .56); font-size: 11px; }
+
+    .mobile-nav { display: none; }
+    .toast { position: fixed; left: 50%; bottom: 28px; z-index: 3; transform: translate(-50%, 18px); opacity: 0; padding: 12px 17px; border-radius: 999px; color: var(--cream); background: var(--ink); box-shadow: var(--shadow); font-size: 12px; pointer-events: none; transition: .3s ease; }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @keyframes icon-breathe {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .task-icon svg { animation: icon-breathe 3.4s ease-in-out infinite; }
+      .task:nth-child(2) .task-icon svg { animation-delay: .45s; }
+      .task:nth-child(3) .task-icon svg { animation-delay: .9s; }
+    }
+
+    @media (max-width: 760px) {
+      .shell { padding: 18px 16px 92px; }
+      .topbar { margin-bottom: 35px; }
+      .brand-caption { display: none; }
+      .brand-name { white-space: nowrap; }
+      .mini-streak, .mini-protection { padding: 7px 8px; font-size: 10px; white-space: nowrap; }
+      .top-actions { gap: 6px; }
+      .hero { display: block; padding: 27px 23px 24px; border-radius: 22px; }
+      .hero-topline { align-items: flex-start; }
+      .hero-kicker { text-align: right; }
+      .hero-title { margin-top: 18px; font-size: clamp(29px, 9vw, 39px); }
+      .hero-progress { margin-top: 27px; }
+      .content-grid { grid-template-columns: 1fr; gap: 16px; margin-top: 16px; }
+      .small-grid { gap: 16px; margin-top: 16px; }
+      .panel-header { padding: 19px 19px 14px; }
+      .tasks { padding: 0 8px 10px; }
+      .task { grid-template-columns: 36px 1fr auto; gap: 10px; padding: 13px 7px; }
+      .task-icon { width: 34px; height: 34px; border-radius: 11px; font-size: 15px; }
+      .task-title { font-size: 13px; }
+      .task-subtitle { font-size: 10px; }
+      .task-status { padding: 5px 8px; font-size: 10px; }
+      .stat-card, .quote-card { padding: 18px 19px; }
+      .mobile-nav { position: fixed; display: flex; left: 12px; right: 12px; bottom: 12px; z-index: 2; justify-content: space-around; padding: 9px 8px; border: 1px solid rgba(16, 35, 29, .14); border-radius: 18px; background: rgba(251, 248, 241, .88); box-shadow: 0 12px 35px rgba(16, 35, 29, .16); backdrop-filter: blur(14px); }
+      .nav-item { display: grid; gap: 4px; place-items: center; border: 0; color: var(--muted); background: none; font-size: 10px; cursor: pointer; }
+      .nav-item span:first-child { font-size: 16px; }
+      .nav-item.active { color: var(--ink-2); font-weight: 700; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M12 3.5l1.6 6.9L20.5 12l-6.9 1.6L12 20.5l-1.6-6.9L3.5 12l6.9-1.6L12 3.5z"/></svg></div>
+        <div><div class="brand-name">清心安神</div><div class="brand-caption">THAI REVIEW · DAILY RITUAL</div></div>
+      </div>
+      <div class="top-actions">
+        <div class="mini-streak"><span class="flame" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12.2 3.5c.3 2.7-1.4 4-2.8 5.4-1.2 1.2-2.4 2.5-2.4 4.6a5 5 0 0010 0c0-2.1-1.1-3.7-2.7-5.1-.3 1.5-1 2.5-2 3.1.4-2.8-.4-5.3-.1-8z"/></svg></span><strong id="streakCount">6</strong> 天連續</div>
+        <div class="mini-protection"><span class="shield" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-2.9 8.2-7 10-4.1-1.8-7-5.4-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></span>安神保護 1</div>
+        <button class="icon-button" id="themeButton" type="button" aria-label="切換深色模式">☼</button>
+      </div>
+    </header>
+
+    <section class="hero" aria-labelledby="daily-title">
+      <div class="hero-copy">
+        <div class="hero-topline"><div class="hero-date">星期三 · 8 月 19 日</div><div class="hero-kicker"><span class="kicker-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10.5h12a3 3 0 012.8 4.1l-1.1 2.7a2 2 0 01-3.6.3l-1.1-1.6H9l-1.1 1.6a2 2 0 01-3.6-.3l-1.1-2.7A3 3 0 016 10.5z"/><path d="M7 13v3m-1.5-1.5h3m8.5-.8h.01m2 1.6h.01"/></svg></span>今日任務 · 練功房</div></div>
+        <div class="course-chip"><span class="course-dot" aria-hidden="true"></span>本週課程 · <strong>中 2-4</strong></div>
+        <h1 class="hero-title" id="daily-title">今天，讓泰語<br>往前一點點。</h1>
+        <div class="hero-description">今天的 3 個任務，每一個都是一小局。完成一局，就往前一步。</div>
+        <div class="hero-action">
+          <button class="primary-button" id="startButton" type="button">開始下一局 →</button>
+          <span class="hero-meta" id="heroMeta">完成一局就算今天有來</span>
+        </div>
+      </div>
+      <div class="hero-progress" aria-label="今日進度">
+        <div class="progress-head"><span class="progress-label">今日挑戰</span><span class="progress-number" id="progressNumber">1 / 3</span></div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-foot"><span id="progressText">已完成 1 項</span><span>今日累積 <strong id="todayTime">0 分鐘</strong></span></div>
+      </div>
+    </section>
+
+    <div class="content-grid">
+      <section class="panel" aria-labelledby="tasks-title">
+        <div class="panel-header"><h2 class="panel-title" id="tasks-title">今日任務 · 3 局</h2><button class="panel-link" id="resetButton" type="button">重設本日</button></div>
+        <div class="tasks" id="tasks">
+          <article class="task done" data-task="0"><div class="task-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 12h2m2-3v6m3-8v10m3-6v4m3-2v2m3-1v0"/></svg></div><div><div class="task-title">聲音熱身 <span class="task-mode">音感挑戰</span></div><div class="task-subtitle">跟著老師音讀 5 句 · 中 2-4</div></div><button class="task-status" type="button">已完成 ✓</button></article>
+          <article class="task" data-task="1"><div class="task-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="5" y="6" width="13" height="13" rx="2"/><path d="M8 6V4h9a2 2 0 012 2v9h-1M9 10h5m-5 3h6"/></svg></div><div><div class="task-title">複習容易忘的字 <span class="task-mode">連擊複習</span></div><div class="task-subtitle">中 2-4 的 6 張卡</div></div><button class="task-status" type="button">開始一局</button></article>
+          <article class="task" data-task="2"><div class="task-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16v10H9l-5 4v-14z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg></div><div><div class="task-title">生活對話 <span class="task-mode">情境選答</span></div><div class="task-subtitle">兩人來回 6 句，各講 3 句 · 中 2-4</div></div><button class="task-status" type="button">開始一局</button></article>
+        </div>
+      </section>
+
+      <section class="panel week-panel" aria-labelledby="week-title">
+        <div class="panel-header"><h2 class="panel-title" id="week-title"><span class="weekly-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg></span>本週進度</h2><span class="panel-link">中 2-4</span></div>
+        <div class="weekly-goals" aria-label="本週學習進度">
+          <div class="weekly-goal"><div class="weekly-goal-head"><span>來過</span><strong>2 / 3 天</strong></div><div class="weekly-track"><div class="weekly-fill" style="width: 66%"></div></div></div>
+          <div class="weekly-goal"><div class="weekly-goal-head"><span>複習卡片</span><strong>12 / 20 張</strong></div><div class="weekly-track"><div class="weekly-fill gold" style="width: 60%"></div></div></div>
+          <div class="weekly-goal"><div class="weekly-goal-head"><span>對話情境</span><strong>1 / 3 組</strong></div><div class="weekly-track"><div class="weekly-fill coral" style="width: 33%"></div></div></div>
+        </div>
+        <div class="weekly-note"><strong>慢慢累積就好。</strong> 本週課程會跟著最新一堂自動更新。</div>
+      </section>
+    </div>
+
+    <div class="small-grid">
+      <section class="panel stat-card"><div class="stat-label">累積學習</div><div class="stat-value">14 小時 32 分</div><div class="stat-detail">比上個月多 18% · 慢慢來也算數</div></section>
+      <section class="panel quote-card"><div class="quote-label">今日一句</div><div class="quote-text thai">เอาอันนี้ค่ะ</div><div class="quote-translation">我要這個。（女性用語）</div></section>
+    </div>
+  </main>
+
+  <nav class="mobile-nav" aria-label="主要選單"><button class="nav-item active" type="button"><span>⌂</span><span>今日</span></button><button class="nav-item" type="button"><span>◒</span><span>複習</span></button><button class="nav-item" type="button"><span>◌</span><span>課程</span></button><button class="nav-item" type="button"><span>☼</span><span>我的</span></button></nav>
+  <div class="toast" id="toast" role="status" aria-live="polite">今天的第一局，完成。</div>
+
+  <script>
+    const tasks = [...document.querySelectorAll('.task')];
+    const progressNumber = document.querySelector('#progressNumber');
+    const progressText = document.querySelector('#progressText');
+    const progressFill = document.querySelector('#progressFill');
+    const heroMeta = document.querySelector('#heroMeta');
+    const todayTime = document.querySelector('#todayTime');
+    const toast = document.querySelector('#toast');
+    const themeButton = document.querySelector('#themeButton');
+    let toastTimer;
+
+    // Prototype-only session clock: count actual time spent on this page, without a daily target.
+    const todayClockKey = 'thai-review-prototype-today-clock-v1';
+    const todayClockDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
+    let todayClock = (() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(todayClockKey) || 'null');
+        return saved?.date === todayClockDate ? { date: saved.date, seconds: saved.seconds || 0 } : { date: todayClockDate, seconds: 0 };
+      } catch { return { date: todayClockDate, seconds: 0 }; }
+    })();
+    let clockStartedAt = 0;
+    let clockTimer = null;
+
+    function currentClockSeconds() {
+      return todayClock.seconds + (clockStartedAt ? Math.floor((Date.now() - clockStartedAt) / 1000) : 0);
+    }
+
+    function renderTodayTime() {
+      const minutes = Math.floor(currentClockSeconds() / 60);
+      todayTime.textContent = minutes ? `${minutes} 分鐘` : '未滿 1 分鐘';
+    }
+
+    function saveTodayTime() {
+      try { localStorage.setItem(todayClockKey, JSON.stringify({ date: todayClockDate, seconds: currentClockSeconds() })); } catch {}
+    }
+
+    function startClock() {
+      if (clockStartedAt) return;
+      clockStartedAt = Date.now();
+      clearInterval(clockTimer);
+      clockTimer = setInterval(renderTodayTime, 1000);
+      renderTodayTime();
+    }
+
+    function pauseClock() {
+      if (!clockStartedAt) return;
+      todayClock.seconds = currentClockSeconds();
+      clockStartedAt = 0;
+      clearInterval(clockTimer);
+      clockTimer = null;
+      saveTodayTime();
+      renderTodayTime();
+    }
+
+    renderTodayTime();
+    window.addEventListener('pagehide', pauseClock);
+
+    themeButton.addEventListener('click', () => {
+      const dark = document.body.classList.toggle('dark-mode');
+      themeButton.textContent = dark ? '☾' : '☼';
+      themeButton.setAttribute('aria-label', dark ? '切換淺色模式' : '切換深色模式');
+    });
+
+    function updateProgress() {
+      const done = tasks.filter(task => task.classList.contains('done')).length;
+      progressNumber.textContent = `${done} / 3`;
+      progressText.textContent = done === 3 ? '今日任務完成！' : `已完成 ${done} 項`;
+      progressFill.style.width = `${Math.max(8, done / 3 * 100)}%`;
+      heroMeta.textContent = done === 3 ? '明天見，今天做得很好' : '完成一局就算今天有來';
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
+    }
+
+    tasks.forEach(task => {
+      const statusButton = task.querySelector('.task-status');
+      statusButton.dataset.startLabel = statusButton.textContent;
+      statusButton.addEventListener('click', () => {
+        startClock();
+        const wasDone = task.classList.contains('done');
+        task.classList.toggle('done');
+        statusButton.textContent = task.classList.contains('done') ? '已完成 ✓' : statusButton.dataset.startLabel;
+        updateProgress();
+        showToast(wasDone ? '已放回今天的任務' : '完成一局，今天的節奏開始了');
+      });
+    });
+
+    document.querySelector('#startButton').addEventListener('click', () => {
+      startClock();
+      const next = tasks.find(task => !task.classList.contains('done'));
+      if (next) {
+        next.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        next.querySelector('.task-status').focus();
+        showToast(`下一步：${next.querySelector('.task-title').textContent}`);
+      } else {
+        showToast('今天已完成，明天再來就好');
+      }
+    });
+
+    document.querySelector('#resetButton').addEventListener('click', () => {
+      tasks.forEach((task, index) => {
+        task.classList.toggle('done', index === 0);
+        const statusButton = task.querySelector('.task-status');
+        statusButton.textContent = index === 0 ? '已完成 ✓' : statusButton.dataset.startLabel;
+      });
+      updateProgress();
+      showToast('已回到今天的第一局');
+    });
+  </script>
+</body>
+</html>
