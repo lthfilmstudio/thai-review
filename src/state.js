@@ -13,8 +13,14 @@ const SETTINGS_VERSION = 2;
 /* 本地時區（台北）的 YYYY-MM-DD。不能用 toISOString()（UTC 會在早上 8 點前算成前一天）。
    today.js / stats.js 都要用同一份，放在共同的底層模組避免互相 import。 */
 export function localDateKey(ts = Date.now()) {
-  const d = new Date(ts);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(ts));
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 /* ===== 舊版：整份 lessons cache（保留相容，其他非 publish-to-web 模式還在用） ===== */

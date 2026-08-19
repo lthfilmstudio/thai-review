@@ -36,6 +36,6 @@ test('service worker refreshes mutable Thai audio indexes before using cache', (
   }
 });
 
-test('service worker cache version invalidates the stale v62 prompt bundle', () => {
-  assert.ok(sw.includes("const CACHE = 'thai-review-v68';"));
+test('service worker cache version invalidates the stale v68 review bundle', () => {
+  assert.ok(sw.includes("const CACHE = 'thai-review-v69';"));
 });

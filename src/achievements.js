@@ -13,7 +13,7 @@ export const ACHIEVEMENT_DEFS = [
     id: 'allGraded',
     icon: '📚',
     label: ctx => `${ctx.totalCards} 張全上手`,
-    check: ctx => ctx.totalCards > 0 && ctx.gradedCards >= ctx.totalCards,
+    check: ctx => ctx.allLessonsLoaded && ctx.totalCards > 0 && ctx.gradedCards >= ctx.totalCards,
   },
   { id: 'cumulative1000', icon: '🌟', label: '千張複習', check: ctx => ctx.totalReviewed >= 1000 },
   {

@@ -2,7 +2,7 @@
    每日複習日誌存獨立 localStorage key，不動主 STORAGE_KEY schema。 */
 
 import { state, allCardsWithLessonId, cardKey, getDueCount, localDateKey } from './state.js';
-import { cardStatus } from './srs.js';
+import { cardStatus, normalizeGrade } from './srs.js';
 import { ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel } from './achievements.js';
 import { accuracyTrend, averageAccuracy, weakLessons, weakestCards } from './stats.js';
 import { escapeHtml } from './ui.js';
@@ -41,9 +41,13 @@ function saveDailyLog(log) {
 export function logReview(gradeStr, ts = Date.now()) {
   const log = loadDailyLog();
   const key = localDateKey(ts);
-  const day = log.days[key] || { reviewed: 0, again: 0, hard: 0, good: 0, easy: 0 };
+  const day = {
+    reviewed: 0, again: 0, hard: 0, good: 0, easy: 0,
+    ...(log.days[key] || {}),
+  };
   day.reviewed += 1;
-  if (gradeStr in day) day[gradeStr] += 1;
+  const grade = normalizeGrade(gradeStr);
+  if (grade in day) day[grade] += 1;
   log.days[key] = day;
   saveDailyLog(log);
 }
@@ -56,9 +60,13 @@ export function initDailyLog(progress) {
     const v = progress[k];
     if (!v || typeof v !== 'object' || !(v.reviewedAt > 0)) continue;
     const key = localDateKey(v.reviewedAt);
-    const day = log.days[key] || { reviewed: 0, again: 0, hard: 0, good: 0, easy: 0 };
+    const day = {
+      reviewed: 0, again: 0, hard: 0, good: 0, easy: 0,
+      ...(log.days[key] || {}),
+    };
     day.reviewed += 1;
-    if (v.grade in day) day[v.grade] += 1;
+    const grade = normalizeGrade(v.grade);
+    if (grade in day) day[grade] += 1;
     log.days[key] = day;
   }
   log.backfilled = true;
@@ -133,12 +141,15 @@ export function buildAchievementCtx(log = loadDailyLog()) {
   }
   const cards = allCardsWithLessonId();
   const gradedCards = cards.filter(c => !!state.progress[c._cardKey]).length;
+  const allLessonsLoaded = state.lessons.length > 0
+    && state.lessons.every(lesson => lesson._loaded || !lesson.gid);
   return {
     streak: streakDays(log.days),
     maxDailyReviewed,
     totalReviewed,
     totalCards: cards.length,
     gradedCards,
+    allLessonsLoaded,
     hasFullyMatureLesson: hasFullyMatureLesson(),
     weeklyAccuracy: averageAccuracy(accuracyTrend(log.days, 7)),
   };

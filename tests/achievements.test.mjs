@@ -17,6 +17,7 @@ function baseCtx(overrides = {}) {
     totalReviewed: 0,
     totalCards: 100,
     gradedCards: 0,
+    allLessonsLoaded: true,
     hasFullyMatureLesson: false,
     weeklyAccuracy: null,
     ...overrides,
@@ -46,6 +47,11 @@ test('allGraded requires every card graded, label reflects current total', () =>
   const def = unlocked.find(d => d.id === 'allGraded');
   assert.ok(def);
   assert.equal(achievementLabel(def, { totalCards: 50 }), '50 張全上手');
+});
+
+test('allGraded does not unlock while the deck is only partially loaded', () => {
+  stored.clear();
+  assert.equal(checkAndUnlock(baseCtx({ gradedCards: 100, allLessonsLoaded: false })).length, 0);
 });
 
 test('cumulative1000 and daily50 are independent of streak/grading', () => {
