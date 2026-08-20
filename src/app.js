@@ -440,6 +440,28 @@ async function updateRuntimeHint() {
   el.textContent = lines.join('\n');
 }
 
+/* 通知深連結：?card=<lessonId>:<thai>（跟 state.js cardKey() 同一種 key 格式）。
+   URLSearchParams 已經自動解掉 percent-encoding，不用再 decodeURIComponent 一次。
+   只在開啟當下讀一次，讀完清掉網址參數，避免重整頁面又被拉回同一張卡。 */
+function parseDeepLinkParam() {
+  const raw = new URLSearchParams(location.search).get('card');
+  if (!raw) return null;
+  const sep = raw.indexOf(':');
+  if (sep < 0) return null;
+  const lessonId = raw.slice(0, sep);
+  const thai = raw.slice(sep + 1);
+  if (!lessonId || !thai) return null;
+  return { lessonId, thai };
+}
+
+function clearDeepLinkParam() {
+  const params = new URLSearchParams(location.search);
+  if (!params.has('card')) return;
+  params.delete('card');
+  const qs = params.toString();
+  history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : '') + location.hash);
+}
+
 function onFreshLessons(fresh) {
   // 舊版 eager cache revalidation callback
   const sameStructure = fresh.length === state.lessons.length
@@ -464,13 +486,27 @@ async function init() {
   if (!hasManifest && !hasEager) showLoading('正在從 Google Sheets 抓課程列表…');
 
   state.lessons = await loadLessonsSmart(onFreshManifest);
-  if (!state.currentLessonId ||
+
+  const deepLink = parseDeepLinkParam();
+  if (deepLink && state.lessons.find(l => l.id === deepLink.lessonId)) {
+    // 來自通知的深連結：強制切到那堂課、用字卡 mode 開、關掉 SRS 篩選，
+    // 這樣待會才能在 lesson.cards 原始順序裡穩定找到那句話的 index。
+    state.currentLessonId = deepLink.lessonId;
+    state.mode = 'card';
+    state.srsToggle = false;
+  } else if (!state.currentLessonId ||
       (state.currentLessonId !== '__ALL__' && !state.lessons.find(l => l.id === state.currentLessonId))) {
     state.currentLessonId = state.lessons[0]?.id || null;
   }
 
   // lazy 模式：確保當前課程的卡片已載入
   await ensureLessonLoaded(state.currentLessonId, { silentUI: false });
+
+  if (deepLink) {
+    const idx = filteredCards().findIndex(c => c.thai === deepLink.thai);
+    if (idx >= 0) { state.cardIndex = idx; state.flipped = false; }
+    clearDeepLinkParam();
+  }
 
   // 防止舊 cardIndex 在課程更新後越界
   const _initCards = filteredCards();
