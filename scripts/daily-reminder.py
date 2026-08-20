@@ -14,6 +14,7 @@ daily-reminder.py — Phase 0.5 每日提醒：推「今日一句」到 Telegram
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import os
 import re
@@ -72,6 +73,7 @@ def send_telegram(token: str, chat_id: str, text: str, retries: int = 3) -> None
     payload = urllib.parse.urlencode({
         "chat_id": chat_id,
         "text": text,
+        "parse_mode": "HTML",  # 讓 <a href="...">中文</a> 變成點文字直接跳轉的超連結
         "disable_web_page_preview": "true",  # 不然 Telegram 會在訊息下面貼一張 CF Access 登入頁的預覽卡
     }).encode()
 
@@ -117,11 +119,14 @@ def main() -> int:
     lesson, card = picked
     thai = card.get("thai", "")
     zh = card.get("zh", "")
+    link = deep_link_url(lesson.get("id", ""), thai)
 
+    # parse_mode=HTML：thai/zh 是動態內容，過 html.escape() 才能安全塞進 HTML；
+    # href 也跟著跳脫，避免萬一 URL 裡帶到 & 之類的字元把標籤弄壞。
     text = (
-        f"清心安神・今日一句\n\n"
-        f"{thai}\n{zh}\n\n"
-        f"開這句的字卡：{deep_link_url(lesson.get('id', ''), thai)}"
+        "清心安神・今日一句\n\n"
+        f"{html.escape(thai)}\n"
+        f'<a href="{html.escape(link)}">{html.escape(zh)}</a>'
     )
 
     try:
