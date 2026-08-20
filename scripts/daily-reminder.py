@@ -38,13 +38,6 @@ def thai_char_count(text: str) -> int:
     return len(THAI_CHAR_RE.findall(text))
 
 
-def youglish_url(thai: str) -> str:
-    """跟 src/card.js 的 youglishUrl() 同一條規則：YouGlish 後端擋 encoded slash，
-    泰文資料常見「ค่ะ / ครับ」男女變體，取 / 前第一段當搜尋詞最乾淨。"""
-    term = thai.split("/")[0].strip()
-    return "https://youglish.com/pronounce/" + urllib.parse.quote(term, safe="") + "/thai"
-
-
 def deep_link_url(lesson_id: str, thai: str) -> str:
     """跟 src/state.js 的 cardKey()（`${lessonId}:${thai}`）同一種 key 格式，
     App 端 src/app.js 的 parseDeepLinkParam() 讀 ?card= 這個參數直接跳到該卡。"""
@@ -128,7 +121,6 @@ def main() -> int:
     text = (
         f"清心安神・今日一句\n\n"
         f"{thai}\n{zh}\n\n"
-        f"聽發音：{youglish_url(thai)}\n"
         f"開這句的字卡：{deep_link_url(lesson.get('id', ''), thai)}"
     )
 
