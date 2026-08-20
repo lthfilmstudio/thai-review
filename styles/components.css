@@ -2211,7 +2211,24 @@
   color: var(--text);
   font-size: 16px;
 }
-.home-sentence-zh { margin-top: 6px; color: var(--text-mute); font-size: 12px; }
+.home-sentence-zh {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--text-mute);
+  font-size: 12px;
+}
+a.home-sentence-zh {
+  text-decoration: underline;
+  text-decoration-color: rgba(196, 165, 116, 0.45);
+  text-underline-offset: 3px;
+}
+a.home-sentence-zh:visited { color: var(--text-mute); }
+a.home-sentence-zh:hover { color: var(--gold); }
+a.home-sentence-zh:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
 
 /* ===== 音感挑戰局 ===== */
 .glg-wrap {

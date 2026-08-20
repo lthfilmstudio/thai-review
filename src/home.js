@@ -4,7 +4,7 @@
    （11.2 節 B 案）；視覺語言照 prototype-daily.html，但變數改用 base.css
    那套 --bg/--text/--gold（11.4 節）。 */
 
-import { state, localDateKey, allCardsWithLessonId } from './state.js';
+import { state, localDateKey, allCardsWithLessonId, cardKey } from './state.js';
 import { escapeHtml } from './ui.js';
 import {
   loadDailyLog, streakDays, weekSummary,
@@ -61,6 +61,30 @@ function getDailySentence(lessons) {
     sentenceCache = { dateKey, promise: pickDailySentence(lessons, dateKey) };
   }
   return sentenceCache.promise;
+}
+
+export function buildDailySentenceHref(lessonId, thai) {
+  if (!lessonId || !thai) return null;
+  const params = new URLSearchParams({ card: cardKey({ _lessonId: lessonId, thai }) });
+  return `?${params.toString()}`;
+}
+
+export function fillDailySentence(box, result, documentRef = document) {
+  const thai = result?.card?.thai || '';
+  const zh = result?.card?.zh || '';
+  const thaiLine = box?.querySelector('.home-sentence-thai');
+  if (!thaiLine || !thai) return false;
+
+  thaiLine.textContent = thai;
+  if (!zh) return true;
+
+  const href = buildDailySentenceHref(result?.lesson?.id, thai);
+  const zhLine = documentRef.createElement(href ? 'a' : 'div');
+  zhLine.className = 'home-sentence-zh';
+  zhLine.textContent = zh;
+  if (href) zhLine.href = href;
+  box.appendChild(zhLine);
+  return true;
 }
 
 /* ===== render ===== */
@@ -139,6 +163,11 @@ export function renderHomeMode(el, rerender) {
         <button class="home-primary-btn" data-home-start-game type="button">開始下一局 →</button>
       </div>
 
+      <div class="home-sentence" id="homeSentenceBox">
+        <div class="home-sentence-label">今日一句</div>
+        <div class="home-sentence-thai">…</div>
+      </div>
+
       <div class="home-tasks">
         <div class="home-task${task1Done ? ' done' : ''}" data-home-task="1">
           <div class="home-task-icon">${SVG_HEADPHONE}</div>
@@ -173,11 +202,6 @@ export function renderHomeMode(el, rerender) {
       </div>
 
       ${renderAchievementsHtml(achvCtx)}
-
-      <div class="home-sentence" id="homeSentenceBox">
-        <div class="home-sentence-label">今日一句</div>
-        <div class="home-sentence-thai">…</div>
-      </div>
     </div>
   `;
 
@@ -199,11 +223,6 @@ export function renderHomeMode(el, rerender) {
 
   getDailySentence(state.lessons).then(result => {
     const box = document.getElementById('homeSentenceBox');
-    if (!box || !result) return;
-    box.querySelector('.home-sentence-thai').textContent = result.card.thai;
-    const zhLine = document.createElement('div');
-    zhLine.className = 'home-sentence-zh';
-    zhLine.textContent = result.card.zh || '';
-    box.appendChild(zhLine);
+    fillDailySentence(box, result);
   }).catch(() => {});
 }
