@@ -13,6 +13,7 @@ def prepare_job(
     job_id: str | None = None,
     data_path: Path | None = Path("data.json"),
     available_bytes: int | None = None,
+    keyterms: list[str] | None = None,
     runner: Callable[..., subprocess.CompletedProcess] = run_process,
 ) -> dict:
     ordered, derived_job_id = order_sources(sources)
@@ -25,6 +26,7 @@ def prepare_job(
             job_id=selected_job_id,
             data_path=data_path,
             available_bytes=available_bytes,
+            keyterms=keyterms,
             runner=runner,
         )
 
@@ -36,6 +38,7 @@ def _prepare_job_locked(
     job_id: str | None = None,
     data_path: Path | None = Path("data.json"),
     available_bytes: int | None = None,
+    keyterms: list[str] | None = None,
     runner: Callable[..., subprocess.CompletedProcess] = run_process,
 ) -> dict:
     if not tool_available("ffmpeg") or not tool_available("ffprobe"):
@@ -69,6 +72,11 @@ def _prepare_job_locked(
     state_path = job_root / "job.json"
     existing = load_json_object(state_path) if state_path.exists() else None
     existing_segments = (existing or {}).get("segments") or []
+    if keyterms is None:
+        # 沒有明確傳 keyterms 就沿用既有 job 已經揭露過的選擇（跟 data_snapshot／
+        # combined_transcript／tsv 同一套保留邏輯），避免重跑免費 prepare 時
+        # 沒帶 --keyterms-file 就把先前核准的詞彙表悄悄清空。
+        keyterms = ((existing or {}).get("approval") or {}).get("request", {}).get("keyterms")
     if existing and existing.get("job_id") != selected_job_id:
         raise ValueError("既有 job ID 與目前輸入不符")
     if existing and len(existing_segments) != len(inspected):
@@ -170,7 +178,7 @@ def _prepare_job_locked(
             ):
                 raise ValueError("既有 TSV 與 data snapshot evidence 不符")
 
-    approval = _approval_summary(segments)
+    approval = _approval_summary(segments, keyterms=keyterms)
     if not within_paid_caps(approval["estimate"]):
         raise ValueError("待上傳音訊超出 120 分鐘或 USD 0.50 付費硬上限")
     timestamp = now_utc()
@@ -303,12 +311,18 @@ def load_stt_secrets(path: Path) -> dict[str, str]:
     }
 
 
-def _scribe_post_form_args() -> list[str]:
+def _scribe_post_form_args(keyterms: list[str] | None = None) -> list[str]:
     args: list[str] = []
     for field in SCRIBE_POST_FIELDS:
         value = SCRIBE_REQUEST_CONTRACT[field]
         rendered = str(value).lower() if isinstance(value, bool) else str(value)
         args.extend(["--form", f"{field}={rendered}"])
+    # keyterms 是陣列欄位：API 要求同一個欄位名重複送多次，不是包成一個 JSON 字串
+    # （官方 SDK v2.59.0 曾經因為包成 JSON 字串誤觸 50 字元限制，見
+    # github.com/elevenlabs/elevenlabs-python/issues/819）。用 --form-string 避免
+    # 詞彙裡剛好出現 @ / < / ; 被 curl 誤判成檔案上傳語法。
+    for term in keyterms or []:
+        args.extend(["--form-string", f"keyterms={term}"])
     return args
 
 
@@ -317,6 +331,7 @@ def run_scribe_curl(
     api_key: str,
     temp_parent: Path,
     *,
+    keyterms: list[str] | None = None,
     runner: Callable[..., subprocess.CompletedProcess] = run_process,
 ) -> dict:
     if any(ord(character) < 33 or ord(character) == 127 for character in api_key):
@@ -354,7 +369,7 @@ def run_scribe_curl(
         "%{http_code}",
         "--form",
         f"file=@{mp3_path};type=audio/mpeg",
-        *_scribe_post_form_args(),
+        *_scribe_post_form_args(keyterms),
         SCRIBE_ENDPOINT,
     ]
     child_env = {
@@ -623,7 +638,8 @@ def _execute_paid_inner(
         _save_job(state_path, job)
         return job
 
-    current_approval = _approval_summary(job["segments"])
+    persisted_keyterms = ((job.get("approval") or {}).get("request") or {}).get("keyterms")
+    current_approval = _approval_summary(job["segments"], keyterms=persisted_keyterms)
     current_fingerprint = paid_input_fingerprint(current_approval)
     if (
         job.get("approval_fingerprint") != current_fingerprint
@@ -732,6 +748,7 @@ def _execute_paid_inner(
                 Path(segment["mp3"]["path"]),
                 secret["api_key"],
                 Path(job["job_root"]),
+                keyterms=current_approval["request"].get("keyterms"),
                 runner=http_runner,
             )
         except FileNotFoundError as exc:

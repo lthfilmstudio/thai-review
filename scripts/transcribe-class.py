@@ -36,6 +36,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--out-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--data", type=Path, default=Path("data.json"))
     parser.add_argument(
+        "--keyterms-file",
+        type=Path,
+        help=(
+            "Free preparation only: JSON file containing a plain list of keyterm strings "
+            "to bias Scribe recognition toward (adds a 20%% ElevenLabs surcharge). "
+            "Sticky across re-preparation once set; omit to keep the previous choice."
+        ),
+    )
+    parser.add_argument(
         "--secrets-file",
         type=Path,
         default=DEFAULT_STT_SECRETS_PATH,
@@ -85,6 +94,11 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("--approval-fingerprint 必須是 64 位小寫十六進位字串")
     if args.force_paid_retry and not args.confirm_paid_api:
         raise SystemExit("--force-paid-retry 必須與 --confirm-paid-api 一起使用")
+    if args.keyterms_file and (
+        args.confirm_paid_api or args.recover_unknown or args.handoff
+        or args.validate_tsv or args.status
+    ):
+        raise SystemExit("--keyterms-file 只能用在免費 preparation")
     operation_count = sum(bool(value) for value in (
         args.confirm_paid_api, args.recover_unknown, args.handoff, args.validate_tsv, args.status
     ))
@@ -128,11 +142,19 @@ def main(argv: list[str] | None = None) -> int:
         else:
             if not args.sources:
                 raise ValueError("免費 preparation 必須提供至少一個原始 MP4")
+            keyterms = None
+            if args.keyterms_file:
+                loaded = json.loads(args.keyterms_file.read_text(encoding="utf-8"))
+                if not isinstance(loaded, list) or not all(isinstance(t, str) for t in loaded):
+                    raise ValueError("--keyterms-file 必須是純字串陣列的 JSON")
+                validate_keyterms(loaded)
+                keyterms = loaded
             job = prepare_job(
                 args.sources,
                 args.out_root,
                 job_id=args.job_id,
                 data_path=args.data,
+                keyterms=keyterms,
             )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc

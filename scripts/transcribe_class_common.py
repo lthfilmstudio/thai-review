@@ -26,6 +26,11 @@ MAX_TOTAL_SECONDS = Decimal("7200")
 MAX_BUFFERED_USD = Decimal("0.50")
 SCRIBE_USD_PER_HOUR = Decimal("0.22")
 ESTIMATE_BUFFER = Decimal("1.10")
+# ElevenLabs keyterms 加成：官方文件「an additional 20% surcharge on the base
+# transcription cost」，非零 keyterms 一律套用，不隨詞數縮放。
+KEYTERMS_SURCHARGE = Decimal("1.20")
+MAX_KEYTERMS = 1000
+MAX_KEYTERM_CHARS = 50
 RATE_CHECKED_ON = "2026-08-16"
 RATE_MAX_AGE_DAYS = 30
 DEFAULT_OUTPUT_ROOT = Path("out/class-transcriptions")
@@ -51,6 +56,9 @@ SCRIBE_REQUEST_CONTRACT = {
     "no_verbatim": False,
     "detect_speaker_roles": False,
     "use_speaker_library": True,
+    # num_speakers 實測過會反效果：2026-08-20 設成 8 之後，含噪音的段落講者數會被
+    # 推到剛好頂到這個上限（同一支音檔沒設這個參數時是 92-100% 單一講者、3-5 個
+    # 講者；設了之後同一支音檔變成 30% 上下、剛好 8 個講者）——拿掉，不再設定。
     "keyterms": [],
     "entity_detection": None,
 }
@@ -64,6 +72,16 @@ SCRIBE_POST_FIELDS = (
     "detect_speaker_roles",
     "use_speaker_library",
 )
+
+
+def validate_keyterms(keyterms: list[str]) -> None:
+    if len(keyterms) > MAX_KEYTERMS:
+        raise ValueError(f"keyterms 超過上限 {MAX_KEYTERMS} 個：{len(keyterms)}")
+    for term in keyterms:
+        if not isinstance(term, str) or not term.strip():
+            raise ValueError(f"keyterms 含空白或非字串項目：{term!r}")
+        if len(term) >= MAX_KEYTERM_CHARS:
+            raise ValueError(f"keyterms 項目超過 {MAX_KEYTERM_CHARS} 字元：{term!r}")
 
 
 def tool_available(name: str) -> bool:
@@ -240,12 +258,14 @@ def atomic_write_json(path: Path, value: dict) -> str:
     return sha256_bytes(payload_bytes)
 
 
-def estimate_paid_usage(durations_seconds: Iterable[float]) -> dict:
+def estimate_paid_usage(durations_seconds: Iterable[float], *, has_keyterms: bool = False) -> dict:
     durations = [Decimal(str(value)) for value in durations_seconds]
     if any(value <= 0 for value in durations):
         raise ValueError("每段音訊時長都必須大於 0")
     billed_minutes = sum(math.ceil(float(value / Decimal(60))) for value in durations)
     raw = Decimal(billed_minutes) * SCRIBE_USD_PER_HOUR / Decimal(60)
+    if has_keyterms:
+        raw *= KEYTERMS_SURCHARGE
     buffered = raw * ESTIMATE_BUFFER
     quant = Decimal("0.0001")
     return {
@@ -253,6 +273,7 @@ def estimate_paid_usage(durations_seconds: Iterable[float]) -> dict:
         "billed_minutes": billed_minutes,
         "usd_per_hour": str(SCRIBE_USD_PER_HOUR),
         "rate_checked_on": RATE_CHECKED_ON,
+        "keyterms_surcharge_applied": has_keyterms,
         "raw_usd": str(raw.quantize(quant, rounding=ROUND_HALF_UP)),
         "buffered_usd": str(buffered.quantize(quant, rounding=ROUND_HALF_UP)),
         "buffer_percent": 10,
@@ -495,11 +516,16 @@ def _exclusive_transport_temp(parent: Path, label: str) -> Path:
     return path
 
 
-def _approval_summary(segments: list[dict]) -> dict:
+def _approval_summary(segments: list[dict], *, keyterms: list[str] | None = None) -> dict:
+    keyterms = list(keyterms or [])
+    validate_keyterms(keyterms)
     pending_segments = [segment for segment in segments if segment["state"] != "Complete"]
     estimate = estimate_paid_usage(
-        segment["mp3"]["duration_seconds"] for segment in pending_segments
+        (segment["mp3"]["duration_seconds"] for segment in pending_segments),
+        has_keyterms=bool(keyterms),
     )
+    request = copy.deepcopy(SCRIBE_REQUEST_CONTRACT)
+    request["keyterms"] = keyterms
     return {
         "version": 1,
         "destination": "ElevenLabs Speech-to-Text API",
@@ -508,7 +534,7 @@ def _approval_summary(segments: list[dict]) -> dict:
             "ElevenLabs standard logging may retain uploaded STT audio and text; "
             "Zero Retention is Enterprise-only and is not assumed for this run."
         ),
-        "request": copy.deepcopy(SCRIBE_REQUEST_CONTRACT),
+        "request": request,
         "segments": [
             {
                 "index": segment["index"],

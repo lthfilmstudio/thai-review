@@ -332,6 +332,76 @@ class MediaPreparationTest(unittest.TestCase):
                 transcribe_class.prepare_job([source], root / "out", data_path=None)
 
 
+class KeytermsAndSpeakerCountTest(unittest.TestCase):
+    def test_estimate_applies_keyterms_surcharge_before_buffer(self):
+        without = transcribe_class.estimate_paid_usage([3600.0], has_keyterms=False)
+        with_kw = transcribe_class.estimate_paid_usage([3600.0], has_keyterms=True)
+        self.assertEqual(without["keyterms_surcharge_applied"], False)
+        self.assertEqual(with_kw["keyterms_surcharge_applied"], True)
+        # 20% 加成套在 raw_usd（buffer 前），buffered_usd 應該正好是 raw_usd * 1.10
+        self.assertEqual(float(with_kw["raw_usd"]), round(float(without["raw_usd"]) * 1.2, 4))
+        self.assertAlmostEqual(
+            float(with_kw["buffered_usd"]), float(with_kw["raw_usd"]) * 1.10, places=3
+        )
+
+    def test_validate_keyterms_rejects_too_many_or_too_long(self):
+        transcribe_class.validate_keyterms(["สวัสดี", "ขอบคุณ"])  # ok, no raise
+
+        with self.assertRaisesRegex(ValueError, "上限"):
+            transcribe_class.validate_keyterms(["x"] * 1001)
+
+        with self.assertRaisesRegex(ValueError, "超過"):
+            transcribe_class.validate_keyterms(["a" * 50])
+
+        with self.assertRaisesRegex(ValueError, "空白"):
+            transcribe_class.validate_keyterms([""])
+
+    @unittest.skipUnless(
+        transcribe_class.tool_available("ffmpeg") and transcribe_class.tool_available("ffprobe"),
+        "FFmpeg required",
+    )
+    def test_prepare_job_threads_keyterms_into_disclosure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "260814.mp4"
+            make_mp4(source)
+
+            job = transcribe_class.prepare_job(
+                [source], root / "out", data_path=None, keyterms=["สวัสดี", "ขอบคุณ"],
+            )
+
+            request = job["approval"]["request"]
+            self.assertEqual(request["keyterms"], ["สวัสดี", "ขอบคุณ"])
+            self.assertNotIn("num_speakers", request)
+            self.assertTrue(job["approval"]["estimate"]["keyterms_surcharge_applied"])
+            self.assertEqual(
+                job["approval_fingerprint"],
+                transcribe_class.paid_input_fingerprint(job["approval"]),
+            )
+
+            # 同一個 job 沒帶 keyterms 重跑 prepare（模擬之後的 --confirm-paid-api
+            # 呼叫不會重新指定 keyterms）：既有揭露內容應該原封不動，不會被清空。
+            second = transcribe_class.prepare_job([source], root / "out", data_path=None)
+            self.assertEqual(second["approval"]["request"]["keyterms"], ["สวัสดี", "ขอบคุณ"])
+
+    def test_scribe_post_form_args_sends_repeated_keyterms_not_num_speakers(self):
+        args = transcribe_class._paid._scribe_post_form_args(["สวัสดี", "ขอบคุณ"])
+
+        forms = [args[i + 1] for i, v in enumerate(args) if v == "--form"]
+        form_strings = [args[i + 1] for i, v in enumerate(args) if v == "--form-string"]
+
+        # num_speakers 實測會讓吵雜段落的講者數被推到剛好頂到上限，已經拿掉不送。
+        self.assertFalse(any(f.startswith("num_speakers=") for f in forms))
+        self.assertEqual(form_strings, ["keyterms=สวัสดี", "keyterms=ขอบคุณ"])
+        # keyterms 不該混進 --form 那一批（那批是 JSON-string 誤植的舊坑）
+        self.assertFalse(any(f.startswith("keyterms=") for f in forms))
+
+    def test_scribe_post_form_args_with_no_keyterms_sends_nothing_extra(self):
+        args = transcribe_class._paid._scribe_post_form_args(None)
+        form_strings = [args[i + 1] for i, v in enumerate(args) if v == "--form-string"]
+        self.assertEqual(form_strings, [])
+
+
 @unittest.skipUnless(transcribe_class.tool_available("ffmpeg") and transcribe_class.tool_available("ffprobe"), "FFmpeg required")
 class PaidGateTest(unittest.TestCase):
     def prepared_job(self, root):
