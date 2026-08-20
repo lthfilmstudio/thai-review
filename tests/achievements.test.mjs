@@ -78,10 +78,18 @@ test('weeklyAccuracy90 requires actual data (not null) at or above 90', () => {
   assert.equal(unlocked[0].id, 'weeklyAccuracy90');
 });
 
-test('ACHIEVEMENT_DEFS now holds all 7 badges from the improvement plan', () => {
+test('ACHIEVEMENT_DEFS now holds all 8 badges (Phase 2 adds streak100)', () => {
   const ids = ACHIEVEMENT_DEFS.map(d => d.id).sort();
   assert.deepEqual(ids, [
     'allGraded', 'cumulative1000', 'daily50', 'lessonMastered',
-    'streak30', 'streak7', 'weeklyAccuracy90',
+    'streak100', 'streak30', 'streak7', 'weeklyAccuracy90',
   ]);
+});
+
+test('streak100 unlocks once streak reaches 100, independent of streak7/30', () => {
+  stored.clear();
+  const unlocked = checkAndUnlock(baseCtx({ streak: 100 }));
+  const ids = unlocked.map(d => d.id).sort();
+  // 一次跨過 7/30/100 三個門檻，三個都該一起解鎖
+  assert.deepEqual(ids, ['streak100', 'streak30', 'streak7']);
 });

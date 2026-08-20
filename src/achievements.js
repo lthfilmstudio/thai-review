@@ -7,6 +7,7 @@ const KEY = 'thai-review-achievements-v1';
 export const ACHIEVEMENT_DEFS = [
   { id: 'streak7', icon: '🔥', label: '連續 7 天', check: ctx => ctx.streak >= 7 },
   { id: 'streak30', icon: '🔥', label: '連續 30 天', check: ctx => ctx.streak >= 30 },
+  { id: 'streak100', icon: '🔥', label: '連續 100 天', check: ctx => ctx.streak >= 100 },
   { id: 'daily50', icon: '📅', label: '單日複習 50 張', check: ctx => ctx.maxDailyReviewed >= 50 },
   { id: 'lessonMastered', icon: '🎓', label: '課程全通關', check: ctx => ctx.hasFullyMatureLesson },
   {

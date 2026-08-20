@@ -54,13 +54,27 @@ export function logReview(gradeStr, ts = Date.now()) {
 
 /* 完成一局遊戲時記一筆。跟 reviewed 分開欄位、刻意不動 reviewed——
    那個欄位還餵著月曆熱度、maxDailyReviewed、totalReviewed 三個成就判定，
-   混寫會讓「單日複習 50 張」「千張複習」的語意歪掉（見設計書 11.3）。 */
-export function logGame(ts = Date.now()) {
+   混寫會讓「單日複習 50 張」「千張複習」的語意歪掉（見設計書 11.3）。
+   gameId（'listen' / 'combo' / 'dialog'）記進 day.gameIds，讓首頁「今日任務清單」
+   分得出來哪一局做過，不只是總數——只看 games 總數的話，玩過任一局其他兩局
+   也會被誤判成已完成。
+   同時檢查有沒有補救中的 makeupPending：今天累積滿 2 局就把昨天蓋章補回（6.1 節），
+   settleStreakOnOpen() 已經在每次開 App 時把 makeupPending 算到今天最新狀態，
+   這裡不用再驗證日期是否過期。 */
+export function logGame(gameId, ts = Date.now()) {
   const log = loadDailyLog();
   const key = localDateKey(ts);
-  const day = { reviewed: 0, again: 0, hard: 0, good: 0, easy: 0, games: 0, seconds: 0, ...(log.days[key] || {}) };
+  const day = { reviewed: 0, again: 0, hard: 0, good: 0, easy: 0, games: 0, seconds: 0, gameIds: [], ...(log.days[key] || {}) };
   day.games = (day.games || 0) + 1;
+  day.gameIds = [...(day.gameIds || []), gameId];
   log.days[key] = day;
+
+  if (log.makeupPending && day.games >= 2) {
+    const { missedDate } = log.makeupPending;
+    log.days[missedDate] = { ...ensureDay(log.days, missedDate), bridged: true };
+    log.makeupPending = null;
+  }
+
   saveDailyLog(log);
 }
 
@@ -98,9 +112,10 @@ export function initDailyLog(progress) {
 
 /* ===== Streak ===== */
 
-/* 「今天有來」＝正式複習過，或完成過一局遊戲（見設計書 6 節／11.3）。 */
+/* 「今天有來」＝正式複習過、完成過一局遊戲，或這天被安神保護／補救蓋章
+   （見設計書 6 節／11.3／6.1）。 */
 function cameOnDay(day) {
-  return !!(day && (day.reviewed > 0 || day.games > 0));
+  return !!(day && (day.reviewed > 0 || day.games > 0 || day.bridged));
 }
 
 /* 連續複習天數。今天還沒複習不算斷（從昨天起算）；用 Date 遞減避開時制邊界。 */
@@ -114,6 +129,117 @@ export function streakDays(days, now = Date.now()) {
     d.setDate(d.getDate() - 1);
   }
   return n;
+}
+
+/* day 物件的預設形狀，給結算流程操作「非 key 那天」時用（例如安神保護蓋章的舊日子）。 */
+function ensureDay(days, key) {
+  return { reviewed: 0, again: 0, hard: 0, good: 0, easy: 0, games: 0, seconds: 0, gameIds: [], ...(days[key] || {}) };
+}
+
+function dayKeyOffset(now, offsetDays) {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + offsetDays);
+  return localDateKey(d.getTime());
+}
+
+/* 從昨天往回數，連續「沒來」的天數；安神保護上限 2，超過 PROTECTION_MAX+2 天
+   後面的分支判斷都一樣是「R>=2 歸零」，不用再往前找，數到這裡就停。 */
+export const PROTECTION_MAX = 2;
+
+function countGapDays(days, now) {
+  let d = 0;
+  const cap = PROTECTION_MAX + 2;
+  while (d < cap) {
+    const key = dayKeyOffset(now, -(d + 1));
+    if (cameOnDay(days[key])) break;
+    d++;
+  }
+  return d;
+}
+
+/* streak 結算（安神保護消耗 + 補救判定 + 保護回補），設計書 6.1 節的順序。
+   純函式：吃 log、回傳新 log + 這次結算做了什麼事（給 UI 顯示提示用）。
+   不用另存一個「今天結算過了嗎」旗標——保護一旦蓋章，那天 cameOnDay() 就會是
+   true，下次（甚至同一天）再結算時 D 會自然重算成 0，天然冪等。 */
+export function runStreakSettlement(log, now = Date.now()) {
+  const days = { ...log.days };
+  let protection = log.protection || 0;
+  let makeupPending = log.makeupPending || null;
+  let event = { type: 'none' };
+
+  const D = countGapDays(days, now);
+
+  if (D === 0) {
+    // 昨天有來，任何舊的補救判定都已經沒意義（例如她自己另外用正式複習補上了）
+    makeupPending = null;
+  } else {
+    const spend = Math.min(D, protection);
+    const R = D - spend;
+    protection -= spend;
+
+    // 保護只在「補得完或差 1 天」時才蓋章，且蓋的是缺口裡最舊的 spend 天，
+    // 刻意留下離今天最近的 R 天不蓋——這樣 streakDays() 從今天往回走，
+    // R=1 時第一步（昨天）就會撞到沒蓋章的那天，正確顯示「斷」，
+    // 不會因為更早的日子蓋了章就顯示成部分連續（詳見設計書 6.1 討論）。
+    // R>=2 注定歸零，蓋章沒有意義，乾脆不蓋，避免留下無用的 bridged 資料。
+    if (R <= 1) {
+      for (let i = 1; i <= spend; i++) {
+        const offset = -(D - i + 1);
+        const key = dayKeyOffset(now, offset);
+        days[key] = { ...ensureDay(days, key), bridged: true };
+      }
+    }
+
+    if (R === 0) {
+      event = { type: 'protected', spent: spend };
+      makeupPending = null;
+    } else if (R === 1) {
+      const missedDate = dayKeyOffset(now, -1);
+      makeupPending = { missedDate };
+      event = { type: 'makeup-offered', missedDate };
+    } else {
+      makeupPending = null;
+      event = { type: 'reset' };
+    }
+  }
+
+  // 保護回補：每連續 7 天回補 1 個，上限 2。回補以連續天數為準——用掉保護
+  // 蓋章的那天已經算進 cameOnDay()，streakDays() 天然把它算進連續天數，
+  // 回補门檻才追得上消耗（設計書 6.1）。checkpoint 記錄「算到第幾天已經
+  // 結算過回補」；streak 歸零時 checkpoint 也歸零，不然下次累積 7 天時對不上。
+  const streakNow = streakDays(days, now);
+  let checkpoint = log.protectionRefillCheckpoint || 0;
+  if (streakNow < checkpoint) checkpoint = 0;
+  const gained = Math.floor((streakNow - checkpoint) / 7);
+  if (gained > 0) {
+    protection = Math.min(PROTECTION_MAX, protection + gained);
+    checkpoint += gained * 7;
+  }
+
+  return {
+    log: { ...log, days, protection, protectionRefillCheckpoint: checkpoint, makeupPending },
+    event,
+  };
+}
+
+/* 每次開 App 呼叫一次（app.js init()）。內部自己 load/save，呼叫端只要用回傳的
+   event 決定要不要顯示提示。 */
+export function settleStreakOnOpen(now = Date.now()) {
+  const log = loadDailyLog();
+  const { log: settled, event } = runStreakSettlement(log, now);
+  saveDailyLog(settled);
+  return event;
+}
+
+/* 目前的安神保護數量，首頁狀態列顯示用。 */
+export function getProtectionCount(log = loadDailyLog()) {
+  return log.protection || 0;
+}
+
+/* 補救中的補救對象（{missedDate} 或 null），首頁顯示補救 banner 用。 */
+export function getMakeupPending(log = loadDailyLog()) {
+  return log.makeupPending || null;
 }
 
 /* ===== 未來到期預測 ===== */
@@ -206,11 +332,10 @@ export function buildAchievementCtx(log = loadDailyLog()) {
   };
 }
 
-let achvToastTimer = null;
+let toastTimer = null;
 
-/* 新解鎖成就的浮動提示；沒有新解鎖時不做事。 */
-export function notifyAchievements(justUnlocked, ctx) {
-  if (!justUnlocked.length) return;
+/* 通用浮動提示，成就解鎖跟安神保護消耗提示共用同一個元素／樣式。 */
+export function showToast(msg, ms = 3200) {
   let el = document.getElementById('achvToast');
   if (!el) {
     el = document.createElement('div');
@@ -218,10 +343,16 @@ export function notifyAchievements(justUnlocked, ctx) {
     el.className = 'achv-toast';
     document.body.appendChild(el);
   }
-  el.textContent = justUnlocked.map(d => `${d.icon} 解鎖成就：${achievementLabel(d, ctx)}`).join('\n');
+  el.textContent = msg;
   el.classList.add('show');
-  clearTimeout(achvToastTimer);
-  achvToastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+/* 新解鎖成就的浮動提示；沒有新解鎖時不做事。 */
+export function notifyAchievements(justUnlocked, ctx) {
+  if (!justUnlocked.length) return;
+  showToast(justUnlocked.map(d => `${d.icon} 解鎖成就：${achievementLabel(d, ctx)}`).join('\n'));
 }
 
 function renderAchievementsHtml(ctx) {

@@ -10,7 +10,7 @@ import {
   findCardByKey, saveCardEdit, clearCardEdit,
 } from './state.js';
 import { loadLessons, loadTabsOnly, fetchLessonCards, loadFromBundledJson } from './data.js';
-import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds } from './today.js';
+import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds, settleStreakOnOpen, showToast } from './today.js';
 import { recordGrade } from './grade-history.js';
 import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices } from './tts.js';
@@ -135,8 +135,10 @@ async function ensureLessonLoaded(lessonId, { silentUI = false, force = false } 
   }
 }
 
-/* 全部混合：把還沒抓過的課程全部補抓（並行）。 */
-async function ensureAllLoaded({ force = false } = {}) {
+/* 全部混合：把還沒抓過的課程全部補抓（並行）。
+   export 給 home.js 開連擊複習局前用（跨課程選卡需要所有課都載入過；bundled JSON
+   模式下每堂課早就 _loaded=true，這裡多半是即時 resolve，只有 lazy 模式才真的抓）。 */
+export async function ensureAllLoaded({ force = false } = {}) {
   const todo = state.lessons.filter(l => (force || !l._loaded) && l.gid && state.baseUrl);
   if (!todo.length) return;
   showLoading(`正在補抓 ${todo.length} 堂未載入的課程…`);
@@ -489,6 +491,13 @@ async function init() {
   loadState();
   initDailyLog(state.progress);
   applyTheme();
+
+  // streak 結算（安神保護消耗／補救判定／回補，設計書 6.1 節）：每次開 App 跑一次，
+  // 要在任何畫面 render 之前跑完，首頁的連續天數／安神保護數字才會是結算後的數字。
+  const settleEvent = settleStreakOnOpen();
+  if (settleEvent.type === 'protected') {
+    showToast(`昨天沒開，用掉 ${settleEvent.spent} 個安神保護幫你保住連續天數`);
+  }
 
   const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
   const hasManifest = !!loadManifest(url);

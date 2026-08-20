@@ -153,7 +153,7 @@ function renderFeedback(q, gotIt) {
 function renderSummary(el, { onExit }) {
   if (!session.logged) {
     session.logged = true;
-    logGame();
+    logGame('listen');
   }
   const total = session.questions.length;
   const wrong = session.wrongCards || [];
