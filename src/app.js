@@ -9,12 +9,16 @@ import {
   setLastSync, getLastSync, formatLastSync,
   findCardByKey, saveCardEdit, clearCardEdit,
 } from './state.js';
-import { loadLessons, loadTabsOnly, fetchLessonCards, loadFromBundledJson } from './data.js';
+import {
+  loadLessons, loadTabsOnly, fetchLessonCards, loadBundledData,
+  fetchDialogues,
+} from './data.js';
 import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds, settleStreakOnOpen, showToast } from './today.js';
 import { recordGrade } from './grade-history.js';
 import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices } from './tts.js';
 import { stopListen } from './listen.js';
+import { exitDialogueGame } from './game-dialogue.js';
 import {
   renderSidebar, renderTopbarTitle, renderStats, renderContent,
   openDrawer, closeDrawer, openModal, closeModal, applyTheme,
@@ -71,25 +75,48 @@ function buildLessonsFromManifest(manifest) {
   });
 }
 
-async function loadLessonsLazy(url, onFreshManifest, { force = false } = {}) {
+async function loadManifestDialogues(manifest, { force = false } = {}) {
+  try {
+    if (!manifest.dialogueTab) throw new Error('找不到生活對話分頁');
+    const dialogues = await fetchDialogues(manifest.baseUrl, manifest.dialogueTab, { force });
+    if (!dialogues.length) throw new Error('生活對話沒有完整情境');
+    const changed = JSON.stringify(dialogues) !== JSON.stringify(state.dialogues);
+    state.dialogues = dialogues;
+    return changed;
+  } catch (e) {
+    console.warn('生活對話載入失敗：', e.message);
+    if (force) {
+      e.dialogueSyncFailed = true;
+      throw e;
+    }
+    return null;
+  }
+}
+
+async function loadLessonsLazy(url, onFreshManifest, { force = false, onFreshDialogues } = {}) {
   let manifest = force ? null : loadManifest(url);
 
   if (!manifest) {
     const m = await loadTabsOnly(url, { force });
     if (!m) throw new Error('no-manifest');
     manifest = { url, ts: Date.now(), ...m };
+    await loadManifestDialogues(manifest, { force });
     saveManifest(url, m);
   } else {
+    if (manifest.dialogueTab) await loadManifestDialogues(manifest);
     // 背景 revalidate manifest（只抓小小的 pubhtml，便宜）
     (async () => {
       try {
         const fresh = await loadTabsOnly(url);
         if (!fresh) return;
         const changed = JSON.stringify(fresh.tabs) !== JSON.stringify(manifest.tabs);
-        if (changed) {
+        const dialogueTabChanged = JSON.stringify(fresh.dialogueTab) !== JSON.stringify(manifest.dialogueTab);
+        const dialoguesChanged = await loadManifestDialogues(fresh);
+        if (changed || (dialogueTabChanged && dialoguesChanged !== null)) {
           saveManifest(url, fresh);
-          onFreshManifest?.(fresh);
         }
+        if (changed) onFreshManifest?.(fresh);
+        else if (dialoguesChanged) onFreshDialogues?.();
       } catch {}
     })();
   }
@@ -168,7 +195,8 @@ async function loadLessonsSmart(onFresh, { force = false } = {}) {
   // 預設 Sheet + 非 force → 試 bundled JSON
   if (!customInput && !force) {
     try {
-      const lessons = await loadFromBundledJson();
+      const { lessons, dialogues } = await loadBundledData();
+      state.dialogues = dialogues;
       // 同 lazy 模式格式：補上 _loaded=true（cards 已內含）+ baseUrl 用來提供「重新同步」走 live
       state.baseUrl = DEFAULT_SHEET_URL.replace(/\/pub(html)?$/, '');
       return lessons.map((l) => ({ ...l, _loaded: true }));
@@ -177,9 +205,13 @@ async function loadLessonsSmart(onFresh, { force = false } = {}) {
     }
   }
 
+  const isPublishedSheet = /\/d\/e\//.test(url) && !/output=csv/i.test(url);
+  if (!isPublishedSheet) state.dialogues = [];
+
   try {
-    return await loadLessonsLazy(url, onFresh, { force });
+    return await loadLessonsLazy(url, onFresh, { force, onFreshDialogues: rerender });
   } catch (e) {
+    if (force && e.dialogueSyncFailed) throw e;
     if (e.message !== 'no-manifest') console.warn('lazy failed:', e.message);
     return await loadLessonsCacheFirstEager(onFresh, { force });
   }
@@ -228,6 +260,7 @@ async function selectMode(m) {
   state.mode = m;
   state.flipped = false;
   stopListen();
+  exitDialogueGame();
   syncModeButtons(m);
   saveState();
   renderContent(rerender);

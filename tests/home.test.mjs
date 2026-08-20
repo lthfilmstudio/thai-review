@@ -95,3 +95,15 @@ test('daily sentence appears before the home task list', () => {
   assert.ok(sentenceIndex >= 0, 'daily sentence block should exist');
   assert.ok(tasksIndex > sentenceIndex, 'daily sentence should render before tasks');
 });
+
+test('home wires the third dialogue game as an enabled task', () => {
+  assert.match(homeSource, /import \* as dialogueGame from '\.\/game-dialogue\.js'/);
+  assert.match(homeSource, /doneGameIds\.has\('dialog'\)/);
+  assert.match(homeSource, /data-home-task-btn="3"/);
+  assert.doesNotMatch(homeSource, /data-home-task="3"[\s\S]{0,400}disabled type="button">準備中/);
+});
+
+test('next-game hero falls back when dialogue data is unavailable', () => {
+  assert.match(homeSource, /else if \(!task3Done && state\.dialogues\.length\) startDialogue\(\);/);
+  assert.match(homeSource, /else startListen\(\);/);
+});

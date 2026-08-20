@@ -171,6 +171,15 @@ test('weekSummary: exactly one entry marks today, daysCame/reviewedTotal match i
   assert.equal(todayDay.reviewed, mondayKey === todayKey ? 3 : 0);
 });
 
+test('weekSummary counts completed dialogue games separately', () => {
+  const now = NOON_TAIPEI(2026, 8, 20);
+  const week = weekSummary({
+    '2026-08-18': { reviewed: 0, games: 2, gameIds: ['dialog', 'dialog'] },
+    '2026-08-20': { reviewed: 0, games: 1, gameIds: ['listen'] },
+  }, now);
+  assert.equal(week.dialoguesCompleted, 2);
+});
+
 /* ===== streak 結算：安神保護／補救／回補（設計書 6.1 節） ===== */
 
 const TODAY = NOON_TAIPEI(2026, 8, 20);

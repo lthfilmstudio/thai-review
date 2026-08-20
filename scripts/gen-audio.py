@@ -186,25 +186,34 @@ def collect_unique_thai(data: dict) -> tuple[list[ThaiItem], int, int, int]:
     total_cards = 0
     total_chars = 0
 
+    def collect(card: dict, source_title: str) -> None:
+        nonlocal total_cards, total_chars
+        thai = str(card.get("thai") or "").strip()
+        if not thai:
+            return
+        tts_text = str(card.get("tts_prompt") or card.get("ttsPrompt") or thai).strip()
+        if not tts_text:
+            return
+        total_cards += 1
+        total_chars += text_len(tts_text)
+        counts[tts_text] = counts.get(tts_text, 0) + 1
+        if tts_text not in first_seen:
+            first_seen[tts_text] = {
+                "thai": thai,
+                "tts_text": tts_text,
+                "zh": str(card.get("zh") or "").strip(),
+                "lesson": source_title,
+            }
+
     for lesson in lessons:
         lesson_title = str(lesson.get("title") or "")
         for card in lesson.get("cards") or []:
-            thai = str(card.get("thai") or "").strip()
-            if not thai:
-                continue
-            tts_text = str(card.get("tts_prompt") or card.get("ttsPrompt") or thai).strip()
-            if not tts_text:
-                continue
-            total_cards += 1
-            total_chars += text_len(tts_text)
-            counts[tts_text] = counts.get(tts_text, 0) + 1
-            if tts_text not in first_seen:
-                first_seen[tts_text] = {
-                    "thai": thai,
-                    "tts_text": tts_text,
-                    "zh": str(card.get("zh") or "").strip(),
-                    "lesson": lesson_title,
-                }
+            collect(card, lesson_title)
+
+    for dialogue in data.get("dialogues") or []:
+        source_title = f"對話：{str(dialogue.get('title') or dialogue.get('id') or '').strip()}"
+        for turn in dialogue.get("turns") or []:
+            collect(turn, source_title)
 
     items = [
         ThaiItem(

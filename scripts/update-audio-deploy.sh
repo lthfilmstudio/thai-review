@@ -17,7 +17,7 @@ Options:
   --out-dir PATH         Site/audio output root. Default: out/site-preview.
   --keychain-service S   macOS Keychain service for ELEVENLABS_API_KEY.
                          Default: elevenlabs-thai-review-sample.
-  --skip-tests           Skip node tests before deploy.
+  --skip-tests           Skip test suites before deploy.
   -h, --help             Show this help.
 
 Examples:
@@ -35,13 +35,6 @@ max_chars=""
 manifest="out/site-preview/audio-manifest.json"
 out_dir="out/site-preview"
 keychain_service="elevenlabs-thai-review-sample"
-node_tests=(
-  tests/autoplay.test.mjs
-  tests/listen_lock.test.mjs
-  tests/zh_sprite.test.mjs
-  tests/service_worker.test.mjs
-)
-
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --generate) generate=1; shift ;;
@@ -271,7 +264,8 @@ if [[ "$deploy" -eq 1 ]]; then
   if [[ "$skip_tests" -ne 1 ]]; then
     echo
     echo "== Tests =="
-    node --test "${node_tests[@]}"
+    node --test tests/*.test.mjs
+    python3 -m unittest discover -s tests -p '*_test.py'
   fi
 
   echo

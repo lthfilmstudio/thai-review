@@ -30,6 +30,8 @@ DEFAULT_PUB_URL = (
     "https://docs.google.com/spreadsheets/d/e/"
     "2PACX-1vQzG3dKsEvQSsMxu4d1cwTMyvzUaq7kPK2Nwlg2qVZvzEmVhO4IS6D9lPirt4-cRbfokXbQNgvBWo9C/pubhtml"
 )
+DIALOGUE_SHEET_TITLE = "生活對話"
+EXPECTED_DIALOGUE_IDS = {f"D{index:02d}" for index in range(1, 11)}
 
 # ── 欄位別名（跟 src/data.js COL_ALIASES 對齊） ────────────────────
 COL_ALIASES = {
@@ -42,6 +44,10 @@ COL_ALIASES = {
     "lesson":    ["課程", "課", "堂", "lesson"],
     "start_ms":  ["start_ms", "start", "開始毫秒", "起始毫秒"],
     "end_ms":    ["end_ms", "end", "結束毫秒"],
+    "scenario_id":    ["情境 id", "scenario id", "scenario_id"],
+    "scenario_title": ["情境名稱", "scenario title", "scenario_title"],
+    "order":          ["順序", "order", "turn"],
+    "speaker":        ["說話者", "speaker"],
 }
 
 USER_AGENT = "thai-review-sync/1.0 (+https://github.com/lthfilmstudio/thai-review)"
@@ -125,8 +131,7 @@ def rows_to_cards(rows: list[list[str]]) -> list[dict]:
     iEnd = find_col(header, "end_ms")
 
     if iT < 0 or iK < 0 or iZ < 0:
-        # 必要欄位不齊，回空（不 raise，讓單一 tab 失敗不要拖累全部）
-        return []
+        raise ValueError(f"CSV 缺少必要欄位（泰文/拼音/中文）：{' | '.join(header)}")
 
     cards: list[dict] = []
     for row in rows[1:]:
@@ -151,17 +156,78 @@ def rows_to_cards(rows: list[list[str]]) -> list[dict]:
     return cards
 
 
+def rows_to_dialogues(rows: list[list[str]]) -> list[dict]:
+    if not rows:
+        return []
+    header = rows[0]
+    indexes = {key: find_col(header, key) for key in (
+        "scenario_id", "scenario_title", "order", "speaker", "thai", "karaoke", "zh"
+    )}
+    missing = [key for key, index in indexes.items() if index < 0]
+    if missing:
+        raise ValueError(f"生活對話分頁缺少欄位：{', '.join(missing)}")
+
+    grouped: dict[str, dict] = {}
+    for row in rows[1:]:
+        if not row or len(row) <= indexes["scenario_id"]:
+            continue
+        scenario_id = row[indexes["scenario_id"]].strip()
+        if not scenario_id:
+            continue
+        try:
+            order = int(row[indexes["order"]].strip())
+        except (ValueError, IndexError) as exc:
+            raise ValueError(f"{scenario_id} 有無效順序") from exc
+        scenario = grouped.setdefault(scenario_id, {
+            "id": scenario_id,
+            "title": row[indexes["scenario_title"]].strip(),
+            "turns": [],
+        })
+        title = row[indexes["scenario_title"]].strip()
+        if scenario["title"] != title:
+            raise ValueError(f"{scenario_id} 情境名稱不一致")
+        scenario["turns"].append({
+            "order": order,
+            "speaker": row[indexes["speaker"]].strip(),
+            "thai": row[indexes["thai"]].strip(),
+            "karaoke": row[indexes["karaoke"]].strip(),
+            "zh": row[indexes["zh"]].strip(),
+        })
+
+    dialogues = list(grouped.values())
+    for scenario in dialogues:
+        scenario["turns"].sort(key=lambda turn: turn["order"])
+        turns = scenario["turns"]
+        if len(turns) != 6:
+            raise ValueError(f"{scenario['id']} 必須是完整 6 句")
+        if [turn["order"] for turn in turns] != list(range(1, 7)):
+            raise ValueError(f"{scenario['id']} 順序必須是 1 到 6")
+        if [turn["speaker"] for turn in turns] != ["A", "B", "A", "B", "A", "B"]:
+            raise ValueError(f"{scenario['id']} 必須 A/B 各 3 句並交替")
+        if not scenario["title"] or any(not turn["thai"] or not turn["karaoke"] or not turn["zh"] for turn in turns):
+            raise ValueError(f"{scenario['id']} 有空白必填欄位")
+    return dialogues
+
+
 def fetch_lesson(base: str, tab: dict) -> dict:
     csv_url = f"{base}/pub?gid={tab['gid']}&single=true&output=csv"
     text = http_get(csv_url)
     rows = list(csv.reader(io.StringIO(text)))
     cards = rows_to_cards(rows)
+    if not cards:
+        raise ValueError("沒有可用字卡")
     return {
         "id": f"gid-{tab['gid']}",
         "gid": tab["gid"],
         "title": tab["name"],
         "cards": cards,
     }
+
+
+def fetch_dialogues(base: str, tab: dict) -> list[dict]:
+    csv_url = f"{base}/pub?gid={tab['gid']}&single=true&output=csv"
+    text = http_get(csv_url)
+    return rows_to_dialogues(list(csv.reader(io.StringIO(text))))
 
 
 def main() -> int:
@@ -180,17 +246,25 @@ def main() -> int:
         return 1
     print(f"[sync-sheet] found {len(tabs)} tabs", flush=True)
 
+    dialogue_tabs = [tab for tab in tabs if tab["name"] == DIALOGUE_SHEET_TITLE]
+    lesson_tabs = [tab for tab in tabs if tab["name"] != DIALOGUE_SHEET_TITLE]
+    if len(dialogue_tabs) != 1:
+        print(
+            f"[sync-sheet] ERROR: expected exactly one {DIALOGUE_SHEET_TITLE} tab; "
+            f"found {len(dialogue_tabs)}. Keep the previous complete data.json",
+            flush=True,
+        )
+        return 4
+
     lessons: list[dict] = []
     failures: list[tuple[str, str]] = []
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        futures = {pool.submit(fetch_lesson, base, tab): tab for tab in tabs}
+    # Google publish CSV 偶爾會在高併發下逾時；寧可多等一點，也不能產出缺課資料。
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = {pool.submit(fetch_lesson, base, tab): tab for tab in lesson_tabs}
         for fut in as_completed(futures):
             tab = futures[fut]
             try:
                 lesson = fut.result()
-                if not lesson["cards"]:
-                    print(f"  - skip empty: {tab['name']} ({tab['gid']})", flush=True)
-                    continue
                 lessons.append(lesson)
             except Exception as e:
                 failures.append((tab["name"], str(e)))
@@ -200,14 +274,42 @@ def main() -> int:
     order = {t["gid"]: i for i, t in enumerate(tabs)}
     lessons.sort(key=lambda l: order.get(l["gid"], 9999))
 
+    if failures:
+        print(
+            f"[sync-sheet] ERROR: {len(failures)} tab(s) failed; keep the previous complete data.json",
+            flush=True,
+        )
+        return 3
+
     if not lessons:
         print("[sync-sheet] ERROR: no lessons captured; aborting.", flush=True)
         return 2
+
+    try:
+        dialogues = fetch_dialogues(base, dialogue_tabs[0])
+    except Exception as exc:
+        print(
+            f"[sync-sheet] ERROR: {DIALOGUE_SHEET_TITLE} failed: {exc}; "
+            "keep the previous complete data.json",
+            flush=True,
+        )
+        return 4
+    dialogue_ids = {dialogue["id"] for dialogue in dialogues}
+    if dialogue_ids != EXPECTED_DIALOGUE_IDS:
+        missing = sorted(EXPECTED_DIALOGUE_IDS - dialogue_ids)
+        extra = sorted(dialogue_ids - EXPECTED_DIALOGUE_IDS)
+        print(
+            f"[sync-sheet] ERROR: incomplete dialogue set; missing={missing}, extra={extra}. "
+            "Keep the previous complete data.json",
+            flush=True,
+        )
+        return 4
 
     out = {
         "generated_at": int(time.time()),
         "source_url": base + "/pubhtml",
         "lessons": lessons,
+        "dialogues": dialogues,
     }
     out_path.write_text(
         json.dumps(out, ensure_ascii=False, indent=None, separators=(",", ":")) + "\n",
@@ -217,6 +319,7 @@ def main() -> int:
     total_cards = sum(len(l["cards"]) for l in lessons)
     print(
         f"[sync-sheet] wrote {out_path}: {len(lessons)} lessons, {total_cards} cards"
+        + f", {len(dialogues)} dialogues"
         + (f", {len(failures)} failures" if failures else ""),
         flush=True,
     )

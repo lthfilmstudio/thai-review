@@ -14,6 +14,28 @@ SPEC.loader.exec_module(gen_audio)
 
 
 class GenAudioTest(unittest.TestCase):
+    def test_dialogue_turns_are_included_and_reuse_matching_lesson_audio(self):
+        data = {
+            "lessons": [{
+                "title": "初 1",
+                "cards": [{"thai": "สวัสดีค่ะ", "zh": "你好"}],
+            }],
+            "dialogues": [{
+                "id": "D01",
+                "title": "初次見面",
+                "turns": [
+                    {"thai": "สวัสดีค่ะ", "zh": "你好"},
+                    {"thai": "ยินดีที่ได้รู้จัก", "zh": "很高興認識你"},
+                ],
+            }],
+        }
+
+        items, total_cards, _, _ = gen_audio.collect_unique_thai(data)
+        self.assertEqual(total_cards, 3)
+        self.assertEqual([item.thai for item in items], ["สวัสดีค่ะ", "ยินดีที่ได้รู้จัก"])
+        self.assertEqual(items[0].count, 2)
+        self.assertEqual(items[1].lesson, "對話：初次見面")
+
     def test_dry_run_treats_zero_byte_manifest_audio_as_missing(self):
         data = {
             "generated_at": 0,

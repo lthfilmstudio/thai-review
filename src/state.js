@@ -148,6 +148,7 @@ export const DEMO_LESSONS = [
 
 export const state = {
   lessons: [],
+  dialogues: [],             // Sheet「生活對話」分頁同步的固定 6 句情境
   currentLessonId: null,
   mode: 'card',              // 'card' | 'reverse' | 'listen' | 'dialog' | 'srs' | 'today' | 'home'
   lastOpenDate: null,        // localDateKey()；每天第一次打開落首頁用（app.js init()）

@@ -2,7 +2,7 @@
 
 建立：2026-08-19（Asia/Taipei）
 修訂：2026-08-20 — Codex 實作可行性審查（6 項）+ 第二輪拍板（3 項）+ 第三／四輪文字缺口核對（3+4 項），見第 16 節；同日完成 Phase 0.5 上線、Phase 1、Phase 2 實作
-狀態：**Phase 0.5（Telegram 每日提醒）已上線**，14 天觀察期進行中（約至 2026-09-03 檢視方向性訊號，見 13 節）。**Phase 1（新首頁「練功」+ 音感挑戰）已部署**（commit `a167e80`，SW `v71`）。**Phase 2（streak 完整規則 + 連擊複習局）已部署**（commit `56f0c86`，SW `v72`）：`today.js` 的 `runStreakSettlement`/`settleStreakOnOpen`（6.1 節安神保護／補救／回補結算）、`src/game-combo.js`（第 2 局，跨課程到期／弱字）、`achievements.js` 加 `streak100`。剩 Phase 3（對話局 + 進步時刻 + 成就徽章搬視覺）、Phase 4（Web Push）、Phase 5（語音）未實作。
+狀態：**Phase 0.5（Telegram 每日提醒）已上線**，14 天觀察期進行中（約至 2026-09-03 檢視方向性訊號，見 13 節）。**Phase 1（新首頁「練功」+ 音感挑戰）已部署**（commit `a167e80`，SW `v71`）。**Phase 2（streak 完整規則 + 連擊複習局）已部署**（commit `56f0c86`，SW `v72`）。**Phase 3（對話局 + 進步時刻 + 成就徽章搬視覺）已完成**（SW `v75`）：10 組核准生活對話已落進 Sheet 與離線資料，第三局支援逐句與整段重播；進步時刻與 SVG 成就徽章先於 Phase 3A 上線。剩 Phase 4（Web Push）、Phase 5（語音能力）未實作。
 
 ## 1. 產品定位
 

@@ -279,6 +279,7 @@ export function weekSummary(days, now = Date.now()) {
   const out = [];
   let daysCame = 0;
   let reviewedTotal = 0;
+  let dialoguesCompleted = 0;
   for (let i = 0; i < 7; i++) {
     const key = localDateKey(d.getTime());
     const day = days[key];
@@ -286,10 +287,11 @@ export function weekSummary(days, now = Date.now()) {
     const reviewed = day?.reviewed || 0;
     if (came) daysCame++;
     reviewedTotal += reviewed;
+    dialoguesCompleted += (day?.gameIds || []).filter(id => id === 'dialog').length;
     out.push({ key, came, reviewed });
     d.setDate(d.getDate() + 1);
   }
-  return { days: out, daysCame, reviewedTotal };
+  return { days: out, daysCame, reviewedTotal, dialoguesCompleted };
 }
 
 /* ===== 成就 ===== */

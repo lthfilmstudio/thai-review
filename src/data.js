@@ -7,6 +7,8 @@
 
 import { applyTtsPromptsToLesson, applyTtsPromptsToLessons } from './tts-prompts.js';
 
+export const DIALOGUE_SHEET_TITLE = '生活對話';
+
 export function parseCsv(text) {
   const rows = [];
   let row = [];
@@ -42,6 +44,10 @@ const COL_ALIASES = {
   lesson:    ['課程', '課', '堂', 'lesson'],
   start_ms:  ['start_ms', 'start', '開始毫秒', '起始毫秒'],
   end_ms:    ['end_ms', 'end', '結束毫秒'],
+  scenario_id:    ['情境 id', 'scenario id', 'scenario_id'],
+  scenario_title: ['情境名稱', 'scenario title', 'scenario_title'],
+  order:          ['順序', 'order', 'turn'],
+  speaker:        ['說話者', 'speaker'],
 };
 
 function findCol(header, key) {
@@ -91,13 +97,67 @@ function rowsToCards(rows) {
   return cards;
 }
 
-async function fetchCsvCards(url, { force = false } = {}) {
+export function parseDialogueRows(rows) {
+  if (!rows.length) return [];
+  const header = rows[0].map(h => String(h || '').trim().toLowerCase());
+  const keys = ['scenario_id', 'scenario_title', 'order', 'speaker', 'thai', 'karaoke', 'zh'];
+  const indexes = Object.fromEntries(keys.map(key => [key, findCol(header, key)]));
+  const missing = keys.filter(key => indexes[key] < 0);
+  if (missing.length) throw new Error(`生活對話分頁缺少欄位：${missing.join(', ')}`);
+
+  const grouped = new Map();
+  for (const row of rows.slice(1)) {
+    const id = String(row?.[indexes.scenario_id] || '').trim();
+    if (!id) continue;
+    const order = Number(String(row[indexes.order] || '').trim());
+    if (!Number.isInteger(order)) throw new Error(`${id} 有無效順序`);
+    if (!grouped.has(id)) {
+      grouped.set(id, {
+        id,
+        title: String(row[indexes.scenario_title] || '').trim(),
+        turns: [],
+      });
+    }
+    const title = String(row[indexes.scenario_title] || '').trim();
+    if (grouped.get(id).title !== title) throw new Error(`${id} 情境名稱不一致`);
+    grouped.get(id).turns.push({
+      order,
+      speaker: String(row[indexes.speaker] || '').trim(),
+      thai: String(row[indexes.thai] || '').trim(),
+      karaoke: String(row[indexes.karaoke] || '').trim(),
+      zh: String(row[indexes.zh] || '').trim(),
+    });
+  }
+
+  const dialogues = [...grouped.values()];
+  for (const scenario of dialogues) {
+    scenario.turns.sort((a, b) => a.order - b.order);
+    if (scenario.turns.length !== 6) throw new Error(`${scenario.id} 必須是完整 6 句`);
+    if (!scenario.turns.every((turn, index) => turn.order === index + 1)) {
+      throw new Error(`${scenario.id} 順序必須是 1 到 6`);
+    }
+    const expectedSpeakers = ['A', 'B', 'A', 'B', 'A', 'B'];
+    if (!scenario.turns.every((turn, index) => turn.speaker === expectedSpeakers[index])) {
+      throw new Error(`${scenario.id} 必須 A/B 各 3 句並交替`);
+    }
+    if (!scenario.title || scenario.turns.some(turn => !turn.thai || !turn.karaoke || !turn.zh)) {
+      throw new Error(`${scenario.id} 有空白必填欄位`);
+    }
+  }
+  return dialogues;
+}
+
+async function fetchCsvRows(url, { force = false } = {}) {
   const finalUrl = force
     ? url + (url.includes('?') ? '&' : '?') + '_=' + Date.now()
     : url;
   const res = await fetch(finalUrl, force ? { cache: 'no-store' } : {});
   if (!res.ok) throw new Error('HTTP ' + res.status);
-  return rowsToCards(parseCsv(await res.text()));
+  return parseCsv(await res.text());
+}
+
+async function fetchCsvCards(url, { force = false } = {}) {
+  return rowsToCards(await fetchCsvRows(url, { force }));
 }
 
 function extractSheetId(url) {
@@ -141,9 +201,17 @@ export async function loadTabsOnly(input, { force = false } = {}) {
   const res = await fetch(htmlUrl, force ? { cache: 'no-store' } : {});
   if (!res.ok) throw new Error('pubhtml HTTP ' + res.status);
   const html = await res.text();
-  const tabs = parsePubTabs(html);
+  const allTabs = parsePubTabs(html);
+  const dialogueTab = allTabs.find(tab => tab.name === DIALOGUE_SHEET_TITLE) || null;
+  const tabs = allTabs.filter(tab => tab.name !== DIALOGUE_SHEET_TITLE);
   if (!tabs.length) throw new Error('找不到 tab，請確認 Sheet 已「發佈整個文件」');
-  return { baseUrl: base, tabs };
+  return { baseUrl: base, tabs, dialogueTab };
+}
+
+export async function fetchDialogues(baseUrl, tab, { force = false } = {}) {
+  if (!baseUrl || !tab?.gid) return [];
+  const csvUrl = `${baseUrl}/pub?gid=${tab.gid}&single=true&output=csv`;
+  return parseDialogueRows(await fetchCsvRows(csvUrl, { force }));
 }
 
 /* 抓單一 tab 的 cards。 */
@@ -162,7 +230,7 @@ async function loadFromPublishedSheet(pubUrl, { force = false } = {}) {
   const res = await fetch(htmlUrl, force ? { cache: 'no-store' } : {});
   if (!res.ok) throw new Error('pubhtml HTTP ' + res.status);
   const html = await res.text();
-  const tabs = parsePubTabs(html);
+  const tabs = parsePubTabs(html).filter(tab => tab.name !== DIALOGUE_SHEET_TITLE);
   if (!tabs.length) throw new Error('找不到 tab，請確認 Sheet 已「發佈整個文件」');
   // 並行抓所有 tab（28 個 × 300ms 依序 ≈ 10s，並行 <1s）
   const results = await Promise.allSettled(tabs.map(async tab => {
@@ -233,7 +301,7 @@ async function loadSingleCsv(url, { force = false } = {}) {
 /* 方案 0：bundled JSON（GitHub Action 預生成）。
    開 App 預設走這條：同源、CDN cache、< 50ms。
    若 force=true 表示使用者按了「重新同步 Sheet」想要最新資料 → 跳過 bundled、走 live。 */
-export async function loadFromBundledJson() {
+export async function loadBundledData() {
   // base 用相對路徑，讓 GitHub Pages 子目錄部署也能 work
   const url = './data.json?_=' + Date.now(); // 加版本碼避開 SW stale cache
   const res = await fetch(url, { cache: 'no-store' });
@@ -243,12 +311,13 @@ export async function loadFromBundledJson() {
     throw new Error('bundled JSON 格式異常');
   }
   // 規範成跟 loadFromPublishedSheet 一樣的回傳格式：{ id, gid, title, cards }
-  return applyTtsPromptsToLessons(data.lessons.map((l) => ({
+  const lessons = applyTtsPromptsToLessons(data.lessons.map((l) => ({
     id: l.id || ('gid-' + (l.gid || '')),
     gid: l.gid || '',
     title: l.title || '',
     cards: Array.isArray(l.cards) ? l.cards : [],
   })));
+  return { lessons, dialogues: Array.isArray(data.dialogues) ? data.dialogues : [] };
 }
 
 /* 主入口：依輸入型態挑對應方案 */
