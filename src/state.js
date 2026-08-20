@@ -149,7 +149,8 @@ export const DEMO_LESSONS = [
 export const state = {
   lessons: [],
   currentLessonId: null,
-  mode: 'card',              // 'card' | 'reverse' | 'listen' | 'dialog' | 'srs' | 'today'
+  mode: 'card',              // 'card' | 'reverse' | 'listen' | 'dialog' | 'srs' | 'today' | 'home'
+  lastOpenDate: null,        // localDateKey()；每天第一次打開落首頁用（app.js init()）
   srsToggle: false,          // card mode 下「只看待複習」開關（不存 localStorage）
   cardIndex: 0,
   flipped: false,
@@ -195,6 +196,7 @@ export function loadState() {
     state.collapsed = s.collapsed || {};
     state.currentLessonId = s.currentLessonId || null;
     state.mode = s.mode || 'card';
+    state.lastOpenDate = s.lastOpenDate || null;
     state.cardIndex = typeof s.cardIndex === 'number' ? s.cardIndex : 0;
     state.listFilter = s.listFilter || 'all';
     state.listLessonId = s.listLessonId || null;
@@ -241,6 +243,7 @@ export function saveState() {
     collapsed: state.collapsed,
     currentLessonId: state.currentLessonId,
     mode: state.mode,
+    lastOpenDate: state.lastOpenDate,
     cardIndex: state.cardIndex,
     listFilter: state.listFilter,
     listLessonId: state.listLessonId,

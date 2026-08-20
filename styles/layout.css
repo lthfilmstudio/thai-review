@@ -435,8 +435,8 @@
 /* ===== Mobile mode picker ===== */
 .mode-picker-mobile {
   display: flex;
-  gap: 6px;
-  padding: 0 12px 8px;
+  gap: 4px;
+  padding: 0 10px 8px;
 }
 
 @media (min-width: 641px) {
@@ -445,9 +445,9 @@
 
 .mp-btn {
   flex: 1;
-  padding: 8px;
+  padding: 7px 3px;
   border-radius: 9px;
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--text-soft);
   background: var(--surface-soft);
   text-align: center;

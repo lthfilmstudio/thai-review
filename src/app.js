@@ -1,16 +1,17 @@
 /* 入口：init → 載入狀態 → 抓資料 → 綁事件。 */
 
 import {
-  state, loadState, saveState,
+  state, loadState, saveState, localDateKey,
   DEMO_LESSONS, DEFAULT_SHEET_URL,
-  filteredCards, setGrade, shuffleCurrentLesson, isSrsActive,
+  filteredCards, setGrade, shuffleCurrentLesson, isSrsActive, cardKey,
   saveLessonsCache, loadLessonsCache, clearLessonsCache,
   loadManifest, saveManifest, loadLessonCards, saveLessonCards,
   setLastSync, getLastSync, formatLastSync,
   findCardByKey, saveCardEdit, clearCardEdit,
 } from './state.js';
 import { loadLessons, loadTabsOnly, fetchLessonCards, loadFromBundledJson } from './data.js';
-import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements } from './today.js';
+import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds } from './today.js';
+import { recordGrade } from './grade-history.js';
 import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices } from './tts.js';
 import { stopListen } from './listen.js';
@@ -233,6 +234,13 @@ async function selectMode(m) {
     await ensureAllLoaded();
     rerender();
   }
+  if (m === 'home') {
+    const newest = state.lessons[state.lessons.length - 1];
+    if (newest && !newest._loaded) {
+      await ensureLessonLoaded(newest.id, { silentUI: true });
+      rerender();
+    }
+  }
 }
 
 async function selectListMode(order) {
@@ -257,7 +265,9 @@ function nextCard() {
      直接 rerender 自然指到下一張；clamp 防越界
    - 一般 mode：cards 不變，往下一張前進 */
 function gradeAndAdvance(g) {
+  const gradedCard = filteredCards()[state.cardIndex];
   setGrade(state.cardIndex, g);
+  if (gradedCard) recordGrade(gradedCard._cardKey || cardKey(gradedCard), g);
   logReview(g);
   const achvCtx = buildAchievementCtx();
   notifyAchievements(checkAndUnlock(achvCtx), achvCtx);
@@ -488,19 +498,35 @@ async function init() {
   state.lessons = await loadLessonsSmart(onFreshManifest);
 
   const deepLink = parseDeepLinkParam();
+  // 每天第一次打開落首頁；同一天內重開記住上次的 mode。深連結本身就是一次「打開」，
+  // 所以 lastOpenDate 兩種情況都要更新，只有非深連結才會真的落地首頁。
+  const today = localDateKey();
+  const isFirstOpenToday = state.lastOpenDate !== today;
+  state.lastOpenDate = today;
+
   if (deepLink && state.lessons.find(l => l.id === deepLink.lessonId)) {
     // 來自通知的深連結：強制切到那堂課、用字卡 mode 開、關掉 SRS 篩選，
     // 這樣待會才能在 lesson.cards 原始順序裡穩定找到那句話的 index。
     state.currentLessonId = deepLink.lessonId;
     state.mode = 'card';
     state.srsToggle = false;
-  } else if (!state.currentLessonId ||
-      (state.currentLessonId !== '__ALL__' && !state.lessons.find(l => l.id === state.currentLessonId))) {
-    state.currentLessonId = state.lessons[0]?.id || null;
+  } else {
+    if (!state.currentLessonId ||
+        (state.currentLessonId !== '__ALL__' && !state.lessons.find(l => l.id === state.currentLessonId))) {
+      state.currentLessonId = state.lessons[0]?.id || null;
+    }
+    if (isFirstOpenToday) state.mode = 'home';
   }
+  saveState();
 
   // lazy 模式：確保當前課程的卡片已載入
   await ensureLessonLoaded(state.currentLessonId, { silentUI: false });
+
+  // 首頁需要最新一堂課的卡片，不一定跟目前選中的課程是同一堂
+  if (state.mode === 'home') {
+    const newest = state.lessons[state.lessons.length - 1];
+    if (newest) await ensureLessonLoaded(newest.id, { silentUI: true });
+  }
 
   if (deepLink) {
     const idx = filteredCards().findIndex(c => c.thai === deepLink.thai);
@@ -725,8 +751,8 @@ async function init() {
       return;
     }
 
-    // 今日 mode 沒有當前卡片，卡片快捷鍵（翻面 / 評分 / 換卡）不適用
-    if (state.mode === 'today') return;
+    // 今日 / 練功 mode 沒有當前卡片，卡片快捷鍵（翻面 / 評分 / 換卡）不適用
+    if (state.mode === 'today' || state.mode === 'home') return;
 
     if (e.key === 'ArrowLeft') prevCard();
     else if (e.key === 'ArrowRight') nextCard();
@@ -843,7 +869,7 @@ async function init() {
     const dx = t.clientX - tx;
     const dy = t.clientY - ty;
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      if (state.mode === 'today') return;   // 今日 mode 沒有卡片可滑
+      if (state.mode === 'today' || state.mode === 'home') return;   // 今日／練功 mode 沒有卡片可滑
       if (state.mode === 'listen') stopListen();
       if (dx > 0) prevCard(); else nextCard();
     }
@@ -851,6 +877,13 @@ async function init() {
 
   // 預熱 TTS voices
   warmupVoices();
+
+  // 今日累積時間：每 15 秒記一次，分頁在背景時跳過。最多掉尾數 15 秒，
+  // 換掉整套 flush-on-unload 邏輯，划算（只記錄不設目標，見設計書 3 節）。
+  setInterval(() => {
+    if (document.hidden) return;
+    addActiveSeconds(15);
+  }, 15000);
 
   // Service worker
   if ('serviceWorker' in navigator) {

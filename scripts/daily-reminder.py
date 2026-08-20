@@ -60,6 +60,10 @@ def pick_sentence(lessons: list[dict], today: str) -> tuple[dict, dict] | None:
         candidates = [c for c in lesson.get("cards", []) if thai_char_count(c.get("thai", "")) >= MIN_THAI_CHARS]
         if not candidates:
             continue
+        # 依 thai 排序後再取 index：App 端首頁（home.js pickDailySentence）算同一句時
+        # 讀的是 client 端的 lesson.cards，可能被 shuffleCurrentLesson() 打亂過順序；
+        # 兩邊都先排序，選句結果才會跟來源陣列順序無關、彼此對得起來。
+        candidates.sort(key=lambda c: c.get("thai", ""))
         seed = f"{today}:{lesson.get('id', lesson.get('title', ''))}"
         idx = int(hashlib.sha256(seed.encode()).hexdigest(), 16) % len(candidates)
         return lesson, candidates[idx]

@@ -52,6 +52,29 @@ export function logReview(gradeStr, ts = Date.now()) {
   saveDailyLog(log);
 }
 
+/* 完成一局遊戲時記一筆。跟 reviewed 分開欄位、刻意不動 reviewed——
+   那個欄位還餵著月曆熱度、maxDailyReviewed、totalReviewed 三個成就判定，
+   混寫會讓「單日複習 50 張」「千張複習」的語意歪掉（見設計書 11.3）。 */
+export function logGame(ts = Date.now()) {
+  const log = loadDailyLog();
+  const key = localDateKey(ts);
+  const day = { reviewed: 0, again: 0, hard: 0, good: 0, easy: 0, games: 0, seconds: 0, ...(log.days[key] || {}) };
+  day.games = (day.games || 0) + 1;
+  log.days[key] = day;
+  saveDailyLog(log);
+}
+
+/* 累積今天實際活動秒數（app.js 的 15 秒 ticker 呼叫）。只記錄，不設目標。 */
+export function addActiveSeconds(sec, ts = Date.now()) {
+  if (!(sec > 0)) return;
+  const log = loadDailyLog();
+  const key = localDateKey(ts);
+  const day = { reviewed: 0, again: 0, hard: 0, good: 0, easy: 0, games: 0, seconds: 0, ...(log.days[key] || {}) };
+  day.seconds = (day.seconds || 0) + sec;
+  log.days[key] = day;
+  saveDailyLog(log);
+}
+
 /* 一次性回填：progress 只存每張卡最後一次 reviewedAt，回填是下限值，比一片空白好。 */
 export function initDailyLog(progress) {
   const log = loadDailyLog();
@@ -75,13 +98,18 @@ export function initDailyLog(progress) {
 
 /* ===== Streak ===== */
 
+/* 「今天有來」＝正式複習過，或完成過一局遊戲（見設計書 6 節／11.3）。 */
+function cameOnDay(day) {
+  return !!(day && (day.reviewed > 0 || day.games > 0));
+}
+
 /* 連續複習天數。今天還沒複習不算斷（從昨天起算）；用 Date 遞減避開時制邊界。 */
 export function streakDays(days, now = Date.now()) {
   let n = 0;
   const d = new Date(now);
   d.setHours(0, 0, 0, 0);
-  if (!(days[localDateKey(d.getTime())]?.reviewed > 0)) d.setDate(d.getDate() - 1);
-  while (days[localDateKey(d.getTime())]?.reviewed > 0) {
+  if (!cameOnDay(days[localDateKey(d.getTime())])) d.setDate(d.getDate() - 1);
+  while (cameOnDay(days[localDateKey(d.getTime())])) {
     n++;
     d.setDate(d.getDate() - 1);
   }
@@ -113,6 +141,29 @@ export function heatLevel(n) {
   if (n >= 5) return 2;
   if (n >= 1) return 1;
   return 0;
+}
+
+/* 本週（週一起算）每天的來訪／複習彙總，給首頁「本週進度」用。 */
+export function weekSummary(days, now = Date.now()) {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  const dow = (d.getDay() + 6) % 7; // 週一=0
+  d.setDate(d.getDate() - dow);
+
+  const out = [];
+  let daysCame = 0;
+  let reviewedTotal = 0;
+  for (let i = 0; i < 7; i++) {
+    const key = localDateKey(d.getTime());
+    const day = days[key];
+    const came = cameOnDay(day);
+    const reviewed = day?.reviewed || 0;
+    if (came) daysCame++;
+    reviewedTotal += reviewed;
+    out.push({ key, came, reviewed });
+    d.setDate(d.getDate() + 1);
+  }
+  return { days: out, daysCame, reviewedTotal };
 }
 
 /* ===== 成就 ===== */
@@ -273,6 +324,7 @@ function renderCalendarHtml(log) {
   for (let day = 1; day <= daysInMonth; day++) {
     const key = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const reviewed = log.days[key]?.reviewed || 0;
+    const games = log.days[key]?.games || 0;
     const due = forecast[key] || 0;
     const isToday = key === todayKey;
     const isPast = key < todayKey;
@@ -281,6 +333,8 @@ function renderCalendarHtml(log) {
     if (isToday) cls.push('today');
     const heat = heatLevel(reviewed);
     if (heat && (isPast || isToday)) cls.push('past', 'heat-' + heat);
+    // 只玩遊戲沒做正式複習：有來但沒有 heat 色塊，用描邊區分（設計書 6.2）
+    if (!heat && games > 0 && (isPast || isToday)) cls.push('past', 'game-only');
 
     let n = '';
     if ((isPast || isToday) && reviewed > 0) n = `<span class="cal-n">${reviewed}</span>`;
