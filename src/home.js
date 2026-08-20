@@ -9,6 +9,7 @@ import { escapeHtml } from './ui.js';
 import {
   loadDailyLog, streakDays, weekSummary,
   getProtectionCount, getMakeupPending, buildAchievementCtx, notifyAchievements,
+  renderAchievementsHtml,
 } from './today.js';
 import { checkAndUnlock } from './achievements.js';
 import * as listenGame from './game-listen.js';
@@ -170,6 +171,8 @@ export function renderHomeMode(el, rerender) {
         <div class="home-week-stats">來過 <strong>${week.daysCame} / 7</strong> 天 · 複習 <strong>${week.reviewedTotal}</strong> 張</div>
         ${renderWeekChip(week)}
       </div>
+
+      ${renderAchievementsHtml(achvCtx)}
 
       <div class="home-sentence" id="homeSentenceBox">
         <div class="home-sentence-label">今日一句</div>

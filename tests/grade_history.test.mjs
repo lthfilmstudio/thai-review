@@ -10,6 +10,8 @@ globalThis.localStorage = {
 
 const { recordGrade, loadGradeHistory } = await import('../src/grade-history.js');
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 test('records a grade and keeps timestamp in seconds', () => {
   stored.clear();
   recordGrade('L1:a', 'good', 1_700_000_000_000);
@@ -60,4 +62,43 @@ test('corrupted localStorage falls back to an empty history without throwing', (
   assert.doesNotThrow(() => recordGrade('L1:a', 'good', 1));
   const h = loadGradeHistory();
   assert.equal(h.cards['L1:a'].length, 1);
+});
+
+test('improvement moment fires when the previous grade was again at least 14 days ago', () => {
+  stored.clear();
+  const now = 1_800_000_000_000;
+  recordGrade('L1:a', 'again', now - 14 * DAY_MS);
+  assert.equal(recordGrade('L1:a', 'good', now), true);
+
+  stored.clear();
+  recordGrade('L1:a', 'again', now - 14 * DAY_MS);
+  assert.equal(recordGrade('L1:a', 'easy', now), true);
+});
+
+test('improvement moment does not fire before 14 days or from a non-again grade', () => {
+  stored.clear();
+  const now = 1_800_000_000_000;
+  recordGrade('L1:a', 'again', now - 14 * DAY_MS + 1000);
+  assert.equal(recordGrade('L1:a', 'good', now), false);
+
+  stored.clear();
+  recordGrade('L1:a', 'hard', now - 20 * DAY_MS);
+  assert.equal(recordGrade('L1:a', 'good', now), false);
+});
+
+test('improvement moment only uses the latest prior grade so it does not repeat', () => {
+  stored.clear();
+  const now = 1_800_000_000_000;
+  recordGrade('L1:a', 'again', now - 20 * DAY_MS);
+  recordGrade('L1:a', 'good', now - DAY_MS);
+  assert.equal(recordGrade('L1:a', 'good', now), false);
+});
+
+test('improvement moment ignores missing history and grades below good', () => {
+  stored.clear();
+  const now = 1_800_000_000_000;
+  assert.equal(recordGrade('L1:a', 'good', now), false);
+  recordGrade('L1:a', 'again', now - 20 * DAY_MS);
+  assert.equal(recordGrade('L1:a', 'again', now), false);
+  assert.equal(recordGrade('L1:a', 'hard', now), false);
 });

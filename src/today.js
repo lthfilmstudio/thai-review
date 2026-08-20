@@ -3,7 +3,7 @@
 
 import { state, allCardsWithLessonId, cardKey, getDueCount, localDateKey } from './state.js';
 import { cardStatus, normalizeGrade } from './srs.js';
-import { ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel } from './achievements.js';
+import { ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel, achievementIconSvg } from './achievements.js';
 import { accuracyTrend, averageAccuracy, weakLessons, weakestCards } from './stats.js';
 import { escapeHtml } from './ui.js';
 
@@ -349,17 +349,19 @@ export function showToast(msg, ms = 3200) {
   toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
-/* 新解鎖成就的浮動提示；沒有新解鎖時不做事。 */
-export function notifyAchievements(justUnlocked, ctx) {
-  if (!justUnlocked.length) return;
-  showToast(justUnlocked.map(d => `${d.icon} 解鎖成就：${achievementLabel(d, ctx)}`).join('\n'));
+/* 新解鎖成就與同一次操作附帶訊息共用一則浮動提示。 */
+export function notifyAchievements(justUnlocked, ctx, extraMessage = '') {
+  if (!justUnlocked.length && !extraMessage) return;
+  const messages = justUnlocked.map(d => `解鎖成就：${achievementLabel(d, ctx)}`);
+  if (extraMessage) messages.push(extraMessage);
+  if (messages.length) showToast(messages.join('\n'));
 }
 
-function renderAchievementsHtml(ctx) {
+export function renderAchievementsHtml(ctx) {
   const unlocked = loadUnlocked();
   const badges = ACHIEVEMENT_DEFS.map(def => {
     const on = !!unlocked[def.id];
-    return `<span class="achv-badge${on ? ' on' : ''}" title="${achievementLabel(def, ctx)}">${def.icon}</span>`;
+    return `<span class="achv-badge${on ? ' on' : ''}" title="${escapeHtml(achievementLabel(def, ctx))}">${achievementIconSvg(def)}</span>`;
   }).join('');
   return `
     <div class="achv-row">
@@ -525,7 +527,6 @@ export function renderTodayMode(el) {
         </div>
       </div>
       ${renderCalendarHtml(log)}
-      ${renderAchievementsHtml(achvCtx)}
     `;
 
   el.innerHTML = `

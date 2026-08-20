@@ -268,11 +268,16 @@ function nextCard() {
    - 一般 mode：cards 不變，往下一張前進 */
 function gradeAndAdvance(g) {
   const gradedCard = filteredCards()[state.cardIndex];
+  const gradedCardKey = gradedCard ? (gradedCard._cardKey || cardKey(gradedCard)) : '';
   setGrade(state.cardIndex, g);
-  if (gradedCard) recordGrade(gradedCard._cardKey || cardKey(gradedCard), g);
+  const improvementMoment = gradedCard ? recordGrade(gradedCardKey, g) : false;
   logReview(g);
   const achvCtx = buildAchievementCtx();
-  notifyAchievements(checkAndUnlock(achvCtx), achvCtx);
+  notifyAchievements(
+    checkAndUnlock(achvCtx),
+    achvCtx,
+    improvementMoment ? '這句你上次不會，現在會了。' : '',
+  );
   state.flipped = false;
   if (isSrsActive()) {
     const cards = filteredCards();

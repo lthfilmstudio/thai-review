@@ -1880,11 +1880,11 @@
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  font-size: 16px;
-  filter: grayscale(1);
+  color: var(--text-mute);
   opacity: 0.35;
 }
-.achv-badge.on { filter: none; opacity: 1; background: rgba(197, 160, 89, 0.14); }
+.achv-badge svg { width: 18px; height: 18px; }
+.achv-badge.on { color: var(--gold); opacity: 1; background: rgba(197, 160, 89, 0.14); }
 
 .achv-count {
   margin-left: auto;

@@ -8,7 +8,9 @@ globalThis.localStorage = {
   removeItem(key) { stored.delete(key); },
 };
 
-const { ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel } = await import('../src/achievements.js');
+const {
+  ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel, achievementIconSvg,
+} = await import('../src/achievements.js');
 
 function baseCtx(overrides = {}) {
   return {
@@ -92,4 +94,14 @@ test('streak100 unlocks once streak reaches 100, independent of streak7/30', () 
   const ids = unlocked.map(d => d.id).sort();
   // 一次跨過 7/30/100 三個門檻，三個都該一起解鎖
   assert.deepEqual(ids, ['streak100', 'streak30', 'streak7']);
+});
+
+test('every achievement renders an SVG line icon without emoji glyphs', () => {
+  const emojiGlyphs = /[🔥📅🎓📚🌟🎯]/u;
+  for (const def of ACHIEVEMENT_DEFS) {
+    const svg = achievementIconSvg(def);
+    assert.match(svg, /^<svg\b/);
+    assert.match(svg, /stroke="currentColor"/);
+    assert.equal(emojiGlyphs.test(svg), false);
+  }
 });
