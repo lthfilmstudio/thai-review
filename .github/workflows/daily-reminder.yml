@@ -1,0 +1,30 @@
+name: Daily Reminder → Telegram
+
+on:
+  schedule:
+    # 22:00 Asia/Taipei = 14:00 UTC；用 :07 避開整點 GitHub Actions 塞車
+    # （跟 sync-sheet.yml 同一慣例，見 memory feedback_github_actions_cron_rush_hour.md）
+    - cron: "7 14 * * *"
+  workflow_dispatch: # 手動測試用
+
+permissions:
+  contents: read
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Send daily reminder
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 scripts/daily-reminder.py

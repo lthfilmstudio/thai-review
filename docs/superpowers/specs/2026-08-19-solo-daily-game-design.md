@@ -2,7 +2,7 @@
 
 建立：2026-08-19（Asia/Taipei）
 修訂：2026-08-20 — Codex 實作可行性審查（6 項）+ 第二輪拍板（3 項）+ 第三／四輪文字缺口核對（3+4 項），見第 16 節
-狀態：**規格完成，無擋道待確認事項，Phase 0.5 可開工。** 尚未實作、尚未部署。
+狀態：**Phase 0.5 code 已寫完待部署**（`scripts/daily-reminder.py` + `.github/workflows/daily-reminder.yml`），還缺 Telegram bot token 才能上線；Phase 1 起尚未實作。
 
 ## 1. 產品定位
 
@@ -153,7 +153,7 @@ C 案的實作要點：
 
 - **每日提醒**（固定時間，時間可設定）：把「今日一句」的泰文本文 + 中文意思放進通知本文，末尾附 App 連結。這樣就算沒點進去，光看通知也學到一句；同時製造期待感（下一則會是哪句？）。
   - ⚠️ **通知裡不能放「今天有 N 張到期」**：SRS 進度只活在瀏覽器 localStorage 的 `state.progress`（`src/state.js:156`），而且經核實**沒有任何外送路徑**——沒有 server 同步、沒有上傳。外部的 Telegram bot 或 Cloudflare Worker 拿不到這個數字。到期張數只能留在 App 首頁顯示。要讓通知帶到期數，前提是先做「進度上傳」，那是另一個等級的工程（隱私、認證、衝突處理），第一版不做。
-  - **今日一句的資料來源**：App 本體在 Cloudflare Access 後面，外部抓不到 `data.json`。但 **Google Sheet 是 publish-to-web**，發送端直接讀 Sheet 取最新一堂的句子即可（跟 `scripts/sync-sheet.py` 同一個來源）。
+  - **今日一句的資料來源（實作時再簡化一層，2026-08-20）**：App 本體在 Cloudflare Access 後面，外部抓不到線上那份 `data.json`。但 `data.json` 本身是**明文 commit 進這個 repo**的靜態檔（`sync-sheet.py` 每 30 分鐘更新），GitHub Actions checkout 這個 repo 時就直接讀得到——**不用另外重讀 Sheet**，比原設計少一次網路請求跟一份重複的解析邏輯。實作見 `scripts/daily-reminder.py` + `.github/workflows/daily-reminder.yml`。
   - **挑句規則（2026-08-20 修正，原「`type` 非 `word`」規則有 bug）**：初稿寫「跳過 `type` 是 `word` 的」，但核實 `data.json` 發現**「中 2-4」296 張卡的 `type` 100% 是 `word`**，而且 `sync-sheet.py:139` 缺欄位時本來就預設成 `"word"`——照原規則篩，最新這堂課會**一句都選不出來**。改成純長度門檻：**泰文字元數 ≥ 15** 才算整句（該堂課中位數 13、105/296 張達標，門檻可用）。`type` 欄位不可靠，不當篩選依據。
 - **新課事件**：Sheet 同步（現有 GitHub Action 每 30 分鐘跑）偵測到新分頁時推「這週的新課上了，X 個新句子」。事件驅動比每天固定嘮叨有力得多，因為真的有新東西。這也正是這個 App 對 Duolingo 的獨特優勢——**內容是這禮拜老師剛教的，不是通用教材**。
 - **里程碑**：連續 7 / 30 / 100 天達成時推一則慶祝。
@@ -378,11 +378,13 @@ C 案的實作要點：
 - SVG 線稿圖示與低彩度遊戲感。
 - 手機版底部導覽列（今日／複習／課程／我的）先與現有左側 drawer 並存，不取代。
 
-### Phase 0.5：只做提醒，先驗證假設
+### Phase 0.5：只做提醒，先驗證假設（**code 已寫完，待接 bot token**）
 
 **跟 App 完全解耦，不動任何前端 code**，所以可以馬上開工、也不擋 Phase 1。
 
-- Telegram bot 每天 **22:00（Asia/Taipei，2026-08-20 拍板）** 推一則：**今日一句（泰文 + 中文）+ App 連結**。資料直接讀 publish-to-web 的 Google Sheet（見 5.3），不碰 App。
+- Telegram bot 每天 **22:00（Asia/Taipei，2026-08-20 拍板；實際 cron 14:07 UTC＝22:07，避開整點塞車，跟 `sync-sheet.yml` 同慣例）** 推一則：**今日一句（泰文 + 中文）+ App 連結**。資料讀本 repo 的 `data.json`（見 5.3），不碰 App、不重新讀 Sheet。
+- **實作**：`scripts/daily-reminder.py`（挑句 + 送 Telegram）+ `.github/workflows/daily-reminder.yml`（排程）。已用真實 `data.json` 做過選句邏輯的本地測試（跨天選不同句、同天重跑選同一句、找不到合格句子時跨課回退、空資料與全不合格的邊界情況都不會崩潰）。
+- **待辦（擋上線，不擋寫 code）**：開一支新的專屬 Telegram bot（Nalin 透過 @BotFather）、把 token 與 chat id 存進 GitHub repo Secrets（`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`）。
 - **不放到期張數**（拿不到，理由見 5.3）。
 - 先跑 **14 天**。
 - **方向性訊號（2026-08-20 修正：不叫「成功標準」，因為沒有可信的數字門檻）**：拿**現有的每日日誌**（`thai-review-daily-v1`，就是月曆熱度的資料來源）做前後對照——
