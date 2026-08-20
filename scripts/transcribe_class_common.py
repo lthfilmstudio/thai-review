@@ -38,6 +38,9 @@ MIN_FREE_HEADROOM = 64 * 1024 * 1024
 MAX_RESPONSE_BYTES = 128 * 1024 * 1024
 MAX_HEADER_BYTES = 64 * 1024
 SCRIBE_TIMEOUT_SECONDS = 7200
+# use_speaker_library=True 要求 ElevenLabs 帳號的 Speech to Text → Speakers 已登記
+# 對應講者（老師 "Kru NuLek" / speaker_id "kru-nulek"，2026-08-20 註冊）；
+# 沒登記過的講者依然回傳匿名 speaker_N，不影響既有的多講者流程。
 SCRIBE_REQUEST_CONTRACT = {
     "model_id": "scribe_v2",
     "language_code": None,
@@ -47,7 +50,7 @@ SCRIBE_REQUEST_CONTRACT = {
     "use_multi_channel": False,
     "no_verbatim": False,
     "detect_speaker_roles": False,
-    "use_speaker_library": False,
+    "use_speaker_library": True,
     "keyterms": [],
     "entity_detection": None,
 }

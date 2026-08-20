@@ -359,7 +359,7 @@ class PaidGateTest(unittest.TestCase):
             self.assertIn("tag_audio_events=false", forms)
             self.assertIn("use_multi_channel=false", forms)
             self.assertIn("detect_speaker_roles=false", forms)
-            self.assertIn("use_speaker_library=false", forms)
+            self.assertIn("use_speaker_library=true", forms)
             self.assertFalse(any(form.startswith("speaker_roles=") for form in forms))
             self.assertFalse(any(form.startswith("speaker_library=") for form in forms))
             self.assertFalse(any(form.startswith("keyterms=") for form in forms))
@@ -488,7 +488,7 @@ class PaidGateTest(unittest.TestCase):
             self.assertEqual(job["state"], "needs_tsv_review")
             request = job["approval"]["request"]
             self.assertIs(request["detect_speaker_roles"], False)
-            self.assertIs(request["use_speaker_library"], False)
+            self.assertIs(request["use_speaker_library"], True)
             self.assertEqual(request["keyterms"], [])
             self.assertIsNone(request["entity_detection"])
             self.assertNotIn("speaker_roles", request)
