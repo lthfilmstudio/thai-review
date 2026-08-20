@@ -16,7 +16,7 @@ import {
 import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds, settleStreakOnOpen, showToast } from './today.js';
 import { recordGrade } from './grade-history.js';
 import { checkAndUnlock } from './achievements.js';
-import { getListenLog, speakCard, warmupVoices } from './tts.js';
+import { getListenLog, speakCard, warmupVoices, preloadRealAudioAvailability } from './tts.js';
 import { stopListen } from './listen.js';
 import { exitDialogueGame } from './game-dialogue.js';
 import {
@@ -218,6 +218,7 @@ async function loadLessonsSmart(onFresh, { force = false } = {}) {
 }
 
 function rerender() {
+  preloadRealAudioAvailability(state.currentLessonId, rerender);
   renderSidebar(selectLesson);
   renderTopbarTitle();
   renderContent(rerender);

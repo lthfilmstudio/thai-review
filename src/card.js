@@ -3,7 +3,7 @@
    reverse=true：中文在正面、泰文在背面。 */
 
 import { state, isFavorite, toggleFavorite, srsEntryOf } from './state.js';
-import { speakCard } from './tts.js';
+import { speakCard, zhLessonIdOf, hasRealAudio, getRealAudioUrl } from './tts.js';
 import { escapeHtml } from './ui.js';
 import { wireSentenceButton, SVG_SPARK_ICON } from './sentence.js';
 import { nextReview, formatNextReview } from './srs.js';
@@ -14,6 +14,7 @@ const SVG_CHEV_L = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" 
 const SVG_CHEV_R = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
 const SVG_EXT = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>';
 const SVG_EDIT = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+const SVG_REAL_AUDIO = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15 4 9"/><path d="M16 8a5 5 0 0 1 0 8"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
 const SVG_STAR_OUTLINE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
 const SVG_STAR_FILLED = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
 
@@ -77,6 +78,9 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
   const previewGood = formatNextReview(nextReview('good', cur).interval);
   const previewEasy = formatNextReview(nextReview('easy', cur).interval);
 
+  const realAudioLessonId = zhLessonIdOf(card);
+  const showRealAudio = hasRealAudio(card.thai, realAudioLessonId);
+
   const showReviewHint = state.mode === 'card' || state.mode === 'reverse';
   const dueCount = Number(opts.dueCount || 0);
   const reviewHint = dueCount > 0
@@ -108,6 +112,11 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
           ${backBody(card, reverse)}
           <div class="back-actions">
             <button class="play-btn" id="playBack" aria-label="播放">${SVG_PLAY}</button>
+            ${showRealAudio ? `
+              <button class="yg-btn real-audio-btn" id="realAudioBtn" aria-label="播放老師課堂原音">
+                ${SVG_REAL_AUDIO}<span>課堂原音</span>
+              </button>
+            ` : ''}
             <a class="yg-btn" href="${youglishUrl(card.thai)}" target="_blank" rel="noopener noreferrer" aria-label="在 YouGlish 聽真人發音">
               ${SVG_EXT}<span>聽真人</span>
             </a>
@@ -152,6 +161,7 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
   stage.addEventListener('click', e => {
     if (
       e.target.closest('.play-btn') ||
+      e.target.closest('.real-audio-btn') ||
       e.target.closest('.yg-btn') ||
       e.target.closest('.sent-btn') ||
       e.target.closest('.edit-card-btn') ||
@@ -164,6 +174,18 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
   document.getElementById('playBack')?.addEventListener('click', e => {
     e.stopPropagation();
     speakCard(card);
+  });
+
+  // 課堂原音：獨立 <audio>，不共用 tts.js 的 sharedAudio（那個是自動播放鏈專用的
+  // 狀態機，這裡只是手動點一次播放，混用會互搶播放狀態）。
+  document.getElementById('realAudioBtn')?.addEventListener('click', async e => {
+    e.stopPropagation();
+    const url = await getRealAudioUrl(card.thai, realAudioLessonId);
+    if (!url) {
+      console.warn('課堂原音載入失敗：', card.thai);
+      return;
+    }
+    new Audio(url).play().catch(() => {});
   });
 
   // AI 造句：傳卡片的泰文當 word；按下去 fetch、render；不影響翻面

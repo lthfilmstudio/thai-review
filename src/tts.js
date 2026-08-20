@@ -6,6 +6,7 @@
 
 import { state } from './state.js';
 import { buildZhLessonIndex, lookupZhSegment, sliceRange } from './zh-sprite.js';
+import { buildRealLessonIndex, lookupRealSegment } from './real-audio.js';
 import { stretchAudioBuffer } from './audio-stretch.js';
 
 const WORKER_URL = 'https://thai-tts.lthfilmstudio.workers.dev/tts';
@@ -287,6 +288,108 @@ export async function getZhAudioUrl(zhText, lessonId) {
   const buf = await getZhAudioBuffer(zhText, lessonId);
   const url = buf ? URL.createObjectURL(encodeWav(buf)) : null;
   if (url) zhUrlCache.set(key, url);
+  return url;
+}
+
+/* ===== 課堂真人語音（real audio sprite） =====
+   試點：scripts/build-real-audio.py 從老師課堂錄音切出的真人語音合輯，
+   卡片背面「聽真人」按鈕優先用這個，查無資料才 fallback YouGlish（card.js）。
+   刻意獨立於 zh sprite 的 cache／manifest，欄位語意不同（key 是 thai 原文）。
+   目前只有試點課次有資料，其餘課次的 manifest 查不到 lessonId 就是正常狀況。 */
+
+const REAL_MANIFEST_URL = 'real-manifest.json';
+let realManifestPromise = null;
+const realTimingCache = new Map();       // lessonId → Promise<timing|null>
+const realShardCache = new Map();        // part URL → Promise<AudioBuffer|null>（LRU 2）
+const realUrlCache = new Map();          // lessonId|thai → blob URL
+const realKnownThaiCache = new Map();    // lessonId → Set<thai>（已解析完成的課次，給 UI 同步查有沒有音檔）
+
+function loadRealManifest() {
+  if (!realManifestPromise) {
+    realManifestPromise = fetch(REAL_MANIFEST_URL)
+      .then(res => (res.ok ? res.json() : null))
+      .then(buildRealLessonIndex)
+      .catch(() => new Map());
+  }
+  return realManifestPromise;
+}
+
+function loadRealTiming(lessonId) {
+  if (!realTimingCache.has(lessonId)) {
+    realTimingCache.set(lessonId, loadRealManifest().then(index => {
+      const entry = index.get(lessonId);
+      if (!entry?.timing) return null;
+      return fetch(entry.timing).then(res => (res.ok ? res.json() : null)).catch(() => null);
+    }));
+  }
+  return realTimingCache.get(lessonId);
+}
+
+function loadRealShard(url) {
+  if (realShardCache.has(url)) {
+    const hit = realShardCache.get(url);
+    realShardCache.delete(url);
+    realShardCache.set(url, hit);
+    return hit;
+  }
+  const promise = fetch(url)
+    .then(res => {
+      if (!res.ok) throw new Error(`real-audio shard ${res.status}`);
+      return res.arrayBuffer();
+    })
+    .then(bytes => getZhSliceCtx().decodeAudioData(bytes))
+    .catch(() => null);
+  realShardCache.set(url, promise);
+  while (realShardCache.size > 2) {
+    realShardCache.delete(realShardCache.keys().next().value);
+  }
+  return promise;
+}
+
+/* 課次的真人語音索引還沒抓過就先抓一次（不 await），抓到之後叫 onReady()
+   讓呼叫端（app.js 的 rerender）重畫，UI 才會補上原本因為還沒查到而沒顯示
+   的按鈕。已經抓過的課次直接跳過，重複呼叫零成本。 */
+export function preloadRealAudioAvailability(lessonId, onReady) {
+  if (!lessonId || realKnownThaiCache.has(lessonId)) return;
+  loadRealTiming(lessonId).then(timing => {
+    realKnownThaiCache.set(lessonId, new Set(Object.keys(timing?.items || {})));
+    onReady?.();
+  });
+}
+
+/* 同步查詢，給 card.js render 用；還沒 preload 過的課次一律當作沒有（false），
+   等 preloadRealAudioAvailability 解析完、rerender 一次自然補上。 */
+export function hasRealAudio(thaiText, lessonId) {
+  return !!realKnownThaiCache.get(lessonId)?.has(String(thaiText || '').trim());
+}
+
+export async function getRealAudioBuffer(thaiText, lessonId) {
+  const trimmed = (thaiText || '').trim();
+  if (!trimmed || !lessonId || typeof OfflineAudioContext === 'undefined') return null;
+  try {
+    const timing = await loadRealTiming(lessonId);
+    const seg = lookupRealSegment(timing, trimmed);
+    if (!seg) return null;
+    const fileUrl = timing.files?.[seg.fileIdx];
+    if (!fileUrl) return null;
+    const shard = await loadRealShard(fileUrl);
+    if (!shard) return null;
+    const { offset, length } = sliceRange(seg.startMs, seg.durMs, shard.sampleRate, shard.length);
+    if (!length) return null;
+    const out = getZhSliceCtx().createBuffer(1, length, shard.sampleRate);
+    out.copyToChannel(shard.getChannelData(0).subarray(offset, offset + length), 0);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+export async function getRealAudioUrl(thaiText, lessonId) {
+  const key = `${lessonId}|${(thaiText || '').trim()}`;
+  if (realUrlCache.has(key)) return realUrlCache.get(key);
+  const buf = await getRealAudioBuffer(thaiText, lessonId);
+  const url = buf ? URL.createObjectURL(encodeWav(buf)) : null;
+  if (url) realUrlCache.set(key, url);
   return url;
 }
 
