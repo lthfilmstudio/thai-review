@@ -1,8 +1,8 @@
 # 清心安神：單人每日練功架構草案
 
 建立：2026-08-19（Asia/Taipei）
-修訂：2026-08-20 — Codex 實作可行性審查（6 項）+ 第二輪拍板（3 項）+ 第三／四輪文字缺口核對（3+4 項），見第 16 節
-狀態：**Phase 0.5 code 已寫完待部署**（`scripts/daily-reminder.py` + `.github/workflows/daily-reminder.yml`），還缺 Telegram bot token 才能上線；Phase 1 起尚未實作。
+修訂：2026-08-20 — Codex 實作可行性審查（6 項）+ 第二輪拍板（3 項）+ 第三／四輪文字缺口核對（3+4 項），見第 16 節；同日完成 Phase 0.5 上線與 Phase 1 實作
+狀態：**Phase 0.5（Telegram 每日提醒）已上線**，14 天觀察期進行中（約至 2026-09-03 檢視方向性訊號，見 13 節）。**Phase 1（新首頁「練功」+ 每日紀錄擴充 + 音感挑戰）已實作並部署**（commit `a167e80`，SW `v71`）：新首頁落地邏輯、`today.js` 的 `games`/`seconds` 欄位與月曆遊戲日描邊、`src/home.js` + `src/game-listen.js` + `src/grade-history.js`。streak 完整規則（6.1 結算順序、安神保護）與跨課連擊局留到 Phase 2。
 
 ## 1. 產品定位
 
