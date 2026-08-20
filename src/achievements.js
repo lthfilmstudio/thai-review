@@ -13,7 +13,7 @@ export const ACHIEVEMENT_DEFS = [
   {
     id: 'allGraded',
     iconId: 'book',
-    label: ctx => `${ctx.totalCards} 張全上手`,
+    label: ctx => ctx.allLessonsLoaded === false ? '全部卡片上手' : `${ctx.totalCards} 張全上手`,
     check: ctx => ctx.allLessonsLoaded && ctx.totalCards > 0 && ctx.gradedCards >= ctx.totalCards,
   },
   { id: 'cumulative1000', iconId: 'star', label: '千張複習', check: ctx => ctx.totalReviewed >= 1000 },

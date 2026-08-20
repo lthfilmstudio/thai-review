@@ -53,7 +53,10 @@ test('allGraded requires every card graded, label reflects current total', () =>
 
 test('allGraded does not unlock while the deck is only partially loaded', () => {
   stored.clear();
-  assert.equal(checkAndUnlock(baseCtx({ gradedCards: 100, allLessonsLoaded: false })).length, 0);
+  const ctx = baseCtx({ gradedCards: 100, allLessonsLoaded: false });
+  assert.equal(checkAndUnlock(ctx).length, 0);
+  const def = ACHIEVEMENT_DEFS.find(d => d.id === 'allGraded');
+  assert.equal(achievementLabel(def, ctx), '全部卡片上手');
 });
 
 test('cumulative1000 and daily50 are independent of streak/grading', () => {

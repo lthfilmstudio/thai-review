@@ -8,17 +8,57 @@ globalThis.localStorage = {
   removeItem(key) { stored.delete(key); },
 };
 
+const toastElements = new Map();
+globalThis.document = {
+  getElementById(id) { return toastElements.get(id); },
+  createElement() {
+    return {
+      classList: { add() {}, remove() {} },
+      id: '', className: '', textContent: '',
+    };
+  },
+  body: {
+    appendChild(el) { toastElements.set(el.id, el); },
+  },
+};
+
 const {
   DAILY_KEY, initDailyLog, loadDailyLog, logReview,
   logGame, addActiveSeconds, streakDays, weekSummary, buildAchievementCtx,
   runStreakSettlement, settleStreakOnOpen, getProtectionCount, getMakeupPending,
-  PROTECTION_MAX,
+  PROTECTION_MAX, notifyAchievements, renderAchievementsHtml,
 } = await import('../src/today.js');
 const { localDateKey } = await import('../src/state.js');
 
 test('localDateKey always uses Taipei date', () => {
   // 2026-08-18 23:30 UTC is 2026-08-19 07:30 in Taipei.
   assert.equal(localDateKey(Date.UTC(2026, 7, 18, 23, 30)), '2026-08-19');
+});
+
+test('notifyAchievements handles extra messages, combined messages, and no-op', () => {
+  const ctx = { allLessonsLoaded: true, totalCards: 12 };
+
+  toastElements.clear();
+  notifyAchievements([], ctx, '這句你上次不會，現在會了。');
+  assert.equal(toastElements.get('achvToast').textContent, '這句你上次不會，現在會了。');
+
+  notifyAchievements([{ label: '連續 7 天' }], ctx, '這句你上次不會，現在會了。');
+  assert.equal(toastElements.get('achvToast').textContent, '解鎖成就：連續 7 天\n這句你上次不會，現在會了。');
+
+  toastElements.clear();
+  notifyAchievements([], ctx);
+  assert.equal(toastElements.has('achvToast'), false);
+});
+
+test('renderAchievementsHtml renders all badges with unlock state, count, and escaped titles', () => {
+  stored.clear();
+  stored.set('thai-review-achievements-v1', JSON.stringify({ streak7: 1 }));
+  const html = renderAchievementsHtml({ allLessonsLoaded: true, totalCards: '<3&"' });
+  assert.equal((html.match(/class="achv-badge/g) || []).length, 8);
+  assert.equal((html.match(/<svg\b/g) || []).length, 8);
+  assert.match(html, /class="achv-badge on"/);
+  assert.match(html, /已解鎖 1\/8/);
+  assert.match(html, /title="&lt;3&amp;&quot; 張全上手"/);
 });
 
 test('new reviews extend a legacy-shaped day without dropping counters', () => {
