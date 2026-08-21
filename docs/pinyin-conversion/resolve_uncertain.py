@@ -425,3 +425,19 @@ SYL_FIX['ชล'] = 'ch' + V('o', False) + 'n' + T('low', 'live')
 SYL_FIX['ขยา'] = 'k' + V('a', False) + T('high', 'dead', False) + ' ' + 'y' + V('a', True) + T('high', 'live')
 # พรหม pʰom 梵天(如 พระพรหม)：พ low + short o(隱藏) + final ม(live，รห在此不發音)
 SYL_FIX['พรหม'] = 'p' + V('o', False) + 'm' + T('low', 'live')
+
+# ---- 260821 課堂新字/例外 ----
+# ควร kuan 應該（ควรจะ 的 ควร）：นวร 隱藏母音 ua 這類不規則音節，engine 規則推不出來，
+# Nalin 確認採用目的達課堂講義 Thai.A.7.5 給的官方羅馬拼音 kuan，照講義為準不套一般規則。
+SYL_FIX['ควร'] = 'kuan'
+# ห่ม homˇ 披蓋/穿(如 ผ้าห่ม 被子)：ห high + final ม(live) + 隱藏短o + mai ek，跟已驗證的
+# ส่ง songˇ 同一套規則（high + live + mai ek），T/V helper 算出來的結果，不是講義截圖來源
+# （這句是老師課堂上自己舉的例句，不在 Thai.A.7.5 講義裡）。
+SYL_FIX['ห่ม'] = 'h' + V('o', False) + 'm' + T('high', 'live', mark='ek')
+# ขโมย ka.mōi 偷：來源目的達課堂講義 Thai.A.7.5「1. ḍōn.... 被....」例句截圖（job 260821，
+# 260821-2.mp4 約 3:26），官方羅馬拼音照抄，不套一般規則。
+SYL_FIX['ขโมย'] = 'ka.mōi'
+# วัฒนธรรม wat~ta.na.tam 文化：來源同上，講義「2. คล้าย 相似」例句截圖（約 4:43）。
+SYL_FIX['วัฒนธรรม'] = 'wat~ta.na.tam'
+# อักษรไทย akˇsɔ̆n´thai 泰文字：來源同上，同一張截圖（約 6:37）。
+SYL_FIX['อักษรไทย'] = 'akˇsɔ̆n´thai'
