@@ -1742,6 +1742,16 @@
 .today-checkin { display: inline-flex; align-items: center; gap: 5px; }
 .today-checkin.done { color: var(--gold); }
 
+.today-goal { display: inline-flex; align-items: center; gap: 5px; }
+.today-goal.done { color: var(--gold); }
+
+.coverage-row {
+  display: flex;
+  font-size: 12px;
+  color: var(--text-mute);
+}
+.coverage-label { line-height: 1.6; }
+
 /* 月曆 */
 .cal {
   border: 1px solid var(--hair);

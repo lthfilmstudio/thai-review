@@ -67,6 +67,7 @@ export function weakestCards(progress, lessons, limit = 20) {
       rows.push({
         thai: card.thai,
         zh: card.zh,
+        lessonId: lesson.id,
         lessonTitle: lesson.title,
         grade,
         easeFactor: entry.easeFactor ?? 2.5,

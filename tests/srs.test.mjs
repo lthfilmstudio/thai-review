@@ -12,7 +12,7 @@ Object.defineProperty(globalThis, 'navigator', {
   value: { platform: 'test' },
 });
 
-const { nextReview, cardStatus, normalizeGrade } = await import('../src/srs.js');
+const { nextReview, cardStatus, normalizeGrade, getDueCards } = await import('../src/srs.js');
 
 const DAY_MS = 86400000;
 
@@ -52,6 +52,30 @@ test('cardStatus derives new/learning/review/mature from reps+interval, no extra
   assert.equal(cardStatus({ reps: 3, interval: 20 }), 'review');
   assert.equal(cardStatus({ reps: 3, interval: 21 }), 'mature');
   assert.equal(cardStatus({ reps: 5, interval: 60 }), 'mature');
+});
+
+test('getDueCards sorts by relative overdueness, not absolute nextReviewAt', () => {
+  const now = Date.now();
+  const cards = [
+    { thai: 'long-interval', _lessonId: 'L' },   // interval 400d, 30d overdue → ratio 0.075
+    { thai: 'short-interval', _lessonId: 'L' },  // interval 3d, 30d overdue → ratio 10
+    { thai: 'not-due', _lessonId: 'L' },         // nextReviewAt in the future
+  ];
+  const progress = {
+    'L:long-interval': { nextReviewAt: now - 30 * DAY_MS, interval: 400 },
+    'L:short-interval': { nextReviewAt: now - 30 * DAY_MS, interval: 3 },
+    'L:not-due': { nextReviewAt: now + DAY_MS, interval: 5 },
+  };
+  const due = getDueCards(cards, progress);
+  assert.deepEqual(due.map(c => c.thai), ['short-interval', 'long-interval']);
+});
+
+test('getDueCards treats a never-scheduled interval as 1 day to avoid divide-by-zero', () => {
+  const now = Date.now();
+  const cards = [{ thai: 'migrated', _lessonId: 'L' }];
+  const progress = { 'L:migrated': { nextReviewAt: 0, interval: 0 } };
+  assert.doesNotThrow(() => getDueCards(cards, progress));
+  assert.equal(getDueCards(cards, progress).length, 1);
 });
 
 test('normalizeGrade maps legacy 3-grade values onto the new 4-grade scheme', () => {

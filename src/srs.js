@@ -61,9 +61,20 @@ export function isDue(progressEntry, now = Date.now()) {
   return (progressEntry.nextReviewAt ?? 0) <= now;
 }
 
+/* 相對逾期程度：逾期天數 ÷ interval 天數，越大代表越可能忘記
+   （interval 短又逾期的卡，比 interval 長、逾期天數一樣的卡更該優先複習）。
+   從沒排過程的卡（interval=0）當作 interval=1 天算，避免除以 0。 */
+function overdueRatio(entry, now) {
+  const next = entry?.nextReviewAt ?? 0;
+  const interval = Math.max(1, entry?.interval || 1);
+  return (now - next) / (interval * DAY_MS);
+}
+
 /* 從一批 cards 中過濾出 due 卡並排序。
    每張 card 必須帶 _lessonId（虛擬課程已有；真實課程要在組 cards 時補上）。
-   opts.lessonId：限定來自某堂課（單課 SRS 用） */
+   opts.lessonId：限定來自某堂課（單課 SRS 用）
+   排序依「相對逾期程度」由大到小（設計書 docs/mastery-sprint-plan-2026-08.md），
+   不是絕對 nextReviewAt——interval 短又逾期的卡代表更可能忘記，優先排。 */
 export function getDueCards(allCards, progress, opts = {}) {
   const now = Date.now();
   return allCards
@@ -75,9 +86,7 @@ export function getDueCards(allCards, progress, opts = {}) {
     })
     .sort((a, b) => {
       const ka = `${a._lessonId}:${a.thai}`, kb = `${b._lessonId}:${b.thai}`;
-      const na = progress[ka]?.nextReviewAt ?? 0;
-      const nb = progress[kb]?.nextReviewAt ?? 0;
-      return na - nb;
+      return overdueRatio(progress[kb], now) - overdueRatio(progress[ka], now);
     });
 }
 

@@ -1,11 +1,10 @@
 # thai-review 對標 Speak/ELSA/SRS 改進設計文件
 
-**日期**：2026-08-17（Asia/Taipei），2026-08-21 補充「方向 1 附錄：Shadowing 研究精修」
+**日期**：2026-08-17（Asia/Taipei），2026-08-21 補充「方向 1 附錄：Shadowing 研究精修」，同日 Nalin 決定放棄方向 1
 **狀態**：方向 2（SRS 四檔評分）、方向 3（複習數據呈現）、方向 4（7 條成就全
 數上線，含依賴方向 2/3 的課程全通關 / 一週正確率 90%+）都已完成上線。方向 1
-（錄音跟讀比對）仍暫緩，等系統穩定一段時間、Nalin 有餘裕時再繼續開發。**方向
-1 附錄**（見文末）用語言學 shadowing 研究重新檢視方向 1 的設計，同樣暫緩、
-只先定案文件。
+（錄音跟讀比對，含其 shadowing 研究精修附錄）**Nalin 已決定不做**，理由見下方
+方向 1 段落。
 **影響 repo**：`thai-review`（僅本次規劃，未來實作若涉及中文語音會再影響 `lth-tts-proxy`，本次無）
 
 ## 背景
@@ -40,9 +39,7 @@ API（如 Speechace），這次刻意做零成本的「只錄、只回放比對�
 2. **方向 2：SRS 四檔評分優化**——骨架性質，方向 3、4 剩餘部分依賴它。
 3. **方向 3：複習數據呈現**（趨勢圖 + 課次弱項 + 最弱字清單，聲調分類列可選）。
 4. **補完方向 4 剩下依賴方向 2/3 的成就**（#4/#7）。
-5. **方向 1：錄音跟讀比對**——**暫緩**。技術不確定性最高，跟現有背景播放管
-   線有衝突風險，先讓方向 2/3/4 落地、系統穩定下來，之後有餘裕再回頭做（含
-   下方的 iOS PWA 麥克風 spike 驗證）。
+5. ~~方向 1：錄音跟讀比對~~——**已決定不做**（2026-08-21），見下方方向 1 段落。
 
 ---
 
@@ -133,155 +130,18 @@ API（如 Speechace），這次刻意做零成本的「只錄、只回放比對�
   是四個方向裡最快能做完、風險最低的一塊。#1/#2/#3/#5/#6 完全獨立、不依賴其
   他方向，可以最快先做完當熱身；#4/#7 要等方向 2/3 落地。
 
-## 方向 1：錄音跟讀比對（簡化版）—— 暫緩，技術不確定性最高
+## 方向 1：錄音跟讀比對（含 shadowing 研究精修附錄）—— 已決定不做（2026-08-21）
 
-> **暫緩開發**：等方向 2/3/4 落地、系統穩定後再繼續。以下設計先保留當參考，
-> 開工前記得回來重新確認 iOS 相容性現況是否有變化。
+Nalin 確認放棄這個方向，不排入時程。核心原因：這個功能本來就不會有真正
+「自動比對」——泰文聲調用瀏覽器原生 Web Speech API 準確度不夠，要準就得
+花錢串外部 API，所以設計上一直是「只錄、只回放，靠自己耳朵判斷」，沒有
+演算法比對這件事。確認這點之後 Nalin 覺得不值得投入，直接放棄，含
+2026-08-21 補充的語言學 shadowing 研究精修附錄（Pure/Prosody shadowing、
+漸進式重複三個提案）一起放棄。
 
-**核心限制**：不做語音辨識、不做發音評分，只錄音、只回放，靠 Nalin 自己耳朵
-判斷跟老師的差異。
-
-**iOS Safari PWA 風險**（需要實機驗證，不能只憑文件判斷）：
-
-1. `MediaRecorder` 在 standalone（加到主畫面）模式下的 `getUserMedia` 麥克風
-   權限行為過去曾經不穩定，部分版本可能每次 session 都重新跳授權框，會干擾
-   跟讀節奏。
-2. iOS Safari 的 `MediaRecorder` 輸出格式是 `audio/mp4`（不是 Chrome 慣用的
-   `audio/webm`），程式要用 `MediaRecorder.isTypeSupported()` 做 feature
-   detect 選正確 mimeType，不能寫死。
-3. 背景/鎖屏時 `getUserMedia` 的麥克風串流會被系統暫停或中斷——這跟
-   `listen.js`/`listen-lock.js` 現有「鎖屏也要持續播放」的設計目標根本衝突。
-
-**關鍵設計決策：鎖屏模式(`playbackMode==='lock'`)完全不提供錄音 UI**。錄音
-要求前景，鎖屏要求背景，這兩者在 iOS 上本質衝突，不硬解，直接切開，把最大
-的衝突面直接切掉。
-
-**跟現有音訊管線的整合方式**：
-
-- `listen.js`/`tts.js` 用單一共用 `<audio>` element（`tts.js:28`
-  `sharedAudio`）串所有播放，是為了讓 iOS 認定這是連續一條媒體工作階段才能
-  背景播放不中斷。**錄音回放走獨立的第二條 `<audio>` element**，完全不碰
-  `sharedAudio`，避免跟 `runListenStep` 的播放狀態機（`state.listen.playing`/
-  `runVersion`）搶同一個 element。
-- 新檔 `src/mic-record.js`：`isRecordingSupported()`/
-  `requestMicPermission()`/`startRecording()`/`stopRecording()`/
-  `pickMimeType()`。整合點在 `listen.js` 的 Phase 3 跟讀空白
-  (`listen.js:543-555`)，只在 `playbackMode==='normal'` 且頁面前景時才啟用。
-- UI：跟讀空白階段旁邊加「▶ 播我的錄音」「▶ 老師原音」兩個按鈕做 A/B。
-- **不存錄音**：Blob 只存在 in-memory（掛在 `state.listen` 底下不持久化的
-  runtime 欄位——`saveState()` 白名單本來就沒有 `listen`，天然不會寫進
-  localStorage）。切下一張卡、離開聽力模式、或 App 背景化時
-  `URL.revokeObjectURL()` 釋放，連裝置儲存空間都不占用。
-  `visibilitychange` 自救邏輯(`listen.js:703-725`)要補一行：錄音中切走 App
-  時主動 `stopRecording()`，避免麥克風常駐佔用。
-
-**建議**：先花半天做一個獨立測試頁（不進主 app），在 Nalin 的 iPhone 上
-（PWA standalone 模式，加到主畫面後開啟）測試 (a) `getUserMedia` 是否跳權
-限框、(b) 是否每次都要重新授權、(c) 錄完的 Blob 能不能正常回放。通過再投入
-1-2 天正式整合 `mic-record.js` + `listen.js`，避免在「iOS PWA 環境根本不給
-錄」這種最壞情況上白花時間。
-
-- 要新增/修改的檔案：`src/mic-record.js`（新增）、`src/listen.js`（Phase 3
-  掛錄音、UI 按鈕、鎖屏模式排除）、`sw.js`（`SHELL` 加一行）。
-- 對音訊管線衝突風險：**中-高**，但用「鎖屏模式隔離」+「獨立 audio
-  element」兩個設計決策可控。Android 藍牙耳機情境下麥克風佔用是否會觸發系
-  統音訊路由切換，建議實機測試驗證（尤其 Nalin 平常戴耳機聽力複習的使用情
-  境），不是靠讀文件能保證的。
-- 複雜度：中-高。演算法本身簡單，風險完全集中在環境相容性。
-
-## 方向 1 附錄：Shadowing 研究精修（2026-08-21）—— 暫緩，跟方向 1 一起排
-
-> **暫緩開發**：本節是方向 1 的設計精修，不是新方向。方向 1 本身還沒排入時
-> 程，這份附錄先定案存檔，等方向 1 真的要動工時一起考慮。
-
-### 背景：現有「跟讀」是 Echo Shadowing，不是同步 shadowing
-
-查證語言學文獻（見文末來源）後發現一個值得記錄的落差：語言學上的
-**shadowing** 定義是「聽到的當下幾乎零延遲、跟原音同步複誦」，核心價值在訓
-練大腦同時處理「聽」跟「說」；跟讀空白（等一段話講完才輪到你講）在文獻裡
-是另一個獨立變體，叫 **Echo Shadowing**——**現有 `computeCycleTimeline`
-（`src/tts.js:575`）的「中文意思 →（泰文老師語音 → 靜音空白）× N 次」設
-計，做的正是 Echo Shadowing，這件事本身沒有錯，只是還有其他被驗證有效的
-變體完全沒碰過**：
-
-- **Pure/Parrot shadowing**：跟原音同步複誦，不管意思，純練聲音反應
-- **Prosody shadowing**：刻意誇張模仿語調曲線、重音、節奏——對泰文這種聲
-  調語言特別對症
-- **Content shadowing**：同步跟講 + 同時追意思，難度最高，留給已經抓熟音
-  的人
-- 建議的漸進式練習順序：先聽懂 → 看文字跟讀 → 不看文字跟讀 → 最後一輪刻意
-  誇張語調
-
-### 提案 A：同步跟讀模式（Pure Shadowing）
-
-**設計**：錄音時機從「靜音空白裡錄」改成「跟老師語音同步錄」。技術上這其
-實比方向 1 原案更單純——`computeCycleTimeline` 回傳的 `timeline` 已經算好
-每個 `teacher` 段落精確的 `startMs`/`durMs`，同步錄音只要在該段落開始時呼
-叫方向 1 已設計好的 `mic-record.js` 的 `startRecording()`、段落結束時
-`stopRecording()`，不用像方向 1 原案那樣處理「空白多長才夠使用者講完」這
-種開放式時間問題。
-
-- 沿用方向 1 已經想清楚的部分：iOS `MediaRecorder` mimeType 偵測、鎖屏模式
-  完全排除錄音 UI、Blob 只留在記憶體不落地、`visibilitychange` 自救。
-- 新增的部分：一個跟播放位置同步的 phase-transition 觸發器（`listen.js` 已
-  經有 `getPlaybackPositionMs` 可用，不用另外做位置追蹤）。
-- 風險：`getUserMedia` 授權跟啟動錄音都是非同步呼叫，如果卡在 teacher 段落
-  開始那個時間點才臨時觸發，開頭幾百毫秒的錄音可能被吃掉。建議整堂跟讀模
-  式一開始就先要好麥克風權限、`MediaRecorder` 保持待命，之後每個 teacher
-  段落只是 start/stop 既有 recorder，不重新要權限。
-- 複雜度：**中**。約 90% 工程量跟方向 1 原案重疊（`mic-record.js` 整支不
-  變），新增的只有「什麼時候 start/stop」這個有明確資料可以算的觸發邏輯。
-
-### 提案 B：語調誇張跟讀模式（Prosody Shadowing）
-
-**設計**：不做自動發音評分（原因跟方向 1 一致：泰文聲調用免費 API 準確度
-不夠、貴的 API 又要另外花錢，這次還是不碰）。用「模式切換 + 引導文案」取
-代演算法評分：
-
-- **基本版（低成本）**：跟讀模式加一顆切換鈕「一般 / 誇張語調」，選誇張語
-  調時固定用較慢的速率（沿用現有 0.6x 選項）、UI 文案改成「刻意放大聲調的
-  高低起伏，講得比平常誇張沒關係」。純 UI／文案 + 沿用既有速率設定，幾乎
-  不動音訊管線。複雜度：**低**。
-- **進階版（stretch，不是這次要做的）**：從老師語音本身（不是從
-  `karaoke` 拼音欄位）即時抓音高（F0）曲線畫出來給使用者看。這條路線特別
-  提出來是因為方向 3 當初放棄「聲調分類」是因為 `karaoke` 欄位沒有結構化
-  聲調資料、正則抓變音符號不準（見方向 3 段落）——但音高曲線是從**音檔本
-  身**算的，不依賴那個不可靠的欄位，理論上能做到準確。缺點是要在瀏覽器端
-  跑音高偵測演算法（autocorrelation 或 YIN 這類），屬於一塊新的 DSP 程式
-  碼，複雜度：**中-高**，這次不建議一起做，留一個代辦項就好。
-
-### 提案 C：漸進式重複（每輪跟讀不要一模一樣）
-
-**設計**：現有 `computeCycleTimeline` 的 `for (let r = 0; r < repeat; r++)`
-每一輪用同一個 `teacherEffMs`／`gapMs`，聽起來、放起來都一樣。改成依文獻建
-議的漸進順序分配每一輪的角色，例如 3 輪時：第 1 輪正常速度（先聽懂）、第
-2 輪正常速度＋錄音跟讀、第 3 輪放慢速度＋誇張語調（呼應提案 B）。
-
-- **技術難點不在演算法，在「這段程式碼很脆弱」**：`buildListenCycleUncached`
-  是離線一次性 render 成一條 WAV（`OfflineAudioContext`），還墊了一條
-  40Hz keep-alive 訊號防止 iOS/Chrome 判定「沒在出聲」而收回背景播放身分
-  （`src/tts.js:667-669` 的註解，是真的踩過雷才加的）。要讓每一輪速率不
-  同，就要在同一次 render 裡塞進多個不同速率的 `stretchAudioBuffer` 結
-  果，`cycleKey`（快取鍵）也要跟著擴充覆蓋新參數，不能只加變數不改快取
-  邏輯，不然會拿到舊快取播錯內容。`tests/autoplay.test.mjs` 已經在測這塊
-  邏輯，改動要先確保這份測試全綠再往下走。
-- 複雜度：**中-高**——倒不是提案本身難，是這段程式碼是已知的高風險區
-  （鎖屏背景播放這個功能整個 app 踩過最多雷的地方就在這裡），任何改動都
-  要小心不要把已經修好的 iOS 背景播放問題改壞。
-
-### 建議優先序（如果之後要做）
-
-提案 A（同步跟讀）> 提案 B 基本版（語調模式切換）> 提案 C（漸進重複）>
-提案 B 進階版（音高曲線視覺化，代辦項）。A 跟 B 基本版風險低、跟現有音訊管
-線衝突小；C 因為要動到脆弱的核心播放程式碼，建議排最後，而且要單獨切一個
-分支做、跑滿現有測試再上。
-
-### 來源
-
-- [A Systematic Review of Research on the use of Shadowing for Second Language Pronunciation Teaching](https://www.tandfonline.com/doi/full/10.1080/29984475.2025.2546827)
-- [Shadowing for Fluency, Prosody, and Listening Comprehension — The Language Gym](https://gianfrancoconti.com/2025/07/26/shadowing-for-fluency-prosody-and-listening-comprehension-the-what-why-and-how-according-to-sla-research/)
-- [Shadowing: A Practitioner's Guide to the Technique in 2026 — Migaku](https://migaku.com/blog/language-fun/shadowing-a-practitioners-guide-to-the-technique-in-2026)
-- [Shadowing for Language Learning: What the Research Actually Shows — My Senpai](https://my-senpai.com/insights/shadowing-language-learning.html)
+完整設計（iOS PWA 麥克風相容性風險、跟現有鎖屏音訊管線的整合方式、三個
+shadowing 提案的技術細節與來源）保留在 git 歷史（本檔案 2026-08-21 之前
+的版本）裡，之後如果重新考慮再回去找，不重複貼在這裡占版面。
 
 ## 共通收尾提醒
 
@@ -291,30 +151,22 @@ API（如 Speechace），這次刻意做零成本的「只錄、只回放比對�
 
 ## 額外成本
 
-四項全部**不需要任何新的付費 API 或第三方服務**：
+已上線的三項全部**不需要任何新的付費 API 或第三方服務**：
 
-- 方向 1 錄音比對明確排除自動語音辨識/發音評分，只用瀏覽器原生
-  `MediaRecorder`（免費、無 API key）。
 - 方向 2 SRS 優化是純本地演算法調整，不涉及外部服務。
 - 方向 3 數據呈現、方向 4 成就系統都是純本地 localStorage 資料計算，沒有網
   路請求。
-- 唯一潛在成本是方向 1 若選擇保留錄音會佔用裝置儲存空間——但設計上明確採
-  用「session 內即丟棄、不寫入 localStorage/IndexedDB」，所以連這個都是零
-  成本。
 
 ## 不動的部分（刻意排除，避免範圍蔓延）
 
-- 本次規劃**不寫任何 `src/*.js`、`sw.js`、`data.json`、`styles/*` 的程式碼
-  改動**，只有這份文件本身。
 - 雲端同步（Nalin 沒有選這個落差方向，不在本次分析範圍內）。
 - FSRS 完整導入（方向 2 已決策不做，原因見上）。
-- 聲調自動評分/語音辨識（方向 1 已明確排除，原因見上）。
+- 聲調自動評分/語音辨識、錄音跟讀比對（方向 1 已決定不做，原因見上）。
 - XP 數值系統（方向 4 已決策不做，原因見上）。
 
-## 涉及檔案（未來實作時）
+## 涉及檔案（已上線的部分）
 
 - `src/srs.js`、`src/card.js`、`src/state.js`、`styles/components.css`（方向 2）
-- `src/stats.js`（新增）、`src/today.js`（方向 3）
-- `src/achievements.js`（新增）、`src/today.js`（方向 4）
-- `src/mic-record.js`（新增）、`src/listen.js`（方向 1）
-- `sw.js`（四個方向新增檔案都要跟著更新 `SHELL` + `CACHE` 版本號）
+- `src/stats.js`、`src/today.js`（方向 3）
+- `src/achievements.js`、`src/today.js`（方向 4）
+- `sw.js`（新增檔案都要跟著更新 `SHELL` + `CACHE` 版本號）

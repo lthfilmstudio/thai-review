@@ -2,12 +2,85 @@
    每日複習日誌存獨立 localStorage key，不動主 STORAGE_KEY schema。 */
 
 import { state, allCardsWithLessonId, cardKey, getDueCount, localDateKey } from './state.js';
-import { cardStatus, normalizeGrade } from './srs.js';
+import { cardStatus, normalizeGrade, getDueCards } from './srs.js';
 import { ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel, achievementIconSvg } from './achievements.js';
 import { accuracyTrend, averageAccuracy, weakLessons, weakestCards } from './stats.js';
+import { pickResweepBatch, resweepProgress } from './resweep.js';
 import { escapeHtml } from './ui.js';
 
 export const DAILY_KEY = 'thai-review-daily-v1';
+
+/* ===== 每日複習隊列（設計書 docs/mastery-sprint-plan-2026-08.md） =====
+   到期複習（相對逾期排序，軟上限）＋重新複習掃描（剩餘預算，保底）＋弱項加強
+   （還有剩才補），三段共用同一份每日用時預算，換算張數只是估算，真正的
+   gate 是 day.seconds 本身，估不準下一次開 App 會自我修正。 */
+const DAILY_BUDGET_SEC = 3600;   // 每日用時預算：60 分鐘
+const DUE_SOFT_CAP_SEC = 2700;   // 到期複習軟性上限：45 分鐘
+const RESWEEP_FLOOR_SEC = 900;   // 重新複習掃描保底：15 分鐘
+const MIN_SESSION_SEC = 600;     // 單次「開始複習」至少給 10 分鐘份，即使當天預算已經用完
+const SEC_PER_DUE_CARD = 17.5;   // 估算：評分＋跟讀
+const SEC_PER_RESWEEP_CARD = 11; // 估算：大多是已經熟的卡，直接評分較快
+const SEC_PER_WEAK_CARD = 15;
+const WEAK_CARD_MAX = 8;
+
+/* 純函式：組今天的複習隊列。todaySeconds 是今天已累積的用時（day.seconds），
+   用來算剩餘預算，不是張數上限。回傳 { cards, resweepKeys }——resweepKeys
+   是這批裡「從重新複習掃描抽出來」的卡的 _cardKey 集合，評分時要靠它決定
+   要不要推進 resweep 游標（app.js gradeAndAdvance() 用）。 */
+export function buildDailyQueue(allCards, progress, lessons, todaySeconds) {
+  const remaining = Math.max(MIN_SESSION_SEC, DAILY_BUDGET_SEC - todaySeconds);
+
+  const dueLimit = Math.max(0, Math.floor(Math.min(remaining, DUE_SOFT_CAP_SEC) / SEC_PER_DUE_CARD));
+  const dueCards = getDueCards(allCards, progress).slice(0, dueLimit);
+  const dueKeys = new Set(dueCards.map(c => c._cardKey));
+  const dueSec = dueCards.length * SEC_PER_DUE_CARD;
+
+  const resweepLimit = Math.max(0, Math.floor(Math.max(RESWEEP_FLOOR_SEC, remaining - dueSec) / SEC_PER_RESWEEP_CARD));
+  // 多抓一點份量，濾掉跟到期複習重疊的卡之後才不會不夠
+  const resweepRaw = resweepLimit > 0 ? pickResweepBatch(allCards, resweepLimit + dueKeys.size) : [];
+  const resweepCards = resweepRaw.filter(c => !dueKeys.has(c._cardKey)).slice(0, resweepLimit);
+  const resweepKeys = new Set(resweepCards.map(c => c._cardKey));
+  const resweepSec = resweepCards.length * SEC_PER_RESWEEP_CARD;
+
+  const usedKeys = new Set([...dueKeys, ...resweepKeys]);
+  const weakLimit = Math.min(WEAK_CARD_MAX, Math.floor(Math.max(0, remaining - dueSec - resweepSec) / SEC_PER_WEAK_CARD));
+  const weakCards = [];
+  if (weakLimit > 0) {
+    const byKey = new Map(allCards.map(c => [c._cardKey, c]));
+    for (const row of weakestCards(progress, lessons, 40)) {
+      if (weakCards.length >= weakLimit) break;
+      const k = `${row.lessonId}:${row.thai}`;
+      if (usedKeys.has(k)) continue;
+      const card = byKey.get(k);
+      if (card) { weakCards.push(card); usedKeys.add(k); }
+    }
+  }
+
+  return { cards: interleaveByLesson([...dueCards, ...resweepCards, ...weakCards]), resweepKeys };
+}
+
+/* 輕量交錯：依 _lessonId 分桶、round-robin 輪流各取一張，桶內原本排序不變
+   （到期／掃描／弱項各自的優先順序不受影響，只打散跨課次的連續黏連，呼應
+   設計書引用的 interleaved practice 研究）。 */
+function interleaveByLesson(cards) {
+  const buckets = new Map();
+  const order = [];
+  for (const c of cards) {
+    const id = c._lessonId || '';
+    if (!buckets.has(id)) { buckets.set(id, []); order.push(id); }
+    buckets.get(id).push(c);
+  }
+  if (order.length <= 1) return cards;
+  const out = [];
+  let remaining = cards.length;
+  while (remaining > 0) {
+    for (const id of order) {
+      const bucket = buckets.get(id);
+      if (bucket.length) { out.push(bucket.shift()); remaining--; }
+    }
+  }
+  return out;
+}
 
 const SVG_CHEV_L = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
 const SVG_CHEV_R = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
@@ -498,19 +571,34 @@ export function renderTodayMode(el) {
   const dueCount = getDueCount();
   const todayLog = log.days[localDateKey()];
   const reviewedToday = todayLog?.reviewed || 0;
+  const todaySeconds = todayLog?.seconds || 0;
   const streak = streakDays(log.days);
 
   const checkin = reviewedToday > 0
     ? `<span class="today-checkin done">${SVG_CHECK}今天已複習 ${reviewedToday} 張</span>`
     : `<span class="today-checkin">今天還沒複習</span>`;
 
+  const remainingMin = Math.max(0, Math.ceil((DAILY_BUDGET_SEC - todaySeconds) / 60));
+  const goalHtml = todaySeconds >= DAILY_BUDGET_SEC
+    ? `<span class="today-goal done">${SVG_CHECK}今天已達 1 小時複習目標</span>`
+    : `<span class="today-goal">距離今天 1 小時目標還差 ${remainingMin} 分鐘</span>`;
+
   const achvCtx = buildAchievementCtx(log);
   notifyAchievements(checkAndUnlock(achvCtx), achvCtx);
 
-  const planHtml = dueCount > 0
+  const sweep = resweepProgress(achvCtx.totalCards);
+  const hasMore = dueCount > 0 || !sweep.done;
+
+  const planHtml = hasMore
     ? `<div class="today-due"><span class="today-due-num">${dueCount}</span><span class="today-due-label">張到期</span></div>
        <button class="review-start-btn" data-start-review-all>開始複習</button>`
-    : `<div class="today-due done"><span class="today-due-icon">${SVG_CHECK}</span><span class="today-due-label">今天沒有到期卡片</span></div>`;
+    : `<div class="today-due done"><span class="today-due-icon">${SVG_CHECK}</span><span class="today-due-label">全部卡片都掃完一輪了</span></div>`;
+
+  const coveragePct = achvCtx.totalCards > 0 ? Math.round((achvCtx.gradedCards / achvCtx.totalCards) * 100) : 0;
+  const sweepPct = sweep.total > 0 ? Math.round((sweep.position / sweep.total) * 100) : 0;
+  const coverageHtml = `
+    <div class="coverage-row"><span class="coverage-label">涵蓋率 ${coveragePct}%（${achvCtx.gradedCards} / ${achvCtx.totalCards}）</span></div>
+    <div class="coverage-row"><span class="coverage-label">重新複習掃描 ${sweepPct}%（${sweep.position} / ${sweep.total}）</span></div>`;
 
   const tabsHtml = `
     <div class="today-tabs" role="tablist">
@@ -527,6 +615,10 @@ export function renderTodayMode(el) {
           <span class="today-streak">連續 ${streak} 天</span>
           ${checkin}
         </div>
+        <div class="today-meta">
+          ${goalHtml}
+        </div>
+        ${coverageHtml}
       </div>
       ${renderCalendarHtml(log)}
     `;

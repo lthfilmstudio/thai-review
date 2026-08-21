@@ -180,6 +180,11 @@ export const state = {
     rafId: null,
     timeoutId: null,
   },
+  // 今日複習隊列（today.js buildDailyQueue() 的結果）：currentLessonId==='__TODAY__'
+  // 時 currentLesson()/filteredCards() 讀這裡，不重新計算。App 開著期間有效、不存
+  // localStorage——重開 App 或明天再點「開始複習」都會重新組隊列，不需要持久化。
+  dailyQueueKeys: null,       // string[] | null
+  dailyQueueResweepKeys: null, // Set<string> | null，評分時判斷要不要推進 resweep 游標
 };
 
 export function loadState() {
@@ -311,6 +316,12 @@ export function favoriteCount() {
 }
 
 export function currentLesson() {
+  if (state.currentLessonId === '__TODAY__') {
+    const keys = state.dailyQueueKeys || [];
+    const byKey = new Map(allCardsWithLessonId().map(c => [c._cardKey, c]));
+    const cards = keys.map(k => byKey.get(k)).filter(Boolean);
+    return { id: '__TODAY__', title: '今日複習', cards };
+  }
   if (state.currentLessonId === '__ALL__') {
     return { id: '__ALL__', title: '全部混合', cards: allCardsWithLessonId() };
   }
@@ -354,6 +365,10 @@ export function isSrsActive() {
 export function filteredCards() {
   const lesson = currentLesson();
   if (!lesson) return [];
+  // __TODAY__ 的 cards 已經是 buildDailyQueue() 排好的最終順序（到期＋掃描＋
+  // 弱項混合），不能再套一次 getDueCards()——那會把掃描／弱項卡（不一定「到
+  // 期」）濾掉，只剩到期複習那一段。
+  if (state.currentLessonId === '__TODAY__') return lesson.cards;
   if (!isSrsActive()) return lesson.cards;
   // 真實課程的 cards 沒有 _lessonId，補上才能跑 SRS key
   const tagged = lesson.cards.map(c => c._lessonId ? c : { ...c, _lessonId: lesson.id });
@@ -424,6 +439,24 @@ export function findCardByKey(key) {
 
 export function getDueCount(lessonId) {
   return countDue(allCardsWithLessonId(), state.progress, lessonId);
+}
+
+/* 開始今日複習：today.js buildDailyQueue() 的結果存進 state，
+   currentLesson()/filteredCards() 之後就讀這裡（見上方 __TODAY__ 分支）。 */
+export function setDailyQueue(cards, resweepKeys) {
+  state.dailyQueueKeys = cards.map(c => c._cardKey);
+  state.dailyQueueResweepKeys = resweepKeys || new Set();
+}
+
+/* 評完一張 __TODAY__ 隊列裡的卡就從隊列拿掉（不管是到期／掃描／弱項哪一
+   段來的），行為比照既有到期複習「評完自然從清單消失」。回傳這張是不是從
+   重新複習掃描抽出來的，讓呼叫端決定要不要推進 resweep 游標。 */
+export function removeFromDailyQueue(key) {
+  if (!state.dailyQueueKeys) return false;
+  state.dailyQueueKeys = state.dailyQueueKeys.filter(k => k !== key);
+  const wasResweep = !!state.dailyQueueResweepKeys?.has(key);
+  state.dailyQueueResweepKeys?.delete(key);
+  return wasResweep;
 }
 
 /* Fisher-Yates 就地打亂當前課程的 cards 陣列 */

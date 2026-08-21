@@ -8,12 +8,14 @@ import {
   loadManifest, saveManifest, loadLessonCards, saveLessonCards,
   setLastSync, getLastSync, formatLastSync,
   findCardByKey, saveCardEdit, clearCardEdit,
+  allCardsWithLessonId, setDailyQueue, removeFromDailyQueue,
 } from './state.js';
 import {
   loadLessons, loadTabsOnly, fetchLessonCards, loadBundledData,
   fetchDialogues,
 } from './data.js';
-import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds, settleStreakOnOpen, showToast } from './today.js';
+import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds, settleStreakOnOpen, showToast, buildDailyQueue, loadDailyLog } from './today.js';
+import { advanceResweepCursor } from './resweep.js';
 import { recordGrade } from './grade-history.js';
 import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices, preloadRealAudioAvailability } from './tts.js';
@@ -306,6 +308,10 @@ function gradeAndAdvance(g) {
   setGrade(state.cardIndex, g);
   const improvementMoment = gradedCard ? recordGrade(gradedCardKey, g) : false;
   logReview(g);
+  if (state.currentLessonId === '__TODAY__' && gradedCardKey) {
+    const wasResweep = removeFromDailyQueue(gradedCardKey);
+    if (wasResweep) advanceResweepCursor(1, allCardsWithLessonId().length);
+  }
   const achvCtx = buildAchievementCtx();
   notifyAchievements(
     checkAndUnlock(achvCtx),
@@ -827,7 +833,13 @@ async function init() {
   document.getElementById('content').addEventListener('click', e => {
     if (e.target.closest('[data-start-review-all]')) {
       e.stopPropagation();
-      state.currentLessonId = '__ALL__';
+      const log = loadDailyLog();
+      const todaySeconds = log.days[localDateKey()]?.seconds || 0;
+      const { cards, resweepKeys } = buildDailyQueue(
+        allCardsWithLessonId(), state.progress, state.lessons, todaySeconds,
+      );
+      setDailyQueue(cards, resweepKeys);
+      state.currentLessonId = '__TODAY__';
       state.mode = 'srs';
       state.cardIndex = 0;
       state.flipped = false;

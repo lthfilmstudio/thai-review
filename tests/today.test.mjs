@@ -26,9 +26,14 @@ const {
   DAILY_KEY, initDailyLog, loadDailyLog, logReview,
   logGame, addActiveSeconds, streakDays, weekSummary, buildAchievementCtx,
   runStreakSettlement, settleStreakOnOpen, getProtectionCount, getMakeupPending,
-  PROTECTION_MAX, notifyAchievements, renderAchievementsHtml,
+  PROTECTION_MAX, notifyAchievements, renderAchievementsHtml, buildDailyQueue,
 } = await import('../src/today.js');
 const { localDateKey } = await import('../src/state.js');
+const { advanceResweepCursor } = await import('../src/resweep.js');
+
+function queueCard(lessonId, thai, zh = thai) {
+  return { thai, zh, _lessonId: lessonId, _cardKey: `${lessonId}:${thai}` };
+}
 
 test('localDateKey always uses Taipei date', () => {
   // 2026-08-18 23:30 UTC is 2026-08-19 07:30 in Taipei.
@@ -342,4 +347,75 @@ test('logGame 累積滿 2 局會自動完成補救：蓋章昨天、清掉 makeu
   assert.equal(log.days['2026-08-19'].bridged, true);
   // 補完後連回 08-18 之前的連續紀錄 + 今天，共 3 天
   assert.equal(streakDays(log.days, TODAY), 3);
+});
+
+/* ===== buildDailyQueue（設計書 docs/mastery-sprint-plan-2026-08.md） ===== */
+
+test('buildDailyQueue pulls resweep cards for never-graded material even though they are not due', () => {
+  stored.clear();
+  const cards = [queueCard('L1', 'untouched1'), queueCard('L1', 'untouched2')];
+  const progress = {}; // 都沒評過分，到期複習隊列是空的
+  const lessons = [{ id: 'L1', cards: [] }];
+  const { cards: queue, resweepKeys } = buildDailyQueue(cards, progress, lessons, 0);
+  assert.equal(queue.length, 2);
+  assert.equal(resweepKeys.size, 2);
+});
+
+test('buildDailyQueue does not duplicate a card that is both due and next in resweep order', () => {
+  stored.clear();
+  const now = Date.now();
+  const cards = [queueCard('L1', 'dup'), queueCard('L1', 'fresh')];
+  const progress = { 'L1:dup': { nextReviewAt: now - 1000, interval: 1 } }; // due；fresh 從沒評過
+  const lessons = [{ id: 'L1', cards: [] }];
+  const { cards: queue, resweepKeys } = buildDailyQueue(cards, progress, lessons, 0);
+  const keys = queue.map(c => c._cardKey);
+  assert.equal(keys.filter(k => k === 'L1:dup').length, 1);
+  assert.ok(!resweepKeys.has('L1:dup')); // 被到期複習排走了，不算重新複習掃描抽到的
+});
+
+test('buildDailyQueue resweep portion continues from the persisted cursor position', () => {
+  stored.clear();
+  const cards = [queueCard('L1', 'x1'), queueCard('L1', 'x2'), queueCard('L1', 'x3')];
+  const progress = {};
+  const lessons = [{ id: 'L1', cards: [] }];
+  advanceResweepCursor(1, cards.length); // 假裝 x1 已經掃過
+  const { cards: queue } = buildDailyQueue(cards, progress, lessons, 0);
+  assert.deepEqual(queue.map(c => c.thai), ['x2', 'x3']);
+});
+
+test('buildDailyQueue interleaves lessons so the same lesson does not run unbroken when another lesson has cards ready', () => {
+  stored.clear();
+  const now = Date.now();
+  const cards = [
+    queueCard('L1', 'a1'), queueCard('L1', 'a2'), queueCard('L1', 'a3'),
+    queueCard('L2', 'b1'),
+  ];
+  const progress = {};
+  for (const c of cards) progress[c._cardKey] = { nextReviewAt: now - 1000, interval: 1 };
+  const lessons = [{ id: 'L1', cards: [] }, { id: 'L2', cards: [] }];
+  const { cards: queue } = buildDailyQueue(cards, progress, lessons, 0);
+  const seq = queue.map(c => c._lessonId);
+  let run = 1, maxRun = 1;
+  for (let i = 1; i < seq.length; i++) {
+    run = seq[i] === seq[i - 1] ? run + 1 : 1;
+    maxRun = Math.max(maxRun, run);
+  }
+  assert.ok(maxRun <= 2, `expected no long same-lesson run, got ${seq.join(',')}`);
+});
+
+test('buildDailyQueue returns fewer cards once today\'s time budget is already spent, but never zero', () => {
+  stored.clear();
+  const now = Date.now();
+  const cards = [];
+  const progress = {};
+  for (let i = 0; i < 300; i++) {
+    const c = queueCard('L1', `w${i}`);
+    cards.push(c);
+    progress[c._cardKey] = { nextReviewAt: now - 1000, interval: 1 };
+  }
+  const lessons = [{ id: 'L1', cards: [] }];
+  const fresh = buildDailyQueue(cards, progress, lessons, 0).cards.length;
+  const spent = buildDailyQueue(cards, progress, lessons, 999999).cards.length;
+  assert.ok(fresh > spent, `expected fresh budget to yield more cards (${fresh} vs ${spent})`);
+  assert.ok(spent > 0, '就算今天預算已經用完，保底時間也該回傳非空隊列');
 });
