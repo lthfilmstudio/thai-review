@@ -273,13 +273,6 @@ async function selectMode(m) {
     await ensureAllLoaded();
     rerender();
   }
-  if (m === 'home') {
-    const newest = state.lessons[state.lessons.length - 1];
-    if (newest && !newest._loaded) {
-      await ensureLessonLoaded(newest.id, { silentUI: true });
-      rerender();
-    }
-  }
 }
 
 async function selectListMode(order) {
@@ -553,10 +546,7 @@ async function init() {
   state.lessons = await loadLessonsSmart(onFreshManifest);
 
   const deepLink = parseDeepLinkParam();
-  // 每天第一次打開落首頁；同一天內重開記住上次的 mode。深連結本身就是一次「打開」，
-  // 所以 lastOpenDate 兩種情況都要更新，只有非深連結才會真的落地首頁。
   const today = localDateKey();
-  const isFirstOpenToday = state.lastOpenDate !== today;
   state.lastOpenDate = today;
 
   if (deepLink && state.lessons.find(l => l.id === deepLink.lessonId)) {
@@ -570,15 +560,17 @@ async function init() {
         (state.currentLessonId !== '__ALL__' && !state.lessons.find(l => l.id === state.currentLessonId))) {
       state.currentLessonId = state.lessons[0]?.id || null;
     }
-    if (isFirstOpenToday) state.mode = 'home';
+    // 打開一律落在「今日」（2026-08-22 Nalin 指定）。原本是「每天第一次落練功、
+    // 同一天內記住上次 mode」，練功併進今日後這個分頁就是每天的起點。
+    state.mode = 'today';
   }
   saveState();
 
   // lazy 模式：確保當前課程的卡片已載入
   await ensureLessonLoaded(state.currentLessonId, { silentUI: false });
 
-  // 首頁需要最新一堂課的卡片，不一定跟目前選中的課程是同一堂
-  if (state.mode === 'home') {
+  // 今日分頁的三局遊戲要最新一堂課的卡片，不一定跟目前選中的課程是同一堂
+  if (state.mode === 'today') {
     const newest = state.lessons[state.lessons.length - 1];
     if (newest) await ensureLessonLoaded(newest.id, { silentUI: true });
   }
@@ -807,7 +799,7 @@ async function init() {
     }
 
     // 今日 / 練功 mode 沒有當前卡片，卡片快捷鍵（翻面 / 評分 / 換卡）不適用
-    if (state.mode === 'today' || state.mode === 'home') return;
+    if (state.mode === 'today') return;
 
     if (e.key === 'ArrowLeft') prevCard();
     else if (e.key === 'ArrowRight') nextCard();
@@ -930,7 +922,7 @@ async function init() {
     const dx = t.clientX - tx;
     const dy = t.clientY - ty;
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      if (state.mode === 'today' || state.mode === 'home') return;   // 今日／練功 mode 沒有卡片可滑
+      if (state.mode === 'today') return;   // 今日 mode 沒有卡片可滑
       if (state.mode === 'listen') stopListen();
       if (dx > 0) prevCard(); else nextCard();
     }

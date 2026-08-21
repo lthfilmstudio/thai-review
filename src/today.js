@@ -6,6 +6,7 @@ import { cardStatus, normalizeGrade, getDueCards } from './srs.js';
 import { ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel, achievementIconSvg } from './achievements.js';
 import { accuracyTrend, averageAccuracy, weakLessons, weakestCards } from './stats.js';
 import { pickResweepBatch, resweepProgress } from './resweep.js';
+import { renderActiveGame, homePanelHtml, wireHomePanel, renderWeekChip } from './home.js';
 import { escapeHtml } from './ui.js';
 
 export const DAILY_KEY = 'thai-review-daily-v1';
@@ -567,12 +568,18 @@ function renderCalendarHtml(log) {
 }
 
 export function renderTodayMode(el) {
+  // 遊戲進行中整頁交給遊戲，不畫分頁殼（原「練功」mode 的行為，合併後保留）
+  if (renderActiveGame(el, () => renderTodayMode(el))) return;
+
   const log = loadDailyLog();
   const dueCount = getDueCount();
-  const todayLog = log.days[localDateKey()];
-  const reviewedToday = todayLog?.reviewed || 0;
-  const todaySeconds = todayLog?.seconds || 0;
+  const todayLog = log.days[localDateKey()] || {};
+  const reviewedToday = todayLog.reviewed || 0;
+  const todaySeconds = todayLog.seconds || 0;
   const streak = streakDays(log.days);
+  const week = weekSummary(log.days);
+  const protection = getProtectionCount(log);
+  const makeup = getMakeupPending(log);
 
   const checkin = reviewedToday > 0
     ? `<span class="today-checkin done">${SVG_CHECK}今天已複習 ${reviewedToday} 張</span>`
@@ -602,12 +609,23 @@ export function renderTodayMode(el) {
 
   const tabsHtml = `
     <div class="today-tabs" role="tablist">
-      <button class="today-tab${statsTab === 'plan' ? ' active' : ''}" data-today-tab="plan" role="tab" aria-selected="${statsTab === 'plan'}">複習規劃</button>
+      <button class="today-tab${statsTab === 'plan' ? ' active' : ''}" data-today-tab="plan" role="tab" aria-selected="${statsTab === 'plan'}">今天</button>
       <button class="today-tab${statsTab === 'stats' ? ' active' : ''}" data-today-tab="stats" role="tab" aria-selected="${statsTab === 'stats'}">數據</button>
     </div>`;
 
+  // 分工：「今天」＝現在要做什麼（複習隊列 + 三局遊戲 + 今日一句），
+  // 「數據」＝回頭看數字（月曆、本週、趨勢、弱項、成就）。
   const bodyHtml = statsTab === 'stats'
-    ? renderStatsHtml()
+    ? `
+      ${renderCalendarHtml(log)}
+      <div class="home-week-panel">
+        <div class="home-week-head">本週進度</div>
+        <div class="home-week-stats">來過 <strong>${week.daysCame} / 7</strong> 天 · 複習 <strong>${week.reviewedTotal}</strong> 張 · 對話 <strong>${week.dialoguesCompleted}</strong> 組</div>
+        ${renderWeekChip(week)}
+      </div>
+      ${renderStatsHtml()}
+      ${renderAchievementsHtml(achvCtx)}
+    `
     : `
       <div class="today-plan">
         ${planHtml}
@@ -620,7 +638,7 @@ export function renderTodayMode(el) {
         </div>
         ${coverageHtml}
       </div>
-      ${renderCalendarHtml(log)}
+      ${homePanelHtml({ log, todayLog, streak, protection, makeup })}
     `;
 
   el.innerHTML = `
@@ -628,6 +646,8 @@ export function renderTodayMode(el) {
       ${tabsHtml}
       ${bodyHtml}
     </div>`;
+
+  if (statsTab === 'plan') wireHomePanel(el, todayLog, () => renderTodayMode(el));
 
   el.querySelectorAll('[data-today-tab]').forEach(btn => {
     btn.addEventListener('click', () => {

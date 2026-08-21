@@ -1,17 +1,12 @@
-/* 新首頁（第 7 個 mode tab「練功」）。Phase 3：三種每日遊戲局、進步時刻與
-   成就徽章均已接入（見設計書 13 節）。
-   today.js 是每日日誌／streak／安神保護的唯一真相來源，這裡只消費不複製
-   （11.2 節 B 案）；視覺語言照 prototype-daily.html，但變數改用 base.css
-   那套 --bg/--text/--gold（11.4 節）。 */
+/* 「今日」分頁的行動面板（原本是獨立的「練功」分頁，2026-08-22 合併進今日——
+   兩個分頁都在回答「今天要做什麼」，分開反而要來回切）。Phase 3：三種每日
+   遊戲局、進步時刻與成就徽章均已接入（見設計書 13 節）。
+   today.js 是每日日誌／streak／安神保護的唯一真相來源，也是合併後的分頁殼，
+   這裡只出 HTML 片段 + 綁自己的事件，不自己畫分頁（11.2 節 B 案）；視覺語言
+   照 prototype-daily.html，但變數改用 base.css 那套 --bg/--text/--gold（11.4 節）。 */
 
 import { state, localDateKey, allCardsWithLessonId, cardKey } from './state.js';
 import { escapeHtml } from './ui.js';
-import {
-  loadDailyLog, streakDays, weekSummary,
-  getProtectionCount, getMakeupPending, buildAchievementCtx, notifyAchievements,
-  renderAchievementsHtml,
-} from './today.js';
-import { checkAndUnlock } from './achievements.js';
 import { speakCard } from './tts.js';
 import * as listenGame from './game-listen.js';
 import * as comboGame from './game-combo.js';
@@ -78,6 +73,11 @@ export function fillDailySentence(box, result, documentRef = document) {
   const thaiLine = box?.querySelector('.home-sentence-thai');
   if (!thaiLine || !thai) return false;
 
+  // 冪等：getDailySentence() 一天只建一個 promise，但今日分頁可能 render 兩次
+  // （進分頁一次、ensureAllLoaded() 補完課程後再一次），兩個 then callback 都會
+  // 用 id 抓到「當下」那個 box，不先清掉舊的就會疊出兩行中文翻譯。
+  box.querySelector('.home-sentence-zh')?.remove();
+
   thaiLine.textContent = thai;
   if (!zh) return true;
 
@@ -97,7 +97,7 @@ function newestLesson() {
   return real[real.length - 1] || null;
 }
 
-function renderWeekChip(week) {
+export function renderWeekChip(week) {
   const labels = ['一', '二', '三', '四', '五', '六', '日'];
   const todayKey = localDateKey();
   return `<div class="home-week-chart">
@@ -110,40 +110,41 @@ function renderWeekChip(week) {
   </div>`;
 }
 
-export function renderHomeMode(el, rerender) {
+/* 遊戲進行中：整頁交給遊戲接管，呼叫端（today.js）看到 true 就不要再畫分頁殼。 */
+export function renderActiveGame(el, onExit) {
   if (listenGame.isListenGameActive()) {
-    listenGame.render(el, { onExit: () => renderHomeMode(el, rerender) });
-    return;
+    listenGame.render(el, { onExit });
+    return true;
   }
   if (comboGame.isComboReviewActive()) {
-    comboGame.render(el, { onExit: () => renderHomeMode(el, rerender) });
-    return;
+    comboGame.render(el, { onExit });
+    return true;
   }
   if (dialogueGame.isDialogueGameActive()) {
-    dialogueGame.render(el, { onExit: () => renderHomeMode(el, rerender) });
-    return;
+    dialogueGame.render(el, { onExit });
+    return true;
   }
+  return false;
+}
 
-  const lesson = newestLesson();
-  const log = loadDailyLog();
-  const todayKey = localDateKey();
-  const todayLog = log.days[todayKey] || {};
-  const streak = streakDays(log.days);
-  const week = weekSummary(log.days);
-  const protection = getProtectionCount(log);
-  const makeup = getMakeupPending(log);
-  const minutes = Math.floor((todayLog.seconds || 0) / 60);
-
-  const doneGameIds = new Set(todayLog.gameIds || []);
+/* 今日挑戰三局的完成狀態，HTML 跟事件綁定都要用，抽出來免得兩邊各算一次。 */
+export function gameTaskState(todayLog) {
+  const doneGameIds = new Set(todayLog?.gameIds || []);
   const task1Done = doneGameIds.has('listen');
   const task2Done = doneGameIds.has('combo');
   const task3Done = doneGameIds.has('dialog');
-  const doneCount = [task1Done, task2Done, task3Done].filter(Boolean).length;
+  return {
+    task1Done, task2Done, task3Done,
+    doneCount: [task1Done, task2Done, task3Done].filter(Boolean).length,
+  };
+}
 
-  // 成就檢查（連續 7/30/100 天等）：跟舊「今日」mode 一樣每次 render 都查一次，
-  // checkAndUnlock 本身冪等，只有新解鎖時才跳 toast。
-  const achvCtx = buildAchievementCtx(log);
-  notifyAchievements(checkAndUnlock(achvCtx), achvCtx);
+/* 行動面板 HTML：連續天數／安神保護、補救 banner、今日挑戰、今日一句、三局任務。
+   複習隊列（開始複習）那塊歸 today.js，這裡不碰。 */
+export function homePanelHtml({ log, todayLog, streak, protection, makeup }) {
+  const lesson = newestLesson();
+  const minutes = Math.floor((todayLog.seconds || 0) / 60);
+  const { task1Done, task2Done, task3Done, doneCount } = gameTaskState(todayLog);
 
   const makeupBannerHtml = makeup ? `
     <div class="home-makeup-banner">
@@ -152,14 +153,21 @@ export function renderHomeMode(el, rerender) {
     </div>
   ` : '';
 
-  el.innerHTML = `
-    <div class="home-wrap">
+  return `
       <div class="home-status-row">
         <span class="home-streak">${SVG_FLAME}<strong>${streak}</strong> 天連續</span>
         <span class="home-protection">${SVG_SHIELD}<strong>${protection}</strong> 安神保護</span>
       </div>
 
       ${makeupBannerHtml}
+
+      <div class="home-sentence" id="homeSentenceBox">
+        <div class="home-sentence-head">
+          <div class="home-sentence-label">今日一句</div>
+          <button class="play-btn" id="homeSentencePlay" aria-label="播放">${SVG_PLAY}</button>
+        </div>
+        <div class="home-sentence-thai">…</div>
+      </div>
 
       <div class="home-hero">
         ${lesson ? `<div class="home-course-chip"><span class="home-course-dot"></span>本週課程 · <strong>${escapeHtml(lesson.title)}</strong></div>` : ''}
@@ -169,14 +177,6 @@ export function renderHomeMode(el, rerender) {
         </div>
         <div class="home-time-row">今日累積 <strong>${minutes > 0 ? `${minutes} 分鐘` : '未滿 1 分鐘'}</strong></div>
         <button class="home-primary-btn" data-home-start-game type="button">開始下一局 →</button>
-      </div>
-
-      <div class="home-sentence" id="homeSentenceBox">
-        <div class="home-sentence-head">
-          <div class="home-sentence-label">今日一句</div>
-          <button class="play-btn" id="homeSentencePlay" aria-label="播放">${SVG_PLAY}</button>
-        </div>
-        <div class="home-sentence-thai">…</div>
       </div>
 
       <div class="home-tasks">
@@ -204,32 +204,28 @@ export function renderHomeMode(el, rerender) {
           </div>
           <button class="home-task-btn" data-home-task-btn="3" ${state.dialogues.length ? '' : 'disabled'} type="button">${task3Done ? '再玩一局' : '開始一局'}</button>
         </div>
-      </div>
+      </div>`;
+}
 
-      <div class="home-week-panel">
-        <div class="home-week-head">本週進度</div>
-        <div class="home-week-stats">來過 <strong>${week.daysCame} / 7</strong> 天 · 複習 <strong>${week.reviewedTotal}</strong> 張 · 對話 <strong>${week.dialoguesCompleted}</strong> 組</div>
-        ${renderWeekChip(week)}
-      </div>
-
-      ${renderAchievementsHtml(achvCtx)}
-    </div>
-  `;
+/* 綁行動面板的事件；rerender 由呼叫端（today.js）給，開完一局回到今日分頁。 */
+export function wireHomePanel(el, todayLog, rerender) {
+  const lesson = newestLesson();
+  const { task1Done, task2Done, task3Done } = gameTaskState(todayLog);
 
   const startListen = () => {
     if (!lesson || !lesson.cards?.length) return;
     listenGame.startListenGame(lesson, state.progress);
-    renderHomeMode(el, rerender);
+    rerender();
   };
   const startCombo = () => {
     if (!lesson) return;
     comboGame.startComboReview(allCardsWithLessonId(), state.progress, lesson.id);
-    renderHomeMode(el, rerender);
+    rerender();
   };
   const startDialogue = () => {
     if (!state.dialogues.length) return;
     dialogueGame.startDialogueGame(state.dialogues);
-    renderHomeMode(el, rerender);
+    rerender();
   };
   const startNext = () => {
     if (!task1Done) startListen();

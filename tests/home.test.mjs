@@ -17,9 +17,19 @@ function sentenceBox() {
     thaiLine,
     children: [],
     querySelector(selector) {
-      return selector === '.home-sentence-thai' ? thaiLine : null;
+      if (selector === '.home-sentence-thai') return thaiLine;
+      if (selector === '.home-sentence-zh') {
+        return this.children.find(c => c.className === 'home-sentence-zh') || null;
+      }
+      return null;
     },
-    appendChild(child) { this.children.push(child); },
+    appendChild(child) {
+      child.remove = () => {
+        const i = this.children.indexOf(child);
+        if (i >= 0) this.children.splice(i, 1);
+      };
+      this.children.push(child);
+    },
   };
 }
 
@@ -52,6 +62,21 @@ test('daily sentence creates a link only for the Chinese translation', () => {
     new URLSearchParams(box.children[0].href.slice(1)).get('card'),
     'lesson-1:ฉันจะไปเชียงใหม่พรุ่งนี้',
   );
+});
+
+test('filling the same box twice keeps one translation, not two', () => {
+  // 今日分頁會 render 兩次（進分頁 + ensureAllLoaded 後），共用同一個 daily
+  // sentence promise，兩個 callback 都會塞進當下那個 box。
+  const box = sentenceBox();
+  const result = {
+    lesson: { id: 'lesson-1' },
+    card: { thai: 'ฉันจะไปเชียงใหม่พรุ่งนี้', zh: '我明天要去清邁' },
+  };
+  fillDailySentence(box, result, fakeDocument);
+  fillDailySentence(box, result, fakeDocument);
+
+  assert.equal(box.children.length, 1);
+  assert.equal(box.children[0].textContent, '我明天要去清邁');
 });
 
 test('missing lesson id keeps the Chinese translation non-clickable', () => {
@@ -106,4 +131,42 @@ test('home wires the third dialogue game as an enabled task', () => {
 test('next-game hero falls back when dialogue data is unavailable', () => {
   assert.match(homeSource, /else if \(!task3Done && state\.dialogues\.length\) startDialogue\(\);/);
   assert.match(homeSource, /else startListen\(\);/);
+});
+
+/* 2026-08-22：「練功」分頁併進「今日」。這組測試守住合併結果，避免之後又被
+   拆回兩個分頁、或漏掉某個入口。 */
+
+test('練功 mode is fully removed — no home mode entry points remain', async () => {
+  const indexHtml = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(indexHtml, /data-mode="home"/);
+  assert.doesNotMatch(indexHtml, /data-drawer-mode="home"/);
+  assert.doesNotMatch(indexHtml, /練功/);
+
+  const uiSource = await readFile(new URL('../src/ui.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(uiSource, /renderHomeMode/);
+
+  const appSource = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(appSource, /state\.mode === 'home'/);
+  assert.doesNotMatch(appSource, /m === 'home'/);
+});
+
+test('今日 is the landing tab: first in every mode picker and the mode init falls back to it', async () => {
+  const indexHtml = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  for (const cls of ['mode-tab', 'mp-btn', 'drawer-item']) {
+    const firstMode = indexHtml.match(new RegExp(`class="${cls}[^"]*"[^>]*data-(?:drawer-)?mode="([^"]+)"`));
+    assert.equal(firstMode?.[1], 'today', `${cls} 的第一顆該是今日`);
+  }
+
+  const appSource = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.match(appSource, /state\.mode = 'today';/);
+});
+
+test('today.js owns the merged shell and delegates the action panel to home.js', async () => {
+  const todaySource = await readFile(new URL('../src/today.js', import.meta.url), 'utf8');
+  // 遊戲進行中要整頁接管，這行是原練功 mode 的行為，合併後必須留著
+  assert.match(todaySource, /renderActiveGame\(el, \(\) => renderTodayMode\(el\)\)/);
+  assert.match(todaySource, /homePanelHtml\(/);
+  assert.match(todaySource, /wireHomePanel\(/);
+  // home.js 不能再反過來 import today.js，否則循環相依會變成真的取值循環
+  assert.doesNotMatch(homeSource, /from '\.\/today\.js'/);
 });

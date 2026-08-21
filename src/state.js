@@ -150,8 +150,8 @@ export const state = {
   lessons: [],
   dialogues: [],             // Sheet「生活對話」分頁同步的固定 6 句情境
   currentLessonId: null,
-  mode: 'card',              // 'card' | 'reverse' | 'listen' | 'dialog' | 'srs' | 'today' | 'home'
-  lastOpenDate: null,        // localDateKey()；每天第一次打開落首頁用（app.js init()）
+  mode: 'card',              // 'card' | 'reverse' | 'listen' | 'dialog' | 'srs' | 'today'
+  lastOpenDate: null,        // localDateKey()；記最後一次打開的日期（app.js init()）
   srsToggle: false,          // card mode 下「只看待複習」開關（不存 localStorage）
   cardIndex: 0,
   flipped: false,
