@@ -1,10 +1,10 @@
 # 熟練衝刺期：每日複習排程設計文件
 
 **日期**：2026-08-21（Asia/Taipei），2026-08-22 依 Nalin 回饋改版（見下方「2026-08-22 改版」）
-**狀態**：**Phase 1（複習隊列本體）已實作完成**（2026-08-22，見下方「複雜度
-與要改的檔案」段落標註）。Phase 2（22:00 即時推播的裝置→雲端同步）尚未開
-工，見「即時進度推播」一節。
-**影響 repo**：`thai-review`（本次規劃，未涉及其他 repo）
+**狀態**：**Phase 1（複習隊列本體）+ Phase 2（22:00 即時推播裝置→雲端同
+步）都已實作完成並部署 production**（2026-08-22）。
+**影響 repo**：`thai-review`（主要）+ `lth-tts-proxy`（Phase 2 架構改動，見
+「即時進度推播」一節——不是原設計的 thai-review 自己的 CF Pages Functions）。
 
 ## 2026-08-22 第二次改版：從「每日固定張數」改成「每日 1 小時用時預算」
 
@@ -215,46 +215,63 @@ Nalin 問的「這些新評分要根據熟悉程度混入之後的每日複習�
      置資料離開裝置，範圍刻意壓到最小（只同步「今天累積秒數」這一個數字，
      不是完整 SRS 進度），跟之前排除的「完整雲端同步」是不同量級的決定。
 
-## 即時進度推播：裝置 → 雲端同步設計
+## 即時進度推播：裝置 → 雲端同步設計（Phase 2，2026-08-22 已實作完成）
 
-目前 repo 沒有任何 CF Pages Functions 或 KV 設定（查證：無 `wrangler.toml`、
-無 `functions/` 目錄）——這塊要從零加。範圍刻意縮到最小：只同步「今天累積
-複習秒數」這一個數字，不同步卡片內容、SRS 進度、評分紀錄，也不做雙向同
-步，資料每天過期，跟「完整雲端同步」（之前明確排除的方向）是不同量級的東
-西。
+範圍刻意縮到最小：只同步「今天累積複習秒數」這一個數字，不同步卡片內容、
+SRS 進度、評分紀錄，也不做雙向同步，資料 3 天自動過期，跟「完整雲端同步」
+（之前明確排除的方向）是不同量級的東西。
 
-- **新增 CF Pages Function**（`functions/api/progress.js` 之類，跟現有
-  `wrangler pages deploy --project-name thai-review` 是同一個 CF Pages 專
-  案、同一次部署一起上——實際檔案位置要在實作時查證 Pages Functions 抓路徑
-  的規則，這裡先不猜死）：`POST` 寫入、`GET` 讀出，body/回傳都是
-  `{ date, deviceId, seconds }`。
-- **新增 KV namespace**（例如 `THAI_REVIEW_PROGRESS`）：key 用
-  `progress:{date}:{deviceId}`，value 是秒數，設 TTL（例如 3 天）自動過
-  期，不會無限累積垃圾資料。
-- **裝置端怎麼送**：沿用既有 15 秒 ticker（`app.js:931-934`），節流成每
-  60-120 秒送一次（不用每 15 秒都打一次 API），另外在 `visibilitychange`
-  轉成 `hidden` 時用 `navigator.sendBeacon()` 補送最後一次（背景/關頁時
-  fetch 容易被中斷，`sendBeacon` 是瀏覽器保證會送出的機制）。用既有
-  `getDeviceId()`（`src/srs.js:126-132`）當 `deviceId`。
-- **附帶好處**：因為現有 `day.seconds` 是每個裝置各自獨立算的（手機複習
-  20 分、筆電再複習 20 分，兩邊 localStorage 互不知道對方），22:00 推播用
-  `daily-reminder.py` **把同一天所有 `deviceId` 的秒數加總**，反而會比任何
-  單一裝置自己算的還準——這不是這次要解的問題，只是同步機制順便補上的效
-  果，值得記一筆。
-- **CF Access 認證**：thai-review 正式站是 CF Access 保護的
-  （`feedback_cf_pages_access_header.md` 記錄過 cookie JWT 自驗模式）。瀏覽
-  器端打 `/api/progress` 沿用使用者既有的 Access session，應該不用額外處
-  理；`daily-reminder.py`（GitHub Actions，不是瀏覽器）要讀這個值，得用
-  Cloudflare Access **Service Token**（`CF-Access-Client-Id` /
-  `CF-Access-Client-Secret` header，Cloudflare 官方提供給機器對機器存取
-  Access 保護資源的機制），存成新的 GitHub Secrets——這是現成的官方機制，
-  不用自己刻認證。
-- **複雜度：中-高**——不是演算法難，是要在 Cloudflare 面板／CLI 裡建
-  KV namespace、設 Service Token、接 Pages Functions，這幾步是這個
-  repo 第一次做，實作時要一步步查證（比照這個 session 一路遵守的「查證過
-  才寫」原則），不是憑印象接。
-- 這塊如果卡住兩輪還接不起來，屬於「架構取捨/環境相容性」類，符合升級
-  opus 的例外情境（`model-dispatch.md` §3），到時候再升級，不用現在先換。
+### 架構跟原設計不同：改用 lth-tts-proxy，不是 thai-review 自己的 CF Pages Functions
+
+原設計想在 thai-review 自己的 CF Pages 開 Functions + 新 KV，用 Cloudflare
+Access Service Token 讓 `daily-reminder.py`（GitHub Actions）通過 thai-review
+正式站的 Access 保護。實作時卡住：目前 wrangler OAuth token 的權限範圍沒有
+Zero Trust／Access 管理權限（`npx wrangler whoami` 列出的 scope 沒有 Access
+Apps/Service Token 相關項目），程式化建立 Service Token 做不到，要嘛改用有
+Zero Trust 權限的 API token（沒有），要嘛請 Nalin 自己去 CF 面板點兩下。
+
+**改用已經在服務 thai-review 的 `lth-tts-proxy` Worker 加兩個端點**，完全繞
+開這個卡點：
+
+- 那支 Worker本來就不在 CF Access 保護範圍內（`*.workers.dev`，走自己的
+  CORS allowlist，不是 thai-review 那個受 Access 保護的自訂網域），不需要
+  Service Token。
+- 已經有 CORS allowlist 包含 `https://thai-review.lthfilmstudio.com`、已經
+  有 `TTS_CACHE` KV 可以借用（key 前綴 `progress:` 分開，不用另開 KV
+  namespace）、已經有 `wrangler secret put` 的既有慣例。
+- 新增兩個端點：`POST /progress`（裝置回報秒數，沿用既有 CORS 保護，沒有額
+  外驗證——低風險：偽造頂多讓 Nalin 自己收到錯的分鐘數）、`GET /progress`
+  （`daily-reminder.py` 讀加總，改用 `PROGRESS_READ_KEY` 共享密鑰的 Bearer
+  token，比 Service Token 簡單，這個場景夠用）。
+- 已部署到 production，curl 驗證過完整 round-trip。
+
+### 已知踩雷：Cloudflare 對 `workers.dev` 網域擋 Python urllib 預設 UA
+
+`daily-reminder.py` 第一次用 `urllib.request` 打 `GET /progress` 直接收到
+`403 Forbidden`／`error code: 1010`，跟 Worker 自己的邏輯無關——是 Cloudflare
+邊緣層級對 `Python-urllib/3.x` 這種泛用 HTTP client 預設 User-Agent 的擋
+（同一支 curl 用預設 UA 打得通，換成 `-A "Python-urllib/3.12"` 就 403，實測
+驗證過）。修法：在 request 帶自訂 `User-Agent` header（例如
+`thai-review-daily-reminder/1.0 (+github repo url)`）就過了，不需要動
+Cloudflare 設定。
+
+### 裝置端怎麼送
+
+`src/progress-sync.js`（新檔）：`syncProgressThrottled(seconds)` 給既有 15
+秒 ticker（`app.js` 裡）每次 tick 呼叫，內部節流成 90 秒送一次；
+`syncProgressOnHide(seconds)` 掛在新的 `visibilitychange` 監聽上，背景化時
+用 `navigator.sendBeacon()` 補送最後一筆（背景時一般 fetch 容易被系統中
+斷）。`deviceId` 沿用既有 `getDeviceId()`（`src/srs.js`，改成 export）。
+
+### 附帶好處
+
+因為現有 `day.seconds` 是每個裝置各自獨立算的（手機複習 20 分、筆電再複習
+20 分，兩邊 localStorage 互不知道對方），22:00 推播的 `fetch_progress_seconds()`
+**把同一天所有 `deviceId` 的秒數加總**，反而會比任何單一裝置自己算的還
+準——這不是這次要解的問題，只是同步機制順便補上的效果，值得記一筆。
+
+複雜度：實際落地後是**中**（比原估的中-高低，因為繞開了 CF Access／Service
+Token 這個最貴的部分；bot UA 擋這個雷花了一輪除錯，但一次就抓到根因）。
 
 ## 複雜度與要改的檔案（Phase 1 已實作完成，2026-08-22）
 
@@ -289,20 +306,29 @@ Nalin 問的「這些新評分要根據熟悉程度混入之後的每日複習�
   實際卡片物件。
 - 測試：`tests/resweep.test.mjs`（新檔）、`tests/srs.test.mjs`／
   `tests/today.test.mjs` 各加幾個 case，`node --test tests/*.test.mjs`
-  125/126 綠（剩 1 個跟這次改動無關的既有 flaky 測試，見下方「已知問題」）。
-- 新檔 `src/progress-sync.js`：節流送出 `POST /api/progress`＋
-  `visibilitychange` 時 `sendBeacon` 補送，見上方獨立一節。
-- 新檔 `functions/api/progress.js`（CF Pages Function，範圍/路徑實作時再
-  查證）＋新 KV namespace 綁定。
-- `scripts/daily-reminder.py`：22:00 推播前多一步 `GET /api/progress`（帶
-  Access Service Token），把當天各裝置秒數加總，組進既有訊息文字；
-  `.github/workflows/daily-reminder.yml` 加兩個新 Secrets
-  （`CF_ACCESS_CLIENT_ID`/`CF_ACCESS_CLIENT_SECRET`）。
-- 對音訊管線衝突風險：零（純排序／篩選邏輯，不碰 `listen.js`/`tts.js`）。
-- 複雜度：**中-高**——排序/篩選改動本身不難（中），resweep 游標的持久化正
-  確性、加上全新的 CF Functions/KV/Service Token 環境設定（前一節已標
-  中-高），兩塊疊起來整體算中-高，建議分兩個階段做（先做隊列排程本體，即
-  時推播同步當第二階段）。
+  126/126 綠（原本 1 個跟這次改動無關的既有 flaky 測試也一併修掉了，見下方
+  「已知問題」）。
+- 新檔 `src/progress-sync.js`：節流送出 `POST /progress`＋`visibilitychange`
+  時 `sendBeacon` 補送，見上方「即時進度推播」一節。`src/srs.js` 的
+  `getDeviceId()` 改成 export 給它重用（原本是內部 helper）。
+- `src/app.js`：15 秒 ticker 加一行呼叫 `syncProgressThrottled()`，新增
+  `visibilitychange` 監聽呼叫 `syncProgressOnHide()`。
+- `lth-tts-proxy` repo（**不是 thai-review**，見「即時進度推播」一節的架構
+  改動說明）：`src/index.ts` 加 `POST /progress`／`GET /progress` 兩個端點，
+  借用既有 `TTS_CACHE` KV，新增 `PROGRESS_READ_KEY` secret，已部署 production
+  並 commit/push；新測試 `tests/progress.test.mjs`。
+- `scripts/daily-reminder.py`：新增 `fetch_progress_seconds()`／
+  `format_progress_line()`，22:00 推播前多一步 `GET /progress`（帶
+  `PROGRESS_READ_KEY` Bearer token，注意上面提到的 UA 踩雷修法），把當天各
+  裝置秒數加總組進訊息文字，失敗靜默略過不擋主推播；新測試
+  `tests/daily_reminder_test.py`。`.github/workflows/daily-reminder.yml` 加
+  一個新 Secret `PROGRESS_READ_KEY`（已用 `gh secret set` 設定）。
+- 對音訊管線衝突風險：零（純排序／篩選邏輯 + 獨立的進度同步，不碰
+  `listen.js`/`tts.js`）。
+- 複雜度：Phase 1 + Phase 2 合計落地後是**中**——比原估的中-高低，主因是
+  Phase 2 繞開了最貴的 CF Access／Service Token 設定（改用已存在的
+  `lth-tts-proxy` Worker），實際卡點反而是意料之外的 Cloudflare bot UA 擋
+  Python urllib，一輪除錯就抓到根因解掉。
 
 ## 已知問題（跟這次改動無關，發現時一併修掉）
 

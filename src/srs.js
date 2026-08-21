@@ -132,7 +132,7 @@ export function daysUntil(targetMs, now = Date.now()) {
   return Math.max(1, Math.ceil(ms / DAY_MS));
 }
 
-function getDeviceId() {
+export function getDeviceId() {
   let id = localStorage.getItem('thai-review-device-id');
   if (!id) {
     id = `${navigator.platform}-${Math.random().toString(36).slice(2, 10)}`;

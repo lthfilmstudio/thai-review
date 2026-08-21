@@ -28,6 +28,10 @@ from pathlib import Path
 
 DATA_JSON = Path(__file__).resolve().parent.parent / "data.json"
 APP_URL = "https://thai-review.lthfilmstudio.com/"
+PROGRESS_ENDPOINT = "https://thai-tts.lthfilmstudio.workers.dev/progress"
+# 跟 src/today.js 的 DAILY_BUDGET_SEC 保持一致——兩邊分屬不同語言/repo，沒有
+# 機制共用常數，改動時要記得兩邊一起改（docs/mastery-sprint-plan-2026-08.md）。
+DAILY_BUDGET_SEC = 3600
 MIN_THAI_CHARS = 15
 TAIPEI = timezone(timedelta(hours=8))
 THAI_CHAR_RE = re.compile(r"[฀-๿]")  # 泰文 Unicode 區塊
@@ -68,6 +72,38 @@ def pick_sentence(lessons: list[dict], today: str) -> tuple[dict, dict] | None:
         idx = int(hashlib.sha256(seed.encode()).hexdigest(), 16) % len(candidates)
         return lesson, candidates[idx]
     return None
+
+
+def fetch_progress_seconds(today: str) -> int | None:
+    """讀熟練衝刺期今天各裝置累積複習秒數加總（見 lth-tts-proxy 的 /progress
+    endpoint、docs/mastery-sprint-plan-2026-08.md「即時進度推播」）。失敗回
+    None——這條路徑是錦上添花，任何失敗都不該擋住「今日一句」本體推播。"""
+    key = os.environ.get("PROGRESS_READ_KEY", "")
+    if not key:
+        return None
+    url = f"{PROGRESS_ENDPOINT}?{urllib.parse.urlencode({'date': today})}"
+    # Cloudflare 對 workers.dev 網域預設擋掉 Python-urllib 的預設 User-Agent
+    # signature（403 / error code 1010，實測發現，不是 Worker 自己的邏輯擋
+    # 的）；換一個非泛用 HTTP client 的 UA 字串就過了。
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {key}",
+        "User-Agent": "thai-review-daily-reminder/1.0 (+https://github.com/lthfilmstudio/thai-review)",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="replace"))
+        return max(0, int(data.get("total", 0)))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, json.JSONDecodeError) as e:
+        print(f"[daily-reminder] 進度同步讀取失敗（不影響今日一句本體）：{e}", flush=True)
+        return None
+
+
+def format_progress_line(seconds: int) -> str:
+    minutes = seconds // 60
+    if seconds >= DAILY_BUDGET_SEC:
+        return f"\n\n🎯 今天已複習 {minutes} 分鐘，達標了！"
+    remaining = (DAILY_BUDGET_SEC - seconds + 59) // 60
+    return f"\n\n今天已複習 {minutes} 分鐘，距離 1 小時目標還差 {remaining} 分鐘"
 
 
 def send_telegram(token: str, chat_id: str, text: str, retries: int = 3) -> None:
@@ -127,10 +163,14 @@ def main() -> int:
 
     # parse_mode=HTML：thai/zh 是動態內容，過 html.escape() 才能安全塞進 HTML；
     # href 也跟著跳脫，避免萬一 URL 裡帶到 & 之類的字元把標籤弄壞。
+    progress_seconds = fetch_progress_seconds(today)
+    progress_line = format_progress_line(progress_seconds) if progress_seconds is not None else ""
+
     text = (
         "清心安神・今日一句\n\n"
         f"{html.escape(thai)}\n"
         f'<a href="{html.escape(link)}">{html.escape(zh)}</a>'
+        f"{progress_line}"
     )
 
     try:

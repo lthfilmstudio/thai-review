@@ -16,6 +16,7 @@ import {
 } from './data.js';
 import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds, settleStreakOnOpen, showToast, buildDailyQueue, loadDailyLog } from './today.js';
 import { advanceResweepCursor } from './resweep.js';
+import { syncProgressThrottled, syncProgressOnHide } from './progress-sync.js';
 import { recordGrade } from './grade-history.js';
 import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices, preloadRealAudioAvailability } from './tts.js';
@@ -940,10 +941,19 @@ async function init() {
 
   // 今日累積時間：每 15 秒記一次，分頁在背景時跳過。最多掉尾數 15 秒，
   // 換掉整套 flush-on-unload 邏輯，划算（只記錄不設目標，見設計書 3 節）。
+  // 順便節流同步給 22:00 推播用（docs/mastery-sprint-plan-2026-08.md
+  // 「即時進度推播」），同步失敗不影響複習，syncProgressThrottled 內部靜默吞錯。
   setInterval(() => {
     if (document.hidden) return;
     addActiveSeconds(15);
+    syncProgressThrottled(loadDailyLog().days[localDateKey()]?.seconds || 0);
   }, 15000);
+
+  // 背景化/關頁時補送最後一筆進度（sendBeacon，比一般 fetch 更能在背景存活）。
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) return;
+    syncProgressOnHide(loadDailyLog().days[localDateKey()]?.seconds || 0);
+  });
 
   // Service worker
   if ('serviceWorker' in navigator) {

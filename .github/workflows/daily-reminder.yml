@@ -27,4 +27,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # 熟練衝刺期即時進度（docs/mastery-sprint-plan-2026-08.md）；沒設也
+          # 不會擋住推播，fetch_progress_seconds() 會直接回 None 跳過那一行。
+          PROGRESS_READ_KEY: ${{ secrets.PROGRESS_READ_KEY }}
         run: python3 scripts/daily-reminder.py
