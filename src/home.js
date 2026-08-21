@@ -12,10 +12,12 @@ import {
   renderAchievementsHtml,
 } from './today.js';
 import { checkAndUnlock } from './achievements.js';
+import { speakCard } from './tts.js';
 import * as listenGame from './game-listen.js';
 import * as comboGame from './game-combo.js';
 import * as dialogueGame from './game-dialogue.js';
 
+const SVG_PLAY = '<svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 2 L9 6 L3 10 Z" fill="currentColor"/></svg>';
 const SVG_HEADPHONE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="13" width="4" height="7" rx="1.5"/><rect x="17.5" y="13" width="4" height="7" rx="1.5"/></svg>';
 const SVG_CARDS = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="5" y="6" width="13" height="13" rx="2"/><path d="M8 6V4h9a2 2 0 0 1 2 2v9h-1"/></svg>';
 const SVG_CHAT = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16v10H9l-5 4v-14z"/></svg>';
@@ -170,7 +172,10 @@ export function renderHomeMode(el, rerender) {
       </div>
 
       <div class="home-sentence" id="homeSentenceBox">
-        <div class="home-sentence-label">今日一句</div>
+        <div class="home-sentence-head">
+          <div class="home-sentence-label">今日一句</div>
+          <button class="play-btn" id="homeSentencePlay" aria-label="播放">${SVG_PLAY}</button>
+        </div>
         <div class="home-sentence-thai">…</div>
       </div>
 
@@ -241,5 +246,12 @@ export function renderHomeMode(el, rerender) {
   getDailySentence(state.lessons).then(result => {
     const box = document.getElementById('homeSentenceBox');
     fillDailySentence(box, result);
+    const playBtn = document.getElementById('homeSentencePlay');
+    if (playBtn && result?.card?.thai) {
+      playBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        speakCard(result.card);
+      });
+    }
   }).catch(() => {});
 }

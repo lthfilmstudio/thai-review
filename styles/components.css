@@ -2204,6 +2204,11 @@
   border-radius: 14px;
   background: var(--card);
 }
+.home-sentence-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .home-sentence-label { color: var(--gold); font-size: 11px; letter-spacing: 0.06em; }
 .home-sentence-thai {
   margin-top: 10px;
