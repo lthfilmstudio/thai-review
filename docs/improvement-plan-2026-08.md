@@ -1,9 +1,11 @@
 # thai-review 對標 Speak/ELSA/SRS 改進設計文件
 
-**日期**：2026-08-17（Asia/Taipei）
+**日期**：2026-08-17（Asia/Taipei），2026-08-21 補充「方向 1 附錄：Shadowing 研究精修」
 **狀態**：方向 2（SRS 四檔評分）、方向 3（複習數據呈現）、方向 4（7 條成就全
 數上線，含依賴方向 2/3 的課程全通關 / 一週正確率 90%+）都已完成上線。方向 1
-（錄音跟讀比對）仍暫緩，等系統穩定一段時間、Nalin 有餘裕時再繼續開發。
+（錄音跟讀比對）仍暫緩，等系統穩定一段時間、Nalin 有餘裕時再繼續開發。**方向
+1 附錄**（見文末）用語言學 shadowing 研究重新檢視方向 1 的設計，同樣暫緩、
+只先定案文件。
 **影響 repo**：`thai-review`（僅本次規劃，未來實作若涉及中文語音會再影響 `lth-tts-proxy`，本次無）
 
 ## 背景
@@ -186,6 +188,100 @@ API（如 Speechace），這次刻意做零成本的「只錄、只回放比對�
   統音訊路由切換，建議實機測試驗證（尤其 Nalin 平常戴耳機聽力複習的使用情
   境），不是靠讀文件能保證的。
 - 複雜度：中-高。演算法本身簡單，風險完全集中在環境相容性。
+
+## 方向 1 附錄：Shadowing 研究精修（2026-08-21）—— 暫緩，跟方向 1 一起排
+
+> **暫緩開發**：本節是方向 1 的設計精修，不是新方向。方向 1 本身還沒排入時
+> 程，這份附錄先定案存檔，等方向 1 真的要動工時一起考慮。
+
+### 背景：現有「跟讀」是 Echo Shadowing，不是同步 shadowing
+
+查證語言學文獻（見文末來源）後發現一個值得記錄的落差：語言學上的
+**shadowing** 定義是「聽到的當下幾乎零延遲、跟原音同步複誦」，核心價值在訓
+練大腦同時處理「聽」跟「說」；跟讀空白（等一段話講完才輪到你講）在文獻裡
+是另一個獨立變體，叫 **Echo Shadowing**——**現有 `computeCycleTimeline`
+（`src/tts.js:575`）的「中文意思 →（泰文老師語音 → 靜音空白）× N 次」設
+計，做的正是 Echo Shadowing，這件事本身沒有錯，只是還有其他被驗證有效的
+變體完全沒碰過**：
+
+- **Pure/Parrot shadowing**：跟原音同步複誦，不管意思，純練聲音反應
+- **Prosody shadowing**：刻意誇張模仿語調曲線、重音、節奏——對泰文這種聲
+  調語言特別對症
+- **Content shadowing**：同步跟講 + 同時追意思，難度最高，留給已經抓熟音
+  的人
+- 建議的漸進式練習順序：先聽懂 → 看文字跟讀 → 不看文字跟讀 → 最後一輪刻意
+  誇張語調
+
+### 提案 A：同步跟讀模式（Pure Shadowing）
+
+**設計**：錄音時機從「靜音空白裡錄」改成「跟老師語音同步錄」。技術上這其
+實比方向 1 原案更單純——`computeCycleTimeline` 回傳的 `timeline` 已經算好
+每個 `teacher` 段落精確的 `startMs`/`durMs`，同步錄音只要在該段落開始時呼
+叫方向 1 已設計好的 `mic-record.js` 的 `startRecording()`、段落結束時
+`stopRecording()`，不用像方向 1 原案那樣處理「空白多長才夠使用者講完」這
+種開放式時間問題。
+
+- 沿用方向 1 已經想清楚的部分：iOS `MediaRecorder` mimeType 偵測、鎖屏模式
+  完全排除錄音 UI、Blob 只留在記憶體不落地、`visibilitychange` 自救。
+- 新增的部分：一個跟播放位置同步的 phase-transition 觸發器（`listen.js` 已
+  經有 `getPlaybackPositionMs` 可用，不用另外做位置追蹤）。
+- 風險：`getUserMedia` 授權跟啟動錄音都是非同步呼叫，如果卡在 teacher 段落
+  開始那個時間點才臨時觸發，開頭幾百毫秒的錄音可能被吃掉。建議整堂跟讀模
+  式一開始就先要好麥克風權限、`MediaRecorder` 保持待命，之後每個 teacher
+  段落只是 start/stop 既有 recorder，不重新要權限。
+- 複雜度：**中**。約 90% 工程量跟方向 1 原案重疊（`mic-record.js` 整支不
+  變），新增的只有「什麼時候 start/stop」這個有明確資料可以算的觸發邏輯。
+
+### 提案 B：語調誇張跟讀模式（Prosody Shadowing）
+
+**設計**：不做自動發音評分（原因跟方向 1 一致：泰文聲調用免費 API 準確度
+不夠、貴的 API 又要另外花錢，這次還是不碰）。用「模式切換 + 引導文案」取
+代演算法評分：
+
+- **基本版（低成本）**：跟讀模式加一顆切換鈕「一般 / 誇張語調」，選誇張語
+  調時固定用較慢的速率（沿用現有 0.6x 選項）、UI 文案改成「刻意放大聲調的
+  高低起伏，講得比平常誇張沒關係」。純 UI／文案 + 沿用既有速率設定，幾乎
+  不動音訊管線。複雜度：**低**。
+- **進階版（stretch，不是這次要做的）**：從老師語音本身（不是從
+  `karaoke` 拼音欄位）即時抓音高（F0）曲線畫出來給使用者看。這條路線特別
+  提出來是因為方向 3 當初放棄「聲調分類」是因為 `karaoke` 欄位沒有結構化
+  聲調資料、正則抓變音符號不準（見方向 3 段落）——但音高曲線是從**音檔本
+  身**算的，不依賴那個不可靠的欄位，理論上能做到準確。缺點是要在瀏覽器端
+  跑音高偵測演算法（autocorrelation 或 YIN 這類），屬於一塊新的 DSP 程式
+  碼，複雜度：**中-高**，這次不建議一起做，留一個代辦項就好。
+
+### 提案 C：漸進式重複（每輪跟讀不要一模一樣）
+
+**設計**：現有 `computeCycleTimeline` 的 `for (let r = 0; r < repeat; r++)`
+每一輪用同一個 `teacherEffMs`／`gapMs`，聽起來、放起來都一樣。改成依文獻建
+議的漸進順序分配每一輪的角色，例如 3 輪時：第 1 輪正常速度（先聽懂）、第
+2 輪正常速度＋錄音跟讀、第 3 輪放慢速度＋誇張語調（呼應提案 B）。
+
+- **技術難點不在演算法，在「這段程式碼很脆弱」**：`buildListenCycleUncached`
+  是離線一次性 render 成一條 WAV（`OfflineAudioContext`），還墊了一條
+  40Hz keep-alive 訊號防止 iOS/Chrome 判定「沒在出聲」而收回背景播放身分
+  （`src/tts.js:667-669` 的註解，是真的踩過雷才加的）。要讓每一輪速率不
+  同，就要在同一次 render 裡塞進多個不同速率的 `stretchAudioBuffer` 結
+  果，`cycleKey`（快取鍵）也要跟著擴充覆蓋新參數，不能只加變數不改快取
+  邏輯，不然會拿到舊快取播錯內容。`tests/autoplay.test.mjs` 已經在測這塊
+  邏輯，改動要先確保這份測試全綠再往下走。
+- 複雜度：**中-高**——倒不是提案本身難，是這段程式碼是已知的高風險區
+  （鎖屏背景播放這個功能整個 app 踩過最多雷的地方就在這裡），任何改動都
+  要小心不要把已經修好的 iOS 背景播放問題改壞。
+
+### 建議優先序（如果之後要做）
+
+提案 A（同步跟讀）> 提案 B 基本版（語調模式切換）> 提案 C（漸進重複）>
+提案 B 進階版（音高曲線視覺化，代辦項）。A 跟 B 基本版風險低、跟現有音訊管
+線衝突小；C 因為要動到脆弱的核心播放程式碼，建議排最後，而且要單獨切一個
+分支做、跑滿現有測試再上。
+
+### 來源
+
+- [A Systematic Review of Research on the use of Shadowing for Second Language Pronunciation Teaching](https://www.tandfonline.com/doi/full/10.1080/29984475.2025.2546827)
+- [Shadowing for Fluency, Prosody, and Listening Comprehension — The Language Gym](https://gianfrancoconti.com/2025/07/26/shadowing-for-fluency-prosody-and-listening-comprehension-the-what-why-and-how-according-to-sla-research/)
+- [Shadowing: A Practitioner's Guide to the Technique in 2026 — Migaku](https://migaku.com/blog/language-fun/shadowing-a-practitioners-guide-to-the-technique-in-2026)
+- [Shadowing for Language Learning: What the Research Actually Shows — My Senpai](https://my-senpai.com/insights/shadowing-language-learning.html)
 
 ## 共通收尾提醒
 
