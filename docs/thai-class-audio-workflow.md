@@ -171,6 +171,19 @@ validator 會擋缺欄／多欄、表頭、編號、Karaoke hyphen、完全重�
 | `needs_tsv_review` | Scribe 與 combined transcript 完成 | 跑 handoff、整理 draft、validator |
 | `complete` | 五欄 TSV 已通過 validator | 人工審閱並貼入 Sheet |
 
+## 6.5 Sheet 確認無誤後，自動接課堂原音（2026-08-21 起）
+
+Nalin 確認 Google Sheet 內容無誤（字卡都貼對、拼音都填好）後，**不用再問，直接接著跑
+`scripts/build-real-audio.py --job <job-id> --lesson "<Sheet 分頁標題>"`**——這步純本機
+處理（用已經轉錄好的 Scribe word/speaker 資料比對，不再打付費 API），跑完看一下：
+
+- 比對率（幾成卡片對到老師原音）跟音檔長度分佈（`min/max/avg dur ms`）有沒有明顯異常
+- 沒對到的卡片列出來看一眼，理由合不合理（用詞出入、混英文之類正常；大量對不到才要停下來查）
+
+正常就直接進 `scripts/update-audio-deploy.sh --deploy` 一起部署，不用先給 Nalin 看過
+QA 頁再問一次要不要做——這條已經是每次 Sheet 確認後的標準動作。`out/real-audio-qa/`
+產物不進 Git，`real-manifest.json` 也是部署時當場生成，不用額外 commit。
+
 ## 7. 免費驗證與 gold 驗收
 
 任何真實上傳前先跑：
