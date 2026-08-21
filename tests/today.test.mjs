@@ -147,7 +147,9 @@ test('a games-only day does not affect maxDailyReviewed / totalReviewed achievem
   logGame('listen', NOON_TAIPEI(2026, 8, 20));
   logGame('listen', NOON_TAIPEI(2026, 8, 20));
   logGame('listen', NOON_TAIPEI(2026, 8, 20));
-  const ctx = buildAchievementCtx(loadDailyLog());
+  // streak/週正確率跟「今天」有關，帶固定 now（跟上面寫死的日期同一天）
+  // 才不會隨系統真實日期往前走而變動。
+  const ctx = buildAchievementCtx(loadDailyLog(), NOON_TAIPEI(2026, 8, 20));
   assert.equal(ctx.maxDailyReviewed, 0);
   assert.equal(ctx.totalReviewed, 0);
   assert.equal(ctx.streak, 1); // 遊戲日仍然算「有來」

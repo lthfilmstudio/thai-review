@@ -383,7 +383,7 @@ function hasFullyMatureLesson() {
 }
 
 /* 組裝成就判定要的 ctx。呼叫端（評分後、進今日 tab 時）各自帶目前的 log 呼叫。 */
-export function buildAchievementCtx(log = loadDailyLog()) {
+export function buildAchievementCtx(log = loadDailyLog(), now = Date.now()) {
   let maxDailyReviewed = 0;
   let totalReviewed = 0;
   for (const k in log.days) {
@@ -396,14 +396,14 @@ export function buildAchievementCtx(log = loadDailyLog()) {
   const allLessonsLoaded = state.lessons.length > 0
     && state.lessons.every(lesson => lesson._loaded || !lesson.gid);
   return {
-    streak: streakDays(log.days),
+    streak: streakDays(log.days, now),
     maxDailyReviewed,
     totalReviewed,
     totalCards: cards.length,
     gradedCards,
     allLessonsLoaded,
     hasFullyMatureLesson: hasFullyMatureLesson(),
-    weeklyAccuracy: averageAccuracy(accuracyTrend(log.days, 7)),
+    weeklyAccuracy: averageAccuracy(accuracyTrend(log.days, 7, now)),
   };
 }
 

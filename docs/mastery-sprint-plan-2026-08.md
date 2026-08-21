@@ -304,16 +304,17 @@ Nalin 問的「這些新評分要根據熟悉程度混入之後的每日複習�
   中-高），兩塊疊起來整體算中-高，建議分兩個階段做（先做隊列排程本體，即
   時推播同步當第二階段）。
 
-## 已知問題（跟這次改動無關，發現時一併記錄）
+## 已知問題（跟這次改動無關，發現時一併修掉）
 
 `tests/today.test.mjs`「a games-only day does not affect
 maxDailyReviewed/totalReviewed」這個既有測試會間歇性失敗——它把
 `logGame` 的時間戳寫死在 `2026-08-20`，但斷言用的 `buildAchievementCtx()`
-沒帶 `now` 參數、預設吃真實 `Date.now()`，一旦系統日期走到 2026-08-20 以
-後（就是現在），`streakDays()` 算出來的連續天數就會跟寫死日期的測資對不
-上。用 `git stash` 驗證過 Phase 1 改動之前這個測試在乾淨的 main 上就已經
-失敗，不是這次動到的東西——先記錄，等 Nalin 確認要不要一併修（一行改
-動：讓那個斷言也帶固定的 `now`）。
+原本沒帶 `now` 參數、預設吃真實 `Date.now()`，系統日期走到 2026-08-20 以
+後（就是現在）就會跟寫死日期的測資對不上。用 `git stash` 驗證過 Phase 1
+改動之前這個測試在乾淨的 main 上就已經失敗，不是這次動到的東西——已在
+Nalin 確認後一併修掉：`buildAchievementCtx(log, now = Date.now())` 加一個
+可選的 `now` 參數（往下傳給 `streakDays()`/`accuracyTrend()`），測試改傳
+固定的 `now` 對齊寫死的日期；正式程式碼所有呼叫端都用預設值，行為不變。
 
 ## 不動的部分
 
