@@ -32,6 +32,17 @@ export function loadGradeHistory() {
   return load();
 }
 
+/* 跨裝置同步用的批次寫入：把合併好的 { cardKey: [[code, ts], ...] } 覆蓋進去。
+   合併語意歸 src/cloud-merge.js 的 mergeHistory，這裡只負責落地。 */
+export function writeMergedHistory(merged) {
+  const keys = Object.keys(merged || {});
+  if (!keys.length) return false;
+  const h = load();
+  for (const k of keys) h.cards[k] = merged[k];
+  save(h);
+  return true;
+}
+
 /* 記一筆評分。gradeStr 不是四檔之一就略過（例如清掉評分時 setGrade 傳 undefined）。 */
 export function recordGrade(cardKey, gradeStr, ts = Date.now()) {
   const code = GRADE_CODE[gradeStr];

@@ -17,6 +17,8 @@ import {
 import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds, settleStreakOnOpen, showToast, buildDailyQueue, loadDailyLog } from './today.js';
 import { advanceResweepCursor } from './resweep.js';
 import { syncProgressThrottled, syncProgressOnHide } from './progress-sync.js';
+import * as cloudAuth from './cloud-auth.js';
+import { syncNow, syncThrottled, syncSoon, flushOnHide, lastSyncedAt } from './cloud-sync.js';
 import { recordGrade } from './grade-history.js';
 import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices, preloadRealAudioAvailability } from './tts.js';
@@ -302,6 +304,9 @@ function gradeAndAdvance(g) {
   setGrade(state.cardIndex, g);
   const improvementMoment = gradedCard ? recordGrade(gradedCardKey, g) : false;
   logReview(g);
+  // 評分是唯一會產生要同步的資料的動作，所以在這裡就排同步（去抖動 4 秒）。
+  // 只靠「切背景」不夠：評完就關 App 的話那批評分會留在本機上不去。
+  if (cloudAuth.hasStoredSession()) syncSoon();
   if (state.currentLessonId === '__TODAY__' && gradedCardKey) {
     const wasResweep = removeFromDailyQueue(gradedCardKey);
     if (wasResweep) advanceResweepCursor(1, allCardsWithLessonId().length);
@@ -427,6 +432,33 @@ function updateSyncHint() {
   if (!el) return;
   const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
   el.textContent = `上次同步：${formatLastSync(getLastSync(url))}`;
+}
+
+/* 跨裝置同步的狀態列。沒登入時完全不碰網路，畫面就停在「未登入」。 */
+async function updateCloudHint() {
+  const statusEl = document.getElementById('cloudStatus');
+  const btn = document.getElementById('btnCloudAuth');
+  const hint = document.getElementById('cloudHint');
+  if (!statusEl || !btn) return;
+
+  const session = await cloudAuth.getSession();
+  if (!session) {
+    statusEl.textContent = '未登入';
+    btn.textContent = '用 Google 登入';
+    btn.dataset.cloudAction = 'login';
+    if (hint) hint.textContent = '登入後，手機／平板／電腦的複習紀錄會自動同步。';
+    return;
+  }
+
+  statusEl.textContent = session.user?.email || '已登入';
+  btn.textContent = '登出';
+  btn.dataset.cloudAction = 'logout';
+  if (hint) {
+    const at = lastSyncedAt();
+    hint.textContent = at
+      ? `上次同步：${formatLastSync(at)}`
+      : '尚未同步過，開啟 App 或切到背景時會自動同步。';
+  }
 }
 
 async function fetchJsonMaybe(path) {
@@ -592,6 +624,16 @@ async function init() {
     rerender();
   }
 
+  // 跨裝置同步：登入導回來要先把 ?code= 換成 session，再拉一次雲端進度。
+  // 整段不 await 進主流程——同步慢或失敗都不能拖住 App 開機。
+  void (async () => {
+    await cloudAuth.consumeRedirect();
+    void updateCloudHint();
+    if (!cloudAuth.hasStoredSession()) return;
+    const r = await syncNow();
+    if (r?.pulled) { rerender(); void updateCloudHint(); }
+  })();
+
   // 模式切換
   syncModeButtons();
 
@@ -715,6 +757,35 @@ async function init() {
       renderStats();
       renderContent(rerender);
     }
+  });
+
+  // 跨裝置同步：登入 / 登出，以及登入狀態下手動觸發一次同步
+  document.getElementById('btnCloudAuth')?.addEventListener('click', async e => {
+    const btn = e.currentTarget;
+    if (btn.disabled) return;
+    if (btn.dataset.cloudAction === 'logout') {
+      if (!confirm('登出後這台裝置就不再同步（本機已有的紀錄不會被刪）。確定登出？')) return;
+      btn.disabled = true;
+      await cloudAuth.logout();
+      btn.disabled = false;
+      void updateCloudHint();
+      return;
+    }
+    await cloudAuth.login();   // 會整頁跳轉去 Google
+  });
+
+  // 手動同步（登入後點狀態列就跑一次，離線或自動同步出問題時的逃生口）
+  document.getElementById('cloudStatus')?.addEventListener('click', async () => {
+    const hint = document.getElementById('cloudHint');
+    if (!await cloudAuth.getSession()) return;
+    if (hint) hint.textContent = '同步中…';
+    const r = await syncNow();
+    if (hint) {
+      hint.textContent = r
+        ? `同步完成：收到 ${r.pulled} 筆、送出 ${r.pushed} 筆`
+        : '同步失敗，稍後會自動重試。';
+    }
+    if (r?.pulled) rerender();
   });
 
   // 重新同步 Sheet：先抓再覆蓋；失敗保留舊資料；連點防呆
@@ -947,12 +1018,17 @@ async function init() {
     if (document.hidden) return;
     addActiveSeconds(15);
     syncProgressThrottled(loadDailyLog().days[localDateKey()]?.seconds || 0);
+    // 跨裝置同步（登入才會真的動作，內部節流 2 分鐘一次）
+    if (cloudAuth.hasStoredSession()) syncThrottled();
   }, 15000);
 
   // 背景化/關頁時補送最後一筆進度（sendBeacon，比一般 fetch 更能在背景存活）。
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) return;
     syncProgressOnHide(loadDailyLog().days[localDateKey()]?.seconds || 0);
+    // 切走前把還沒推上去的評分補送（keepalive，分頁關掉也送得完）。
+    // 不用 syncNow()：那是一般 fetch，分頁一關就被瀏覽器砍掉。
+    if (cloudAuth.hasStoredSession()) flushOnHide();
   });
 
   // Service worker

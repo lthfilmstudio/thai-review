@@ -1202,6 +1202,25 @@
   margin-top: 4px;
 }
 
+/* 跨裝置同步狀態列 */
+.cloud-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cloud-status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-soft);
+  cursor: pointer;   /* 已登入時點一下＝手動同步一次 */
+}
+
 .btn {
   padding: 9px 14px;
   border-radius: 9px;
