@@ -80,15 +80,22 @@ export function mergeHistory(local, remote) {
    回傳 { progress, history }，兩個都是 { cardKey: 值 } 的 map，只包含
    「遠端比較新、需要覆蓋本機」的項目；沒有變動的卡不會出現在結果裡，
    呼叫端可以用有沒有 key 判斷要不要存檔。 */
-export function mergeRemoteRows(rows, localProgress, localHistory, resetAt = 0) {
+export function mergeRemoteRows(rows, localProgress, localHistory, resetAt = 0, localEdits = null) {
   const progress = {};
   const history = {};
+  const edits = {};
 
   for (const row of rows || []) {
     const key = row?.card_key;
     if (!key) continue;
 
-    // 重置 epoch 之前的紀錄一律當作已清除。這行讓「第一次登入的新裝置」也能
+    // 編輯不受重置 epoch 影響——「重置進度」清的是評分排程，不是卡片內容，
+    // 所以放在下面那道 epoch 過濾之前。
+    if (row.edit && editStamp(row.edit) > editStamp(localEdits?.[key])) {
+      edits[key] = row.edit;
+    }
+
+    // 重置 epoch 之前的評分一律當作已清除。這行讓「第一次登入的新裝置」也能
     // 正確套用重置——它的 watermark 是空的，會把雲端所有列都拉下來，沒有這個
     // 過濾就會把已經重置掉的舊資料當成新資料收進來。
     if ((row.progress_updated_at ?? 0) <= resetAt) continue;
@@ -106,7 +113,7 @@ export function mergeRemoteRows(rows, localProgress, localHistory, resetAt = 0) 
     }
   }
 
-  return { progress, history };
+  return { progress, history, edits };
 }
 
 /* ===== 每日日誌（Phase B）=====
@@ -213,11 +220,18 @@ export function keysClearedByReset(localProgress, resetAt) {
   return keys;
 }
 
+/* 卡片編輯的時間戳。舊資料沒有 updatedAt 就當 0（最舊）。 */
+export function editStamp(edit) {
+  return (edit && typeof edit === 'object' && edit.updatedAt) || 0;
+}
+
 /* 挑出「本機比 watermark 新、需要上傳」的卡。
    history 沒有自己的時間戳，跟著同一張卡的 progress 一起上傳即可
-   （歷史只在評分當下變動，跟 progress 同步發生）。 */
-export function collectLocalChanges(localProgress, localHistory, since, resetAt = 0) {
-  const rows = [];
+   （歷史只在評分當下變動，跟 progress 同步發生）。
+   編輯有自己的時間戳，而且可能發生在「從沒評過分」的卡上，所以要獨立走一輪，
+   不能只跟著 progress 迴圈跑。 */
+export function collectLocalChanges(localProgress, localHistory, since, resetAt = 0, localEdits = null) {
+  const byKey = new Map();
   for (const key in localProgress) {
     const entry = localProgress[key];
     if (!entry || typeof entry !== 'object') continue;
@@ -231,7 +245,17 @@ export function collectLocalChanges(localProgress, localHistory, since, resetAt 
       row.history = hist;
       row.history_updated_at = stamp;
     }
-    rows.push(row);
+    byKey.set(key, row);
   }
-  return rows;
+
+  for (const key in localEdits || {}) {
+    const stamp = editStamp(localEdits[key]);
+    if (stamp <= since) continue;
+    const row = byKey.get(key) || { card_key: key };
+    row.edit = localEdits[key];
+    row.edit_updated_at = stamp;
+    byKey.set(key, row);
+  }
+
+  return [...byKey.values()];
 }

@@ -286,13 +286,22 @@ export function applyCardEdit(card, lessonId) {
   const source = sourceThai(card);
   const key = `${lessonId || card._lessonId || state.currentLessonId || 'x'}:${source}`;
   const edited = state.edits[key];
+  // 只套用有值的欄位：空字串代表「這欄沒有覆蓋」（清除編輯留下的墓碑就是
+  // 四欄全空），直接整包展開會把卡片內容洗成空的。updatedAt 是同步用的
+  // metadata，更不能混進卡片欄位。
+  const overrides = {};
+  let hasOverride = false;
+  for (const field of ['thai', 'karaoke', 'zh', 'note']) {
+    const v = edited?.[field];
+    if (typeof v === 'string' && v !== '') { overrides[field] = v; hasOverride = true; }
+  }
   return {
     ...card,
-    ...(edited || {}),
+    ...overrides,
     _sourceThai: source,
     _lessonId: lessonId || card._lessonId,
     _cardKey: key,
-    _edited: !!edited,
+    _edited: hasOverride,
   };
 }
 
@@ -303,14 +312,18 @@ export function saveCardEdit(card, patch) {
   for (const field of ['thai', 'karaoke', 'zh', 'note']) {
     cleaned[field] = (patch[field] || '').trim();
   }
+  cleaned.updatedAt = Date.now();
   state.edits[key] = cleaned;
   saveState();
 }
 
+/* 清除編輯留一個空殼墓碑（各欄位空字串 + 新的 updatedAt），不是刪 key——
+   刪掉的話跨裝置同步永遠傳不出去「清掉了」這件事，別台會把它加回來。
+   applyCardEdit() 本來就把空字串當成「沒有覆蓋」，所以顯示行為不變。 */
 export function clearCardEdit(card) {
   if (!card) return;
   const key = card._cardKey || cardKey(card);
-  delete state.edits[key];
+  state.edits[key] = { thai: '', karaoke: '', zh: '', note: '', updatedAt: Date.now() };
   saveState();
 }
 

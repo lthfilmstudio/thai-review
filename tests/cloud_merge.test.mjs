@@ -297,3 +297,45 @@ test('收藏合併可交換', () => {
   const b = { 'กิน': { v: 0, ts: 300 } };
   assert.deepEqual(mergeFavorites(a, b), mergeFavorites(b, a));
 });
+
+/* ===== Phase B：卡片編輯 ===== */
+
+test('編輯有自己的時間戳，較新的一方勝出', () => {
+  const localEdits = { 'L1:a': { zh: '本機版', updatedAt: 9000 } };
+  const rows = [{ card_key: 'L1:a', edit: { zh: '遠端舊版', updatedAt: 3000 } }];
+  assert.deepEqual(mergeRemoteRows(rows, {}, {}, 0, localEdits).edits, {}, '較舊的不該收下');
+
+  const newer = [{ card_key: 'L1:a', edit: { zh: '遠端新版', updatedAt: 99999 } }];
+  assert.equal(mergeRemoteRows(newer, {}, {}, 0, localEdits).edits['L1:a'].zh, '遠端新版');
+});
+
+test('編輯不受重置 epoch 影響（重置清的是評分，不是卡片內容）', () => {
+  const rows = [{
+    card_key: 'L1:a',
+    grade: 'good', progress_updated_at: 1000,      // 重置前的評分 → 該被濾掉
+    edit: { zh: '我的翻譯', updatedAt: 1000 },      // 編輯 → 該保留
+  }];
+  const r = mergeRemoteRows(rows, {}, {}, 5000, {});
+  assert.deepEqual(Object.keys(r.progress), [], '評分要被 epoch 濾掉');
+  assert.equal(r.edits['L1:a'].zh, '我的翻譯', '編輯不該被 epoch 濾掉');
+});
+
+test('只有編輯、從沒評過分的卡也會被上傳', () => {
+  const rows = collectLocalChanges({}, {}, 0, 0, { 'L1:neverGraded': { zh: '譯', updatedAt: 500 } });
+  assert.deepEqual(rows.map(r => r.card_key), ['L1:neverGraded']);
+  assert.equal(rows[0].edit_updated_at, 500);
+});
+
+test('同一張卡的評分與編輯合併成同一列上傳，不會拆成兩列', () => {
+  const rows = collectLocalChanges(
+    { 'L1:a': entry({ updatedAt: 5000 }) }, {}, 0, 0,
+    { 'L1:a': { zh: '譯', updatedAt: 6000 } });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].grade, 'good');
+  assert.equal(rows[0].edit_updated_at, 6000);
+});
+
+test('編輯沒有變動時不上傳（watermark 之前的）', () => {
+  const rows = collectLocalChanges({}, {}, 3000, 0, { 'L1:a': { zh: '舊', updatedAt: 1000 } });
+  assert.deepEqual(rows, []);
+});

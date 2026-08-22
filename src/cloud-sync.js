@@ -190,11 +190,14 @@ async function runSync() {
     // 1) 拉遠端變動並合併進本機
     const rows = await pullRows(token, w.pulledAt);
     const history = loadGradeHistory();
-    const { progress, history: mergedHistory } = mergeRemoteRows(rows, state.progress, history.cards, resetAt);
+    const { progress, history: mergedHistory, edits } = mergeRemoteRows(
+      rows, state.progress, history.cards, resetAt, state.edits);
 
     const changedKeys = Object.keys(progress);
-    if (changedKeys.length) {
+    const editKeys = Object.keys(edits);
+    if (changedKeys.length || editKeys.length) {
       for (const k of changedKeys) state.progress[k] = progress[k];
+      for (const k of editKeys) state.edits[k] = edits[k];
       saveState();
     }
     writeMergedHistory(mergedHistory);
@@ -209,7 +212,8 @@ async function runSync() {
     // 2) 推本機變動。剛剛從遠端合併進來的那幾張不用再推回去（server 上本來
     //    就有），推回去只是白費頻寬。
     const pulledBack = new Set(changedKeys);
-    const outgoing = collectLocalChanges(state.progress, loadGradeHistory().cards, w.pushedAt, resetAt)
+    const outgoing = collectLocalChanges(
+      state.progress, loadGradeHistory().cards, w.pushedAt, resetAt, state.edits)
       .filter(r => !pulledBack.has(r.card_key));
     if (outgoing.length) await pushRows(token, outgoing, userId);
 

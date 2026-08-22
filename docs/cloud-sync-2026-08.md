@@ -188,7 +188,18 @@ UI 照 Nalin 定過的破壞性操作防呆（`feedback_destructive_typing_confi
 `favorites` 用**泰文字串**當 key（不是 `lessonId:thai`），所以放 `thai_meta`
 不是 `thai_cards`；本機格式從 `{泰文: 1}` migrate 成帶時間戳與墓碑的形狀。
 
-`edits` 直接用 Phase A 就留好的 `thai_cards.edit` + `edit_updated_at`。
+### 卡片編輯
+
+用 Phase A 就留好的 `thai_cards.edit` + `edit_updated_at`，各自帶時間戳做 LWW。
+三個要注意的地方：
+
+- **編輯可能發生在「從沒評過分」的卡上**，所以 `collectLocalChanges()` 要獨立
+  走一輪 edits，不能只跟著 progress 迴圈跑，否則那些卡永遠傳不出去
+- **編輯不受重置 epoch 影響**——「重置進度」清的是評分排程，不是卡片內容，
+  所以 edit 的合併放在 epoch 過濾之前
+- **清除編輯留空殼墓碑**（四欄空字串 + 新的 `updatedAt`）而不是刪 key，否則
+  跨裝置傳不出去「清掉了」。連帶 `applyCardEdit()` 改成只套用非空欄位，
+  不然墓碑會把卡片內容洗成空的（原本整包展開，`updatedAt` 也會混進卡片欄位）
 
 ### 同步觸發點
 
