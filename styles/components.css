@@ -1745,6 +1745,52 @@
 .today-goal { display: inline-flex; align-items: center; gap: 5px; }
 .today-goal.done { color: var(--gold); }
 
+/* 課次掌握地圖 */
+.lesson-map {
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  background: var(--surface-soft);
+  padding: 12px 12px 10px;
+}
+
+.lesson-map-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.lesson-map-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.lesson-map-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.lesson-map-cell.status-new { background: var(--surface-soft); color: var(--text-mute); }
+.lesson-map-cell.status-due { background: var(--danger-soft); color: var(--danger); }
+.lesson-map-cell.status-progress { background: var(--warn-soft); color: var(--warn); }
+.lesson-map-cell.status-mastered { background: var(--gold-soft); color: var(--gold); }
+
+.lesson-map-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.lesson-map-swatch.status-new { background: var(--text-mute); opacity: 0.45; }
+.lesson-map-swatch.status-due { background: var(--danger); }
+.lesson-map-swatch.status-progress { background: var(--warn); }
+.lesson-map-swatch.status-mastered { background: var(--gold); }
+
 /* 月曆 */
 .cal {
   border: 1px solid var(--hair);

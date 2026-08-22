@@ -824,6 +824,14 @@ async function init() {
 
   // 字卡頁的上一張 / 下一張 + 評分鈕（事件委派，每次 re-render 都有效）
   document.getElementById('content').addEventListener('click', e => {
+    if (e.target.closest('[data-lesson-map-jump]')) {
+      e.stopPropagation();
+      const lessonId = e.target.closest('[data-lesson-map-jump]').dataset.lessonMapJump;
+      state.mode = 'card';
+      syncModeButtons('card');
+      selectLesson(lessonId);
+      return;
+    }
     if (e.target.closest('[data-start-review-all]')) {
       e.stopPropagation();
       const log = loadDailyLog();

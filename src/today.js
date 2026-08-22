@@ -4,7 +4,7 @@
 import { state, allCardsWithLessonId, cardKey, getDueCount, localDateKey } from './state.js';
 import { cardStatus, normalizeGrade, getDueCards } from './srs.js';
 import { ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel, achievementIconSvg } from './achievements.js';
-import { accuracyTrend, averageAccuracy, weakLessons, weakestCards } from './stats.js';
+import { accuracyTrend, averageAccuracy, weakLessons, weakestCards, lessonMasteryStatus } from './stats.js';
 import { pickResweepBatch, resweepProgress } from './resweep.js';
 import { renderActiveGame, homePanelHtml, wireHomePanel, renderWeekChip, SVG_FLAME, SVG_SHIELD } from './home.js';
 import { escapeHtml } from './ui.js';
@@ -512,6 +512,28 @@ function renderStatsHtml() {
 
 /* ===== Render ===== */
 
+const LESSON_STATUS_LABEL = { new: '未開始', due: '有到期', progress: '進行中', mastered: '已熟練' };
+
+/* 課次掌握地圖：48 堂課一眼看掌握度，巨觀總覽放數據分頁最上面，月曆（每日微觀）排它下面。 */
+function renderLessonMapHtml() {
+  const rows = lessonMasteryStatus(state.progress, state.lessons);
+  const cells = rows.map(r =>
+    `<div class="lesson-map-cell status-${r.status}" data-lesson-map-jump="${escapeHtml(r.lessonId)}">${escapeHtml(r.title)}</div>`
+  ).join('');
+
+  return `
+    <div class="lesson-map">
+      <div class="lesson-map-title">課次掌握地圖</div>
+      <div class="lesson-map-grid">${cells}</div>
+      <div class="cal-legend">
+        <span class="cal-legend-item"><span class="lesson-map-swatch status-new"></span>${LESSON_STATUS_LABEL.new}</span>
+        <span class="cal-legend-item"><span class="lesson-map-swatch status-progress"></span>${LESSON_STATUS_LABEL.progress}</span>
+        <span class="cal-legend-item"><span class="lesson-map-swatch status-due"></span>${LESSON_STATUS_LABEL.due}</span>
+        <span class="cal-legend-item"><span class="lesson-map-swatch status-mastered"></span>${LESSON_STATUS_LABEL.mastered}</span>
+      </div>
+    </div>`;
+}
+
 /* 顯示中的月份（module-local，不持久化；跨 re-render 保留，重開 app 回到當月） */
 let viewYear = null;
 let viewMonth = null;
@@ -615,6 +637,7 @@ export function renderTodayMode(el) {
   // 「數據」＝回頭看數字（月曆、本週、趨勢、弱項、成就）。
   const bodyHtml = statsTab === 'stats'
     ? `
+      ${renderLessonMapHtml()}
       ${renderCalendarHtml(log)}
       <div class="home-week-panel">
         <div class="home-week-head">本週進度</div>

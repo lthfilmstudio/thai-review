@@ -23,6 +23,17 @@ test('again resets reps and always schedules for tomorrow', () => {
   assert.equal(r.nextReviewAt - r.reviewedAt, DAY_MS);
 });
 
+test('again also runs the SM-2 easeFactor formula (q=0), not just a reps/interval reset', () => {
+  const r = nextReview('again', { easeFactor: 2.5 });
+  assert.ok(Math.abs(r.easeFactor - 1.7) < 1e-9);
+  // 連續答錯持續下降，並在 1.3 打底，不會無限下探
+  const r2 = nextReview('again', r);
+  assert.ok(r2.easeFactor < r.easeFactor);
+  let e = r2.easeFactor;
+  for (let i = 0; i < 10; i++) e = nextReview('again', { easeFactor: e }).easeFactor;
+  assert.equal(e, 1.3);
+});
+
 test('first review of hard/good/easy all land on 1 day (rounding collapses the multiplier)', () => {
   for (const g of ['hard', 'good', 'easy']) {
     const r = nextReview(g, {});

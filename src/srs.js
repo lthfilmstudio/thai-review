@@ -1,10 +1,11 @@
 /* SRS 排程：SM-2 簡化版（Anki / Quizlet 同款）。
    純函式 + 一個裝置 ID helper，stateless 方便測試。
-   4 檔評分（again/hard/good/easy）對 SM-2 quality：hard=3、good=4、easy=5；
-   again 是獨立分支（重置 reps），不查表。 */
+   4 檔評分（again/hard/good/easy）對 SM-2 quality：again=0、hard=3、good=4、easy=5；
+   again 是獨立分支（重置 reps/interval），但 easeFactor 公式跟其他三檔一樣照跑，
+   讓常答錯的字持續往下掉 EF，不是只重來一次卻不記難度。 */
 
 const DAY_MS = 86400000;
-const GRADE_Q = { hard: 3, good: 4, easy: 5 };
+const GRADE_Q = { again: 0, hard: 3, good: 4, easy: 5 };
 
 /* 舊版三檔資料（bad/ok/good）讀出來時要能對回新四檔，才能讓清單篩選 / 對話字源
    在混合新舊資料時正確分類，不需要另外寫 migration 改寫已存的 grade 字串。 */
@@ -16,19 +17,19 @@ export function normalizeGrade(gradeStr) {
 
 export function nextReview(gradeStr, prev = {}, now = Date.now()) {
   let { interval = 0, easeFactor = 2.5, reps = 0 } = prev;
+  const q = GRADE_Q[gradeStr] ?? 4;
+  easeFactor = Math.max(1.3, easeFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
 
   if (gradeStr === 'again') {
     reps = 0;
     interval = 1;
   } else {
-    const q = GRADE_Q[gradeStr] ?? 4;
     reps += 1;
     if (reps === 1) interval = 1;
     else if (reps === 2) interval = 3;        // 客製：泰文密集學習，原 SM-2 是 6
     else interval = Math.round(interval * easeFactor);
     if (gradeStr === 'hard') interval = Math.max(1, Math.round(interval * 0.7));
     else if (gradeStr === 'easy') interval = Math.round(interval * 1.3);
-    easeFactor = Math.max(1.3, easeFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
   }
 
   return {

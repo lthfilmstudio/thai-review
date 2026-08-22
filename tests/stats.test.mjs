@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-const { accuracyTrend, averageAccuracy, weakLessons, weakestCards } = await import('../src/stats.js');
+const { accuracyTrend, averageAccuracy, weakLessons, weakestCards, lessonMasteryStatus } = await import('../src/stats.js');
 const { localDateKey } = await import('../src/state.js');
 
 const DAY_MS = 86400000;
@@ -94,4 +94,37 @@ test('weakestCards ranks again before hard, then lower easeFactor first, respect
   const limited = weakestCards(progress, lessons, 1);
   assert.equal(limited.length, 1);
   assert.equal(limited[0].thai, 'b');
+});
+
+test('lessonMasteryStatus buckets each lesson into new / due / progress / mastered', () => {
+  const cardA = { thai: 'a', zh: 'A' };
+  const cardB = { thai: 'b', zh: 'B' };
+  const lessons = [
+    lesson('NEW', [cardA, cardB]),
+    lesson('DUE', [cardA, cardB]),
+    lesson('PROGRESS', [cardA, cardB]),
+    lesson('MASTERED', [cardA, cardB]),
+  ];
+  const future = NOW + 30 * DAY_MS;
+  const past = NOW - DAY_MS;
+  const progress = {
+    // NEW: 完全沒評過分
+    // DUE: 一張到期、一張還沒（有到期就整堂算 due，不管另一張多熟）
+    'DUE:a': { grade: 'good', reps: 3, interval: 30, nextReviewAt: future },
+    'DUE:b': { grade: 'good', reps: 1, interval: 1, nextReviewAt: past },
+    // PROGRESS: 都評過分、都沒到期，但沒有全部 mature
+    'PROGRESS:a': { grade: 'good', reps: 3, interval: 30, nextReviewAt: future },
+    'PROGRESS:b': { grade: 'good', reps: 1, interval: 3, nextReviewAt: future },
+    // MASTERED: 都沒到期，全部 interval>=21
+    'MASTERED:a': { grade: 'good', reps: 3, interval: 30, nextReviewAt: future },
+    'MASTERED:b': { grade: 'easy', reps: 4, interval: 40, nextReviewAt: future },
+  };
+  const rows = lessonMasteryStatus(progress, lessons, NOW);
+  const byId = Object.fromEntries(rows.map(r => [r.lessonId, r]));
+  assert.equal(byId.NEW.status, 'new');
+  assert.equal(byId.DUE.status, 'due');
+  assert.equal(byId.PROGRESS.status, 'progress');
+  assert.equal(byId.MASTERED.status, 'mastered');
+  assert.equal(byId.MASTERED.total, 2);
+  assert.equal(byId.MASTERED.mature, 2);
 });

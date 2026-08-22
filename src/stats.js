@@ -2,7 +2,7 @@
    純函式，資料即時從 daily log + state.progress 算，不另存彙總表。 */
 
 import { localDateKey } from './state.js';
-import { normalizeGrade } from './srs.js';
+import { normalizeGrade, isDue, cardStatus } from './srs.js';
 import { cardKey } from './state.js';
 
 /* 一天的失分數：新舊資料形狀不同（新：again，舊：bad），兩者都當失敗算。 */
@@ -79,4 +79,23 @@ export function weakestCards(progress, lessons, limit = 20) {
     return a.easeFactor - b.easeFactor;
   });
   return rows.slice(0, limit);
+}
+
+/* 課次掌握地圖：每堂課依「有沒有到期卡／有沒有全部練熟」分四色。
+   new：完全沒評過分；due：有卡到期（不管熟練度混得如何，這色最該優先看到）；
+   mastered：沒有到期卡 + 全部卡片 interval≥21 天（mature）；progress：介於中間。 */
+export function lessonMasteryStatus(progress, lessons, now = Date.now()) {
+  return lessons.map(lesson => {
+    const total = lesson.cards.length;
+    let graded = 0, due = 0, mature = 0;
+    for (const card of lesson.cards) {
+      const entry = progress[cardKey(card, lesson.id)];
+      if (!entry || typeof entry !== 'object' || !entry.grade) continue;
+      graded++;
+      if (isDue(entry, now)) due++;
+      if (cardStatus(entry) === 'mature') mature++;
+    }
+    const status = graded === 0 ? 'new' : due > 0 ? 'due' : mature === total ? 'mastered' : 'progress';
+    return { lessonId: lesson.id, title: lesson.title, total, graded, due, mature, status };
+  });
 }
