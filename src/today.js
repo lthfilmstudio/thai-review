@@ -6,7 +6,7 @@ import { cardStatus, normalizeGrade, getDueCards } from './srs.js';
 import { ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel, achievementIconSvg } from './achievements.js';
 import { accuracyTrend, averageAccuracy, weakLessons, weakestCards } from './stats.js';
 import { pickResweepBatch, resweepProgress } from './resweep.js';
-import { renderActiveGame, homePanelHtml, wireHomePanel, renderWeekChip } from './home.js';
+import { renderActiveGame, homePanelHtml, wireHomePanel, renderWeekChip, SVG_FLAME, SVG_SHIELD } from './home.js';
 import { escapeHtml } from './ui.js';
 
 export const DAILY_KEY = 'thai-review-daily-v1';
@@ -601,11 +601,9 @@ export function renderTodayMode(el) {
        <button class="review-start-btn" data-start-review-all>開始複習</button>`
     : `<div class="today-due done"><span class="today-due-icon">${SVG_CHECK}</span><span class="today-due-label">全部卡片都掃完一輪了</span></div>`;
 
-  const coveragePct = achvCtx.totalCards > 0 ? Math.round((achvCtx.gradedCards / achvCtx.totalCards) * 100) : 0;
-  const sweepPct = sweep.total > 0 ? Math.round((sweep.position / sweep.total) * 100) : 0;
-  const coverageHtml = `
-    <div class="coverage-row"><span class="coverage-label">涵蓋率 ${coveragePct}%（${achvCtx.gradedCards} / ${achvCtx.totalCards}）</span></div>
-    <div class="coverage-row"><span class="coverage-label">重新複習掃描 ${sweepPct}%（${sweep.position} / ${sweep.total}）</span></div>`;
+  const statusPillsHtml = `
+    <span class="home-streak">${SVG_FLAME}<strong>${streak}</strong> 天連續</span>
+    <span class="home-protection">${SVG_SHIELD}<strong>${protection}</strong> 安神保護</span>`;
 
   const tabsHtml = `
     <div class="today-tabs" role="tablist">
@@ -629,16 +627,13 @@ export function renderTodayMode(el) {
     : `
       <div class="today-plan">
         ${planHtml}
+        <div class="today-meta">${statusPillsHtml}</div>
         <div class="today-meta">
-          <span class="today-streak">連續 ${streak} 天</span>
           ${checkin}
-        </div>
-        <div class="today-meta">
           ${goalHtml}
         </div>
-        ${coverageHtml}
       </div>
-      ${homePanelHtml({ log, todayLog, streak, protection, makeup })}
+      ${homePanelHtml({ todayLog, makeup })}
     `;
 
   el.innerHTML = `

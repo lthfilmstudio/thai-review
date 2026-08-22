@@ -16,8 +16,8 @@ const SVG_PLAY = '<svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 2 
 const SVG_HEADPHONE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="13" width="4" height="7" rx="1.5"/><rect x="17.5" y="13" width="4" height="7" rx="1.5"/></svg>';
 const SVG_CARDS = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="5" y="6" width="13" height="13" rx="2"/><path d="M8 6V4h9a2 2 0 0 1 2 2v9h-1"/></svg>';
 const SVG_CHAT = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16v10H9l-5 4v-14z"/></svg>';
-const SVG_FLAME = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12.2 3.5c.3 2.7-1.4 4-2.8 5.4-1.2 1.2-2.4 2.5-2.4 4.6a5 5 0 0 0 10 0c0-2.1-1.1-3.7-2.7-5.1-.3 1.5-1 2.5-2 3.1.4-2.8-.4-5.3-.1-8z"/></svg>';
-const SVG_SHIELD = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-2.9 8.2-7 10-4.1-1.8-7-5.4-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>';
+export const SVG_FLAME = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12.2 3.5c.3 2.7-1.4 4-2.8 5.4-1.2 1.2-2.4 2.5-2.4 4.6a5 5 0 0 0 10 0c0-2.1-1.1-3.7-2.7-5.1-.3 1.5-1 2.5-2 3.1.4-2.8-.4-5.3-.1-8z"/></svg>';
+export const SVG_SHIELD = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-2.9 8.2-7 10-4.1-1.8-7-5.4-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>';
 
 /* ===== 今日一句：跟 scripts/daily-reminder.py 的 pick_sentence() 同一套規則
    （§5.3）。兩邊算出同一句，通知才不會跟首頁對不起來。候選先依 thai 排序，
@@ -139,9 +139,10 @@ export function gameTaskState(todayLog) {
   };
 }
 
-/* 行動面板 HTML：連續天數／安神保護、補救 banner、今日挑戰、今日一句、三局任務。
+/* 行動面板 HTML：補救 banner、今日挑戰、今日一句、三局任務。
+   連續天數／安神保護 pill 併進 today.js 的「X 張到期」卡片，這裡不重複顯示。
    複習隊列（開始複習）那塊歸 today.js，這裡不碰。 */
-export function homePanelHtml({ log, todayLog, streak, protection, makeup }) {
+export function homePanelHtml({ todayLog, makeup }) {
   const lesson = newestLesson();
   const minutes = Math.floor((todayLog.seconds || 0) / 60);
   const { task1Done, task2Done, task3Done, doneCount } = gameTaskState(todayLog);
@@ -154,11 +155,6 @@ export function homePanelHtml({ log, todayLog, streak, protection, makeup }) {
   ` : '';
 
   return `
-      <div class="home-status-row">
-        <span class="home-streak">${SVG_FLAME}<strong>${streak}</strong> 天連續</span>
-        <span class="home-protection">${SVG_SHIELD}<strong>${protection}</strong> 安神保護</span>
-      </div>
-
       ${makeupBannerHtml}
 
       <div class="home-sentence" id="homeSentenceBox">

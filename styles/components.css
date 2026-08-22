@@ -1732,25 +1732,18 @@
 .today-meta {
   display: flex;
   align-items: center;
-  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
   color: var(--text-mute);
   font-size: 12px;
 }
-
-.today-streak { color: var(--text-soft); font-weight: 500; }
 
 .today-checkin { display: inline-flex; align-items: center; gap: 5px; }
 .today-checkin.done { color: var(--gold); }
 
 .today-goal { display: inline-flex; align-items: center; gap: 5px; }
 .today-goal.done { color: var(--gold); }
-
-.coverage-row {
-  display: flex;
-  font-size: 12px;
-  color: var(--text-mute);
-}
-.coverage-label { line-height: 1.6; }
 
 /* 月曆 */
 .cal {
