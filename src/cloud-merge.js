@@ -109,6 +109,96 @@ export function mergeRemoteRows(rows, localProgress, localHistory, resetAt = 0) 
   return { progress, history };
 }
 
+/* ===== 每日日誌（Phase B）=====
+
+   關鍵前提：**本機的「自己的紀錄」跟「合併後的顯示值」是兩份東西。**
+   `thai-review-daily-v1` 的 days 永遠只放這台自己的計數（推送就推這份），
+   合併後的視圖另外算。混在一起的話，這台下次會把別台的數字當成自己的推
+   上去，加總後爆增。 */
+
+const DAY_COUNTERS = ['reviewed', 'again', 'hard', 'good', 'easy', 'games', 'seconds'];
+
+/* thai_days 的各列 → 「排除自己那台」的 remote 視圖。
+   `excludeDeviceId` 漏掉的話就會自己加自己，當天數字直接翻倍。 */
+export function remoteDaysFromRows(rows, excludeDeviceId) {
+  const out = {};
+  for (const row of rows || []) {
+    if (!row?.date) continue;
+    if (excludeDeviceId && row.device_id === excludeDeviceId) continue;
+    const day = out[row.date] || (out[row.date] = {
+      reviewed: 0, again: 0, hard: 0, good: 0, easy: 0, games: 0, seconds: 0,
+      gameIds: [], bridged: false,
+    });
+    for (const k of DAY_COUNTERS) day[k] += Math.max(0, row[k] || 0);
+    for (const g of row.game_ids || []) if (!day.gameIds.includes(g)) day.gameIds.push(g);
+    if (row.bridged) day.bridged = true;
+  }
+  return out;
+}
+
+/* 自己的 days ＋ 其他裝置的 days → 顯示用的合併視圖。
+   計數相加、gameIds 聯集、bridged 取 OR。
+   沒有 remote 資料時結果必須等同於原本的 own（未登入回歸的硬條件）。 */
+export function mergedDays(own, remote) {
+  if (!remote || !Object.keys(remote).length) return own || {};
+  const out = {};
+  for (const key of new Set([...Object.keys(own || {}), ...Object.keys(remote)])) {
+    const a = (own || {})[key];
+    const b = remote[key];
+    if (!b) { out[key] = a; continue; }
+    if (!a) { out[key] = b; continue; }
+    const day = { ...a };
+    for (const k of DAY_COUNTERS) day[k] = (a[k] || 0) + (b[k] || 0);
+    const ids = [...(a.gameIds || [])];
+    for (const g of b.gameIds || []) if (!ids.includes(g)) ids.push(g);
+    day.gameIds = ids;
+    day.bridged = !!(a.bridged || b.bridged);
+    out[key] = day;
+  }
+  return out;
+}
+
+/* 自己的 days → 要上傳的列。只挑有內容的日子，空白日不佔一列。 */
+export function ownDaysToRows(days, deviceId) {
+  const rows = [];
+  for (const date in days || {}) {
+    const d = days[date];
+    if (!d) continue;
+    const hasAny = DAY_COUNTERS.some(k => (d[k] || 0) > 0) || d.bridged || (d.gameIds || []).length;
+    if (!hasAny) continue;
+    rows.push({
+      date, device_id: deviceId,
+      reviewed: d.reviewed || 0, again: d.again || 0, hard: d.hard || 0,
+      good: d.good || 0, easy: d.easy || 0, games: d.games || 0, seconds: d.seconds || 0,
+      game_ids: d.gameIds || [],
+      bridged: !!d.bridged,
+    });
+  }
+  return rows;
+}
+
+/* 成就：聯集，同一個成就取較早的解鎖時間。沒有「取消解鎖」。 */
+export function mergeAchievements(a, b) {
+  const out = { ...(a || {}) };
+  for (const k in b || {}) {
+    const cur = out[k];
+    const incoming = b[k];
+    if (!cur || (incoming > 0 && incoming < cur)) out[k] = incoming;
+  }
+  return out;
+}
+
+/* 收藏：{泰文: {v:0|1, ts}} tombstone，逐 key 比 ts。
+   v=0 是「取消收藏」的墓碑，必須能蓋掉舊的 v=1——所以不能用聯集。 */
+export function mergeFavorites(a, b) {
+  const out = { ...(a || {}) };
+  for (const k in b || {}) {
+    const cur = out[k];
+    if (!cur || (b[k]?.ts ?? 0) > (cur.ts ?? -1)) out[k] = b[k];
+  }
+  return out;
+}
+
 /* 套用重置 epoch：挑出本機該清掉的卡（評分時間早於等於 reset_at 的）。
    回傳要刪的 key 陣列；呼叫端負責真的刪、存檔。
    刻意不直接改傳進來的物件——純函式好測，也避免呼叫端沒預期到被就地修改。 */

@@ -156,7 +156,7 @@ export const state = {
   cardIndex: 0,
   flipped: false,
   progress: {},              // { "lessonId:thai": { grade, nextReviewAt, interval, easeFactor, reps, ... } }
-  favorites: {},             // { "thai": 1 }
+  favorites: {},             // { "thai": { v: 0|1, ts } }，v=0 是取消收藏的墓碑（跨裝置同步要）
   edits: {},                 // { "lessonId:thai": { thai, karaoke, zh, note } }，只存在本機
   collapsed: {},             // { "初-2": true } → 初級 2 章節收合中
   searchQuery: '',           // 搜尋虛擬課程用（不存 localStorage）
@@ -198,6 +198,7 @@ export function loadState() {
     state.progress = s.progress || {};
     const migrated = migrateProgress(state.progress);
     state.favorites = s.favorites || {};
+    const favMigrated = migrateFavorites(state.favorites);
     state.edits = s.edits || {};
     state.collapsed = s.collapsed || {};
     state.currentLessonId = s.currentLessonId || null;
@@ -208,7 +209,7 @@ export function loadState() {
     state.listLessonId = s.listLessonId || null;
     state.listOrder = s.listOrder || 'thai';
     // 有 migrate 到資料的話立刻寫回，避免 lazy 遺留舊格式
-    if (migrated || settingsMigrated) saveState();
+    if (migrated || favMigrated || settingsMigrated) saveState();
   } catch (e) {
     // 忽略損毀的 localStorage
   }
@@ -218,6 +219,20 @@ export function loadState() {
    interval=0 / nextReviewAt=0 表示「未排程」（即 due），下次評分才正式進 SRS 軌道。
    這樣升級瞬間不會讓所有舊熟字爆量 due，但仍會跑到 SRS 隊伍裡待重新評估。
    回傳是否有任何項目被 migrate（用來決定要不要立刻 saveState）。 */
+/* 收藏舊格式是 { 泰文: 1 }，升級成帶時間戳與墓碑的 { 泰文: {v, ts} }。
+   ts 給 0 代表「很舊」，任何一台之後的實際操作都贏得過它。 */
+function migrateFavorites(favorites) {
+  let touched = false;
+  for (const k in favorites) {
+    const v = favorites[k];
+    if (typeof v !== 'object' || v === null) {
+      favorites[k] = { v: v ? 1 : 0, ts: 0 };
+      touched = true;
+    }
+  }
+  return touched;
+}
+
 function migrateProgress(progress) {
   let touched = false;
   for (const k in progress) {
@@ -299,20 +314,24 @@ export function clearCardEdit(card) {
   saveState();
 }
 
+/* 收藏存成 { 泰文: { v: 0|1, ts } }。v=0 是「取消收藏」的墓碑，不是刪 key——
+   刪掉的話跨裝置同步永遠傳不出去「取消」這件事，別台會把它加回來。 */
 export function isFavorite(card) {
-  return !!state.favorites[sourceThai(card)];
+  return state.favorites[sourceThai(card)]?.v === 1;
 }
 
 export function toggleFavorite(card) {
   if (!card) return;
   const key = sourceThai(card);
-  if (state.favorites[key]) delete state.favorites[key];
-  else state.favorites[key] = 1;
+  const now = isFavorite(card) ? 0 : 1;
+  state.favorites[key] = { v: now, ts: Date.now() };
   saveState();
 }
 
 export function favoriteCount() {
-  return Object.keys(state.favorites).length;
+  let n = 0;
+  for (const k in state.favorites) if (state.favorites[k]?.v === 1) n++;
+  return n;
 }
 
 export function currentLesson() {

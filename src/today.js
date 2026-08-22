@@ -7,6 +7,7 @@ import { ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel, achie
 import { accuracyTrend, averageAccuracy, weakLessons, weakestCards, lessonMasteryStatus } from './stats.js';
 import { pickResweepBatch, resweepProgress } from './resweep.js';
 import { renderActiveGame, homePanelHtml, wireHomePanel, renderWeekChip, SVG_FLAME, SVG_SHIELD } from './home.js';
+import { mergedDays } from './cloud-merge.js';
 import { escapeHtml } from './ui.js';
 
 export const DAILY_KEY = 'thai-review-daily-v1';
@@ -109,6 +110,40 @@ function saveDailyLog(log) {
   }
 }
 
+/* ===== 其他裝置的每日日誌（跨裝置同步用）=====
+
+   刻意跟自己那份分開存：`DAILY_KEY` 的 days 永遠只有這台自己的計數，
+   推送就推那份。如果把合併結果寫回去，下次推送會把別台的數字當成自己的
+   推上去，加總後爆增。所以「自己的」跟「顯示用的」是兩份東西。 */
+
+const REMOTE_DAYS_KEY = 'thai-review-remote-days-v1';
+
+export function loadRemoteDays() {
+  try {
+    const raw = localStorage.getItem(REMOTE_DAYS_KEY);
+    if (!raw) return {};
+    const d = JSON.parse(raw);
+    return (d && typeof d === 'object') ? d : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveRemoteDays(days) {
+  try {
+    localStorage.setItem(REMOTE_DAYS_KEY, JSON.stringify(days || {}));
+  } catch (e) {
+    console.warn('remote days save failed:', e.message);
+  }
+}
+
+/* 顯示用的合併視圖：自己的 ＋ 其他裝置的。所有「讀」日誌的地方都該走這支，
+   「寫」的地方一律維持只寫自己那份（loadDailyLog）。
+   沒登入／沒 remote 資料時等同原本的 log.days。 */
+export function dailyDays(log = loadDailyLog()) {
+  return mergedDays(log.days, loadRemoteDays());
+}
+
 /* 評分時記一筆。寫入點在 app.js gradeAndAdvance()。
    day 的四檔欄位是 again/hard/good/easy；舊資料留下的 bad/ok 欄位維持原樣不動，
    只是新的一天不會再往那兩個欄位寫。 */
@@ -125,6 +160,12 @@ export function logReview(gradeStr, ts = Date.now()) {
   log.days[key] = day;
   saveDailyLog(log);
 }
+
+/* 日誌變動後要通知同步的 hook。用 hook 而不是直接 import cloud-sync，是因為
+   cloud-sync 已經 import 這個檔案，直接互 import 會變成循環相依。
+   由 app.js 在啟動時掛上。 */
+let logChangeHook = null;
+export function setLogChangeHook(fn) { logChangeHook = fn; }
 
 /* 完成一局遊戲時記一筆。跟 reviewed 分開欄位、刻意不動 reviewed——
    那個欄位還餵著月曆熱度、maxDailyReviewed、totalReviewed 三個成就判定，
@@ -143,13 +184,17 @@ export function logGame(gameId, ts = Date.now()) {
   day.gameIds = [...(day.gameIds || []), gameId];
   log.days[key] = day;
 
-  if (log.makeupPending && day.games >= 2) {
+  // 補救門檻是「今天總共 2 局」，手機玩一局、電腦玩一局也該算數，所以看合併值。
+  // 蓋章仍寫進自己那份（log.days），寫進合併視圖會被當成自己的推上雲端。
+  const totalGamesToday = day.games + (loadRemoteDays()[key]?.games || 0);
+  if (log.makeupPending && totalGamesToday >= 2) {
     const { missedDate } = log.makeupPending;
     log.days[missedDate] = { ...ensureDay(log.days, missedDate), bridged: true };
     log.makeupPending = null;
   }
 
   saveDailyLog(log);
+  logChangeHook?.();
 }
 
 /* 累積今天實際活動秒數（app.js 的 15 秒 ticker 呼叫）。只記錄，不設目標。 */
@@ -236,13 +281,17 @@ function countGapDays(days, now) {
    純函式：吃 log、回傳新 log + 這次結算做了什麼事（給 UI 顯示提示用）。
    不用另存一個「今天結算過了嗎」旗標——保護一旦蓋章，那天 cameOnDay() 就會是
    true，下次（甚至同一天）再結算時 D 會自然重算成 0，天然冪等。 */
-export function runStreakSettlement(log, now = Date.now()) {
+export function runStreakSettlement(log, now = Date.now(), remote = null) {
   const days = { ...log.days };
+  // 出席判定要看「所有裝置」的合併視圖——在手機上複習過的那天不該算成缺口。
+  // 但蓋章一律寫進 days（自己那份），寫進合併視圖的話別台的計數會被當成
+  // 自己的推上雲端，加總後爆增。
+  const view = remote ? mergedDays(days, remote) : days;
   let protection = log.protection || 0;
   let makeupPending = log.makeupPending || null;
   let event = { type: 'none' };
 
-  const D = countGapDays(days, now);
+  const D = countGapDays(view, now);
 
   if (D === 0) {
     // 昨天有來，任何舊的補救判定都已經沒意義（例如她自己另外用正式複習補上了）
@@ -262,6 +311,7 @@ export function runStreakSettlement(log, now = Date.now()) {
         const offset = -(D - i + 1);
         const key = dayKeyOffset(now, offset);
         days[key] = { ...ensureDay(days, key), bridged: true };
+        view[key] = { ...ensureDay(view, key), bridged: true };
       }
     }
 
@@ -282,7 +332,7 @@ export function runStreakSettlement(log, now = Date.now()) {
   // 蓋章的那天已經算進 cameOnDay()，streakDays() 天然把它算進連續天數，
   // 回補门檻才追得上消耗（設計書 6.1）。checkpoint 記錄「算到第幾天已經
   // 結算過回補」；streak 歸零時 checkpoint 也歸零，不然下次累積 7 天時對不上。
-  const streakNow = streakDays(days, now);
+  const streakNow = streakDays(view, now);
   let checkpoint = log.protectionRefillCheckpoint || 0;
   if (streakNow < checkpoint) checkpoint = 0;
   const gained = Math.floor((streakNow - checkpoint) / 7);
@@ -301,7 +351,7 @@ export function runStreakSettlement(log, now = Date.now()) {
    event 決定要不要顯示提示。 */
 export function settleStreakOnOpen(now = Date.now()) {
   const log = loadDailyLog();
-  const { log: settled, event } = runStreakSettlement(log, now);
+  const { log: settled, event } = runStreakSettlement(log, now, loadRemoteDays());
   saveDailyLog(settled);
   return event;
 }
@@ -314,6 +364,28 @@ export function getProtectionCount(log = loadDailyLog()) {
 /* 補救中的補救對象（{missedDate} 或 null），首頁顯示補救 banner 用。 */
 export function getMakeupPending(log = loadDailyLog()) {
   return log.makeupPending || null;
+}
+
+/* ===== 跨裝置同步用的存取面（給 cloud-sync.js）===== */
+
+/* 這台自己的 days（推送用，絕對不能是合併後的視圖）＋ 結算純量。 */
+export function syncableMeta() {
+  const log = loadDailyLog();
+  return {
+    ownDays: log.days,
+    protection: log.protection || 0,
+    protectionRefillCheckpoint: log.protectionRefillCheckpoint || 0,
+    makeupPending: log.makeupPending || null,
+  };
+}
+
+/* 把雲端拉回來的結算純量寫進本機。days 不走這裡（那是 saveRemoteDays 的事）。 */
+export function applySyncedMeta({ protection, protectionRefillCheckpoint, makeupPending }) {
+  const log = loadDailyLog();
+  if (protection !== undefined) log.protection = protection;
+  if (protectionRefillCheckpoint !== undefined) log.protectionRefillCheckpoint = protectionRefillCheckpoint;
+  if (makeupPending !== undefined) log.makeupPending = makeupPending;
+  saveDailyLog(log);
 }
 
 /* ===== 未來到期預測 ===== */
@@ -385,10 +457,11 @@ function hasFullyMatureLesson() {
 
 /* 組裝成就判定要的 ctx。呼叫端（評分後、進今日 tab 時）各自帶目前的 log 呼叫。 */
 export function buildAchievementCtx(log = loadDailyLog(), now = Date.now()) {
+  const days = dailyDays(log);   // 成就要看所有裝置的總和，不是單台
   let maxDailyReviewed = 0;
   let totalReviewed = 0;
-  for (const k in log.days) {
-    const r = log.days[k]?.reviewed || 0;
+  for (const k in days) {
+    const r = days[k]?.reviewed || 0;
     totalReviewed += r;
     if (r > maxDailyReviewed) maxDailyReviewed = r;
   }
@@ -397,14 +470,14 @@ export function buildAchievementCtx(log = loadDailyLog(), now = Date.now()) {
   const allLessonsLoaded = state.lessons.length > 0
     && state.lessons.every(lesson => lesson._loaded || !lesson.gid);
   return {
-    streak: streakDays(log.days, now),
+    streak: streakDays(days, now),
     maxDailyReviewed,
     totalReviewed,
     totalCards: cards.length,
     gradedCards,
     allLessonsLoaded,
     hasFullyMatureLesson: hasFullyMatureLesson(),
-    weeklyAccuracy: averageAccuracy(accuracyTrend(log.days, 7, now)),
+    weeklyAccuracy: averageAccuracy(accuracyTrend(days, 7, now)),
   };
 }
 
@@ -483,7 +556,7 @@ function renderWeakCardsHtml(rows) {
 
 function renderStatsHtml() {
   const log = loadDailyLog();
-  const trend = accuracyTrend(log.days, trendWindow);
+  const trend = accuracyTrend(dailyDays(log), trendWindow);
   const avg = averageAccuracy(trend);
   const weakL = weakLessons(state.progress, state.lessons);
   const weakC = weakestCards(state.progress, state.lessons, 20);
@@ -542,6 +615,7 @@ function renderCalendarHtml(log) {
   const now = new Date();
   if (viewYear === null) { viewYear = now.getFullYear(); viewMonth = now.getMonth(); }
 
+  const days = dailyDays(log);   // 月曆熱度要含其他裝置的複習
   const todayKey = localDateKey();
   const forecast = forecastByDay(allCardsWithLessonId(), state.progress, viewYear, viewMonth);
   const first = new Date(viewYear, viewMonth, 1);
@@ -554,8 +628,8 @@ function renderCalendarHtml(log) {
 
   for (let day = 1; day <= daysInMonth; day++) {
     const key = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const reviewed = log.days[key]?.reviewed || 0;
-    const games = log.days[key]?.games || 0;
+    const reviewed = days[key]?.reviewed || 0;
+    const games = days[key]?.games || 0;
     const due = forecast[key] || 0;
     const isToday = key === todayKey;
     const isPast = key < todayKey;
@@ -595,11 +669,12 @@ export function renderTodayMode(el) {
 
   const log = loadDailyLog();
   const dueCount = getDueCount();
-  const todayLog = log.days[localDateKey()] || {};
+  const days = dailyDays(log);
+  const todayLog = days[localDateKey()] || {};
   const reviewedToday = todayLog.reviewed || 0;
   const todaySeconds = todayLog.seconds || 0;
-  const streak = streakDays(log.days);
-  const week = weekSummary(log.days);
+  const streak = streakDays(days);
+  const week = weekSummary(days);
   const protection = getProtectionCount(log);
   const makeup = getMakeupPending(log);
 

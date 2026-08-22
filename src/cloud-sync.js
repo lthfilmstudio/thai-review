@@ -7,11 +7,19 @@
 
 import { state, saveState } from './state.js';
 import { loadGradeHistory, writeMergedHistory } from './grade-history.js';
+import { getDeviceId } from './srs.js';
+import { saveRemoteDays, applySyncedMeta, syncableMeta, settleStreakOnOpen } from './today.js';
+import { loadUnlocked, writeUnlocked } from './achievements.js';
+import { loadResweepState, setResweepPosition } from './resweep.js';
 import { SUPABASE_URL, SUPABASE_KEY, getSession, readStoredSession } from './cloud-auth.js';
-import { mergeRemoteRows, collectLocalChanges, keysClearedByReset } from './cloud-merge.js';
+import {
+  mergeRemoteRows, collectLocalChanges, keysClearedByReset,
+  remoteDaysFromRows, ownDaysToRows, mergeAchievements, mergeFavorites,
+} from './cloud-merge.js';
 
 const REST = `${SUPABASE_URL}/rest/v1/thai_cards`;
 const META = `${SUPABASE_URL}/rest/v1/thai_meta`;
+const DAYS = `${SUPABASE_URL}/rest/v1/thai_days`;
 const SYNC_KEY = 'thai-review-sync-v1';
 const PAGE = 1000;          // 一次拉幾列（PostgREST 有預設上限，要自己分頁）
 const CHUNK = 500;          // 一次推幾列，避免單次 payload 過大
@@ -74,12 +82,62 @@ async function pullRows(token, since) {
   return rows;
 }
 
-/* 讀帳號層級的重置 epoch。沒有那列（從沒重置過）就回 0。 */
-async function pullResetAt(token) {
-  const res = await fetch(`${META}?select=reset_at`, { headers: headers(token) });
+/* 讀帳號層級的 meta（重置 epoch＋結算純量＋成就＋收藏＋重新複習游標）。
+   沒有那列（第一次同步）回一個全空的預設值。 */
+async function pullMeta(token) {
+  const res = await fetch(`${META}?select=*`, { headers: headers(token) });
   if (!res.ok) throw new Error(`meta ${res.status}`);
-  const rows = await res.json();
-  return rows?.[0]?.reset_at ?? 0;
+  const row = (await res.json())?.[0];
+  return {
+    reset_at: row?.reset_at ?? 0,
+    protection: row?.protection ?? null,
+    protection_refill_checkpoint: row?.protection_refill_checkpoint ?? null,
+    makeup_pending: row?.makeup_pending ?? null,
+    resweep_position: row?.resweep_position ?? 0,
+    resweep_started_at: row?.resweep_started_at ?? 0,
+    achievements: row?.achievements ?? {},
+    favorites: row?.favorites ?? {},
+    meta_updated_at: row?.meta_updated_at ?? 0,
+  };
+}
+
+/* 拉所有裝置的每日日誌。刻意每次拉全部而不做增量：日誌只有每天一列、
+   資料量小（一年 365 列 × 裝置數），而且 remote 視圖是「整份覆蓋」的語意，
+   增量拉會讓「別台刪掉某天」這種情況算不對。 */
+async function pullDays(token) {
+  const rows = [];
+  let offset = 0;
+  for (;;) {
+    const res = await fetch(`${DAYS}?select=*&order=date.asc&limit=${PAGE}&offset=${offset}`,
+      { headers: headers(token) });
+    if (!res.ok) throw new Error(`days ${res.status}`);
+    const page = await res.json();
+    rows.push(...page);
+    if (page.length < PAGE) break;
+    offset += PAGE;
+  }
+  return rows;
+}
+
+async function pushDays(token, rows, userId) {
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK).map(r => ({ ...r, user_id: userId }));
+    const res = await fetch(DAYS, {
+      method: 'POST',
+      headers: { ...headers(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(chunk),
+    });
+    if (!res.ok) throw new Error(`pushDays ${res.status}`);
+  }
+}
+
+async function pushMeta(token, userId, fields) {
+  const res = await fetch(META, {
+    method: 'POST',
+    headers: { ...headers(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify([{ user_id: userId, ...fields }]),
+  });
+  if (!res.ok) throw new Error(`pushMeta ${res.status}`);
 }
 
 async function pushRows(token, rows, userId) {
@@ -119,9 +177,10 @@ async function runSync() {
   const startedAt = Date.now();
 
   try {
-    // 0) 先拉重置 epoch。順序很重要：要先知道「哪個時間點以前的都不算數」，
+    // 0) 先拉 meta。順序很重要：要先知道重置 epoch「哪個時間點以前的都不算數」，
     //    後面的合併跟上傳才不會把已經被別台裝置清掉的資料收回來或推回去。
-    const resetAt = await pullResetAt(token);
+    const meta = await pullMeta(token);
+    const resetAt = meta.reset_at;
     const clearedKeys = keysClearedByReset(state.progress, resetAt);
     if (clearedKeys.length) {
       for (const k of clearedKeys) delete state.progress[k];
@@ -160,6 +219,51 @@ async function runSync() {
        被跳過＝評分遺失。退 1 秒當安全邊際——寧可重推幾筆（DB 的 LWW
        trigger 會判定沒變動、無害），也不要漏掉任何一次評分。 */
     const pushedAt = Math.max(w.pushedAt, startedAt - 1000);
+
+    // 3) 每日日誌：拉回所有裝置的列，扣掉自己那台後存成 remote 視圖。
+    //    漏掉「扣掉自己」會自己加自己，當天數字直接翻倍。
+    const deviceId = getDeviceId();
+    const dayRows = await pullDays(token);
+    saveRemoteDays(remoteDaysFromRows(dayRows, deviceId));
+
+    // 4) 結算 streak——**一定要在合併完 days 之後跑**，這樣它是看著所有裝置的
+    //    出席紀錄做決定（在手機上複習過的那天不會被誤判成缺口）。
+    settleStreakOnOpen();
+
+    // 5) 推自己的 days + 合併後的 meta
+    const local = syncableMeta();
+    const ownRows = ownDaysToRows(local.ownDays, deviceId);
+    if (ownRows.length) await pushDays(token, ownRows, userId);
+
+    const mergedAchv = mergeAchievements(loadUnlocked(), meta.achievements);
+    const mergedFavs = mergeFavorites(state.favorites, meta.favorites);
+    writeUnlocked(mergedAchv);
+    state.favorites = mergedFavs;
+
+    const resweep = loadResweepState();
+    const mergedResweepPos = Math.max(resweep.position || 0, meta.resweep_position || 0);
+    if (mergedResweepPos !== resweep.position) setResweepPosition(mergedResweepPos);
+
+    // 遠端的結算純量比較新的話收下來（DB trigger 那邊用同一個 meta_updated_at 判斷）
+    if ((meta.meta_updated_at || 0) > startedAt && meta.protection !== null) {
+      applySyncedMeta({
+        protection: meta.protection,
+        protectionRefillCheckpoint: meta.protection_refill_checkpoint,
+        makeupPending: meta.makeup_pending,
+      });
+    }
+
+    await pushMeta(token, userId, {
+      protection: local.protection,
+      protection_refill_checkpoint: local.protectionRefillCheckpoint,
+      makeup_pending: local.makeupPending,
+      resweep_position: mergedResweepPos,
+      resweep_started_at: resweep.startedAt || 0,
+      achievements: mergedAchv,
+      favorites: mergedFavs,
+      meta_updated_at: startedAt,
+    });
+    saveState();
 
     const at = Date.now();
     lastSyncAt = at;

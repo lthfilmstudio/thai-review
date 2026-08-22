@@ -5,6 +5,7 @@ const {
   progressStamp, progressToRow, rowToProgress,
   mergeProgress, mergeHistory, mergeRemoteRows, collectLocalChanges,
   keysClearedByReset, HISTORY_MAX,
+  remoteDaysFromRows, mergedDays, ownDaysToRows, mergeAchievements, mergeFavorites,
 } = await import('../src/cloud-merge.js');
 
 function entry(overrides = {}) {
@@ -201,4 +202,98 @@ test('重置後又評同一張卡，新評分不會被 epoch 吃掉', () => {
   const { progress } = mergeRemoteRows(
     [{ card_key: 'L1:a', grade: 'again', progress_updated_at: 6000 }], {}, {}, 5000);
   assert.equal(progress['L1:a'].grade, 'again');
+});
+
+/* ===== Phase B：每日日誌 =====
+   最容易做錯的是「自己加自己」——本機推上去的那列會再被拉回來，
+   如果沒有排除自己的 device_id，當天數字直接翻倍。 */
+
+function row(date, deviceId, over = {}) {
+  return {
+    date, device_id: deviceId,
+    reviewed: 0, again: 0, hard: 0, good: 0, easy: 0, games: 0, seconds: 0,
+    game_ids: [], bridged: false, ...over,
+  };
+}
+
+test('remoteDaysFromRows 排除自己那台，不會自己加自己', () => {
+  const rows = [
+    row('2026-08-22', 'me', { reviewed: 10 }),
+    row('2026-08-22', 'phone', { reviewed: 4 }),
+  ];
+  const remote = remoteDaysFromRows(rows, 'me');
+  assert.equal(remote['2026-08-22'].reviewed, 4, '自己那台的 10 不該算進 remote');
+});
+
+test('多台裝置同一天的計數相加、gameIds 聯集去重、bridged 取 OR', () => {
+  const rows = [
+    row('2026-08-22', 'phone', { reviewed: 4, seconds: 600, game_ids: ['listen', 'combo'] }),
+    row('2026-08-22', 'pad', { reviewed: 6, seconds: 300, game_ids: ['combo'], bridged: true }),
+  ];
+  const d = remoteDaysFromRows(rows, 'me')['2026-08-22'];
+  assert.equal(d.reviewed, 10);
+  assert.equal(d.seconds, 900);
+  assert.deepEqual(d.gameIds.sort(), ['combo', 'listen']);
+  assert.equal(d.bridged, true);
+});
+
+test('mergedDays 把自己的跟別台的相加，不動原物件', () => {
+  const own = { '2026-08-22': { reviewed: 3, games: 1, gameIds: ['listen'] } };
+  const remote = { '2026-08-22': { reviewed: 5, games: 1, gameIds: ['combo'], bridged: true } };
+  const m = mergedDays(own, remote);
+  assert.equal(m['2026-08-22'].reviewed, 8);
+  assert.equal(m['2026-08-22'].games, 2);
+  assert.deepEqual(m['2026-08-22'].gameIds.sort(), ['combo', 'listen']);
+  assert.equal(m['2026-08-22'].bridged, true);
+  assert.equal(own['2026-08-22'].reviewed, 3, '不能就地改到自己的紀錄');
+});
+
+test('沒有 remote 時 mergedDays 等同原本的 days（未登入回歸的硬條件）', () => {
+  const own = { '2026-08-22': { reviewed: 3 } };
+  assert.equal(mergedDays(own, {}), own);
+  assert.equal(mergedDays(own, null), own);
+});
+
+test('mergedDays 帶進只有別台有的日子（這才會讓連續天數變長）', () => {
+  const m = mergedDays({}, { '2026-08-20': { reviewed: 2 } });
+  assert.equal(m['2026-08-20'].reviewed, 2);
+});
+
+test('ownDaysToRows 跳過空白日，不佔一列', () => {
+  const rows = ownDaysToRows({
+    '2026-08-20': { reviewed: 0, games: 0, seconds: 0, gameIds: [] },
+    '2026-08-21': { reviewed: 0, games: 0, seconds: 0, gameIds: [], bridged: true },
+    '2026-08-22': { reviewed: 5, gameIds: ['listen'] },
+  }, 'me');
+  assert.deepEqual(rows.map(r => r.date).sort(), ['2026-08-21', '2026-08-22']);
+  assert.equal(rows.every(r => r.device_id === 'me'), true);
+});
+
+test('推上去再拉回來，數字不會膨脹（自己那列被排除）', () => {
+  const own = { '2026-08-22': { reviewed: 7, games: 1, seconds: 60, gameIds: ['listen'] } };
+  const uploaded = ownDaysToRows(own, 'me');
+  const remote = remoteDaysFromRows(uploaded, 'me');   // 只有自己那列
+  assert.deepEqual(mergedDays(own, remote)['2026-08-22'].reviewed, 7);
+});
+
+/* ===== Phase B：成就與收藏 ===== */
+
+test('成就聯集，同一個取較早的解鎖時間，不會被較晚的蓋掉', () => {
+  const m = mergeAchievements({ streak7: 5000 }, { streak7: 8000, daily50: 7000 });
+  assert.equal(m.streak7, 5000);
+  assert.equal(m.daily50, 7000);
+});
+
+test('取消收藏能傳播出去（tombstone，不是聯集）', () => {
+  const local = { 'กิน': { v: 1, ts: 100 } };
+  const remote = { 'กิน': { v: 0, ts: 300 } };
+  assert.equal(mergeFavorites(local, remote)['กิน'].v, 0);
+  // 反過來：較舊的取消不能蓋掉較新的收藏
+  assert.equal(mergeFavorites({ 'กิน': { v: 1, ts: 500 } }, remote)['กิน'].v, 1);
+});
+
+test('收藏合併可交換', () => {
+  const a = { 'กิน': { v: 1, ts: 100 }, 'น้ำ': { v: 1, ts: 400 } };
+  const b = { 'กิน': { v: 0, ts: 300 } };
+  assert.deepEqual(mergeFavorites(a, b), mergeFavorites(b, a));
 });

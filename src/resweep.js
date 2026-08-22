@@ -48,6 +48,13 @@ export function advanceResweepCursor(delta, total) {
 }
 
 /* 今日頁進度列用：{ position, total, done }。 */
+/* 跨裝置同步用：把合併好的游標寫回（別台掃得比較前面時往前跳）。
+   刻意不做 clamp／不動 startedAt——合併規則歸呼叫端，這裡只落地。 */
+export function setResweepPosition(position) {
+  const s = loadResweepState();
+  saveResweepState({ ...s, position });
+}
+
 export function resweepProgress(total) {
   const { position } = loadResweepState();
   const clamped = Math.min(position, total);

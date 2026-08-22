@@ -27,6 +27,7 @@ const {
   logGame, addActiveSeconds, streakDays, weekSummary, buildAchievementCtx,
   runStreakSettlement, settleStreakOnOpen, getProtectionCount, getMakeupPending,
   PROTECTION_MAX, notifyAchievements, renderAchievementsHtml, buildDailyQueue,
+  saveRemoteDays, dailyDays,
 } = await import('../src/today.js');
 const { localDateKey } = await import('../src/state.js');
 const { advanceResweepCursor } = await import('../src/resweep.js');
@@ -420,4 +421,65 @@ test('buildDailyQueue returns fewer cards once today\'s time budget is already s
   const spent = buildDailyQueue(cards, progress, lessons, 999999).cards.length;
   assert.ok(fresh > spent, `expected fresh budget to yield more cards (${fresh} vs ${spent})`);
   assert.ok(spent > 0, '就算今天預算已經用完，保底時間也該回傳非空隊列');
+});
+
+/* ===== Phase B：跨裝置合併對日誌／結算的影響 ===== */
+
+test('別台裝置的出席紀錄併進來後，連續天數變長（這才是同步要解的痛點）', () => {
+  localStorage.removeItem(DAILY_KEY);
+  localStorage.removeItem('thai-review-remote-days-v1');
+  const now = NOON_TAIPEI(2026, 8, 22);
+  logReview('good', now);                                    // 只有今天在這台複習過
+  assert.equal(streakDays(dailyDays(), now), 1);
+
+  saveRemoteDays({                                           // 手機上前兩天有複習
+    '2026-08-21': { reviewed: 5 },
+    '2026-08-20': { reviewed: 3 },
+  });
+  assert.equal(streakDays(dailyDays(), now), 3);
+  localStorage.removeItem('thai-review-remote-days-v1');
+});
+
+test('自己那份 days 不會被合併結果污染（推上去才不會重複計數）', () => {
+  localStorage.removeItem(DAILY_KEY);
+  const now = NOON_TAIPEI(2026, 8, 22);
+  logReview('good', now);
+  saveRemoteDays({ '2026-08-22': { reviewed: 99 } });
+
+  assert.equal(dailyDays()['2026-08-22'].reviewed, 100, '顯示值要含別台的');
+  assert.equal(loadDailyLog().days['2026-08-22'].reviewed, 1, '自己那份只能有 1');
+  localStorage.removeItem('thai-review-remote-days-v1');
+});
+
+test('合併別台的出席紀錄後結算不會誤扣安神保護', () => {
+  localStorage.removeItem(DAILY_KEY);
+  const now = NOON_TAIPEI(2026, 8, 22);
+  // 這台從 8/19 之後就沒用過，看起來斷了兩天
+  const log = { v: 1, backfilled: true, days: { '2026-08-19': { reviewed: 4 } }, protection: 2 };
+  localStorage.setItem(DAILY_KEY, JSON.stringify(log));
+
+  // 但那兩天其實是在手機上複習的
+  const remote = { '2026-08-20': { reviewed: 6 }, '2026-08-21': { reviewed: 5 } };
+  const { log: settled, event } = runStreakSettlement(loadDailyLog(), now, remote);
+
+  assert.equal(event.type, 'none', '別台有來就不算缺口');
+  assert.equal(settled.protection, 2, '保護不該被扣掉');
+  localStorage.removeItem('thai-review-remote-days-v1');
+});
+
+test('真的斷線時仍照常扣保護（確認上一個測試不是把功能關掉了）', () => {
+  localStorage.removeItem(DAILY_KEY);
+  const now = NOON_TAIPEI(2026, 8, 22);
+  const log = { v: 1, backfilled: true, days: { '2026-08-20': { reviewed: 4 } }, protection: 2 };
+  localStorage.setItem(DAILY_KEY, JSON.stringify(log));
+  const { log: settled, event } = runStreakSettlement(loadDailyLog(), now, {});
+  assert.equal(event.type, 'protected');
+  assert.equal(settled.protection, 1);
+});
+
+test('沒有 remote 資料時 dailyDays 等同原本的 log.days（未登入回歸）', () => {
+  localStorage.removeItem(DAILY_KEY);
+  localStorage.removeItem('thai-review-remote-days-v1');
+  logReview('good', NOON_TAIPEI(2026, 8, 22));
+  assert.deepEqual(dailyDays(), loadDailyLog().days);
 });

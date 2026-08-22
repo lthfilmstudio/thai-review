@@ -50,6 +50,12 @@ export function loadUnlocked() {
   }
 }
 
+/* 跨裝置同步用：把合併好的解鎖清單整份寫回。合併語意（聯集取較早解鎖時間）
+   歸 src/cloud-merge.js 的 mergeAchievements，這裡只負責落地。 */
+export function writeUnlocked(unlocked) {
+  saveUnlocked(unlocked);
+}
+
 function saveUnlocked(unlocked) {
   try {
     localStorage.setItem(KEY, JSON.stringify(unlocked));

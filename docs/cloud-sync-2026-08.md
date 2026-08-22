@@ -1,7 +1,7 @@
 # 跨裝置同步（Supabase Google 登入）
 
-**狀態**：Phase A（登入 + 每張卡的評分排程 / 評分歷史）**已實作**。
-Phase B（連續天數、安神保護、成就、重新複習游標、收藏、卡片編輯）未做。
+**狀態**：Phase A（登入 + 評分排程／評分歷史）與 Phase B（每日日誌、連續天數、
+安神保護、成就、重新複習游標、收藏）**都已實作**。
 **日期**：2026-08-22
 
 ## 為什麼要做
@@ -145,14 +145,58 @@ UI 照 Nalin 定過的破壞性操作防呆（`feedback_destructive_typing_confi
 紅框紅標題、執行前揭露會清幾張卡與影響範圍（登入時明講「所有裝置」）、
 要完整輸入「重置進度」才解鎖紅色按鈕。
 
-## Phase B 待辦
+## Phase B：每日日誌與帳號層級狀態
 
-- `thai_days`（每裝置一列，讀時加總）→ 連續天數、安神保護、月曆熱度
-- `thai_meta`（帳號層級單列）→ 重新複習游標取 `GREATEST`、成就取聯集且保留
-  較早解鎖時間、收藏用 `{泰文: {v, ts}}` tombstone（不能單純聯集，否則
-  「取消收藏」永遠同步不出去）、`protection` 等純量走 LWW 再交給
-  `settleStreakOnOpen()` 收斂
-- `favorites` 目前用**泰文字串**當 key（不是 `lessonId:thai`），不能塞進
-  `thai_cards`，要放 `thai_meta`
-- `favorites` / `edits` / `days` 目前都**沒有時間戳**，Phase B 要先補上才能
-  做 last-write-wins
+### 「自己的紀錄」和「顯示用的合併值」必須分開存
+
+`thai_days` 是「每台裝置一列、讀取時加總」。如果本機把合併結果寫回
+`thai-review-daily-v1`，這台下次推送就會把**別台的數字當成自己的**推上去，
+加總後爆增。所以：
+
+- `thai-review-daily-v1` 的 `days` **永遠只放這台自己的計數**，所有寫入點
+  （`logReview` / `logGame` / `addActiveSeconds` / settlement 的 `bridged`）
+  都不用改，推送也一律推這份
+- `thai-review-remote-days-v1` 存「其他裝置的加總」，每次拉取後整份覆蓋
+- `dailyDays()` = `mergedDays(自己的, 別台的)`，**只有讀取點走這支**
+
+`remoteDaysFromRows()` 一定要**排除自己的 `device_id`**，否則自己加自己，
+當天數字直接翻倍。
+
+### 結算順序：合併 days → 跑 settlement → 推 meta
+
+`runStreakSettlement(log, now, remote)` 的出席判定看**合併視圖**（在手機上
+複習過的那天不該算成缺口），但蓋章一律寫進**自己那份**。
+
+`protection` / `protectionRefillCheckpoint` 是可變計數器，而且「回補撞上限
+就丟棄溢出」讓數值路徑相依，沒辦法從 `days` 的 `bridged` 反推，所以不重構，
+用 `meta_updated_at` 做 LWW。settlement 在合併之後才跑，所以最後同步的那台
+是**看著最完整的出席紀錄**做的決定，LWW 是有依據的。
+
+**已知限制（接受）**：兩台都離線、同時對同一個缺口跑結算，可能各扣一次保護。
+單人輪流用裝置的機率極低，代價是少一點保護（上限 2、每 7 天連續回補）。
+
+### `thai_meta` 各欄位的合併語意不同（統一 LWW 會出錯）
+
+| 欄位 | 規則 | 為什麼 |
+|---|---|---|
+| `reset_at` / `resweep_position` | `greatest` | 單調只能前進；游標被舊裝置拉回會害人重複複習一段 |
+| `resweep_started_at` | 取較早的非零值 | 0 代表還沒開始 |
+| `achievements` | 聯集，同一個取**較早**解鎖時間 | 沒有「取消解鎖」這回事 |
+| `favorites` | `{泰文: {v:0|1, ts}}` tombstone，逐 key 比 ts | **不能用聯集**，否則「取消收藏」永遠同步不出去 |
+| `protection` / `checkpoint` / `makeup_pending` | 依 `meta_updated_at` LWW | 見上面的結算順序 |
+
+`favorites` 用**泰文字串**當 key（不是 `lessonId:thai`），所以放 `thai_meta`
+不是 `thai_cards`；本機格式從 `{泰文: 1}` migrate 成帶時間戳與墓碑的形狀。
+
+`edits` 直接用 Phase A 就留好的 `thai_cards.edit` + `edit_updated_at`。
+
+### 同步觸發點
+
+評分（`gradeAndAdvance`）與完成一局（`logGame`）都會排 4 秒去抖動同步。
+`logGame` 在 `today.js`，而 `cloud-sync.js` 已經 import 它——直接反向 import
+會循環相依，所以走 `setLogChangeHook()` 由 `app.js` 掛上。
+
+### 秒數兩條管道並存（Nalin 拍板）
+
+「今天累積秒數」同時存在 lth-tts-proxy 的 KV（給 22:00 推播）與 `thai_days`。
+不動正在正常運作的推播管道，代價是同一個數字有兩個來源。

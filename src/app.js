@@ -14,7 +14,7 @@ import {
   loadLessons, loadTabsOnly, fetchLessonCards, loadBundledData,
   fetchDialogues,
 } from './data.js';
-import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds, settleStreakOnOpen, showToast, buildDailyQueue, loadDailyLog } from './today.js';
+import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds, settleStreakOnOpen, showToast, buildDailyQueue, loadDailyLog, setLogChangeHook } from './today.js';
 import { advanceResweepCursor } from './resweep.js';
 import { syncProgressThrottled, syncProgressOnHide } from './progress-sync.js';
 import * as cloudAuth from './cloud-auth.js';
@@ -1074,6 +1074,10 @@ async function init() {
     // 不用 syncNow()：那是一般 fetch，分頁一關就被瀏覽器砍掉。
     if (cloudAuth.hasStoredSession()) flushOnHide();
   });
+
+  // 完成一局遊戲也會產生要同步的資料（games / gameIds / 補救蓋章），
+  // 用 hook 通知，避免 today.js 反向 import cloud-sync 造成循環相依。
+  setLogChangeHook(() => { if (cloudAuth.hasStoredSession()) syncSoon(); });
 
   // Service worker
   if ('serviceWorker' in navigator) {
