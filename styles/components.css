@@ -1249,6 +1249,37 @@
   color: var(--danger);
 }
 
+/* ===== 破壞性操作 modal（重置進度）===== */
+.danger-modal {
+  max-width: 420px;
+  border: 1px solid var(--danger);
+}
+
+.modal-title.danger { color: var(--danger); }
+
+.danger-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--danger-soft);
+}
+
+.danger-line {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-soft);
+}
+
+.danger-num { color: var(--danger); font-weight: 600; }
+.danger-warn { color: var(--danger); font-weight: 500; }
+
+.danger-modal .btn.danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ===== 搜尋 modal ===== */
 .search-modal {
   max-width: 520px;

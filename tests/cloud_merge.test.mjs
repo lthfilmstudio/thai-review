@@ -4,7 +4,7 @@ import test from 'node:test';
 const {
   progressStamp, progressToRow, rowToProgress,
   mergeProgress, mergeHistory, mergeRemoteRows, collectLocalChanges,
-  HISTORY_MAX,
+  keysClearedByReset, HISTORY_MAX,
 } = await import('../src/cloud-merge.js');
 
 function entry(overrides = {}) {
@@ -158,4 +158,47 @@ test('collectLocalChanges 跳過壞掉的 entry，不讓整次同步失敗', () 
   const localProgress = { 'L1:a': null, 'L1:b': 'legacy-string', 'L1:c': entry({ updatedAt: 9 }) };
   const rows = collectLocalChanges(localProgress, {}, 0);
   assert.deepEqual(rows.map(r => r.card_key), ['L1:c']);
+});
+
+/* ===== 重置 epoch：這是刪除語意，錯了就是真的丟資料 ===== */
+
+test('keysClearedByReset 只清掉 epoch 之前的卡，之後評的留著', () => {
+  const localProgress = {
+    'L1:before': entry({ updatedAt: 1000 }),
+    'L1:onEpoch': entry({ updatedAt: 5000 }),   // 剛好等於 epoch，算被清掉
+    'L1:after': entry({ updatedAt: 9000 }),
+  };
+  assert.deepEqual(keysClearedByReset(localProgress, 5000).sort(), ['L1:before', 'L1:onEpoch']);
+});
+
+test('沒重置過（epoch=0）時什麼都不清', () => {
+  const localProgress = { 'L1:a': entry({ updatedAt: 1000 }) };
+  assert.deepEqual(keysClearedByReset(localProgress, 0), []);
+});
+
+test('第一次登入的新裝置不會把已重置的舊資料拉回來', () => {
+  // 新裝置 watermark 是空的，雲端所有列都會被拉下來
+  const rows = [
+    { card_key: 'L1:old', grade: 'good', progress_updated_at: 3000 },   // 重置前
+    { card_key: 'L1:new', grade: 'easy', progress_updated_at: 7000 },   // 重置後
+  ];
+  const { progress } = mergeRemoteRows(rows, {}, {}, 5000);
+  assert.deepEqual(Object.keys(progress), ['L1:new']);
+});
+
+test('離線裝置重新上線時，不會把重置前的紀錄推回雲端', () => {
+  const localProgress = {
+    'L1:stale': entry({ updatedAt: 3000 }),   // 這台離線時評的，但已被重置蓋掉
+    'L1:fresh': entry({ updatedAt: 8000 }),
+  };
+  const rows = collectLocalChanges(localProgress, {}, 0, 5000);
+  assert.deepEqual(rows.map(r => r.card_key), ['L1:fresh']);
+});
+
+test('重置後又評同一張卡，新評分不會被 epoch 吃掉', () => {
+  const regraded = entry({ grade: 'again', updatedAt: 6000 });
+  assert.deepEqual(keysClearedByReset({ 'L1:a': regraded }, 5000), []);
+  const { progress } = mergeRemoteRows(
+    [{ card_key: 'L1:a', grade: 'again', progress_updated_at: 6000 }], {}, {}, 5000);
+  assert.equal(progress['L1:a'].grade, 'again');
 });

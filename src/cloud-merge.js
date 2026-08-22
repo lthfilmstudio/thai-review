@@ -80,13 +80,18 @@ export function mergeHistory(local, remote) {
    回傳 { progress, history }，兩個都是 { cardKey: 值 } 的 map，只包含
    「遠端比較新、需要覆蓋本機」的項目；沒有變動的卡不會出現在結果裡，
    呼叫端可以用有沒有 key 判斷要不要存檔。 */
-export function mergeRemoteRows(rows, localProgress, localHistory) {
+export function mergeRemoteRows(rows, localProgress, localHistory, resetAt = 0) {
   const progress = {};
   const history = {};
 
   for (const row of rows || []) {
     const key = row?.card_key;
     if (!key) continue;
+
+    // 重置 epoch 之前的紀錄一律當作已清除。這行讓「第一次登入的新裝置」也能
+    // 正確套用重置——它的 watermark 是空的，會把雲端所有列都拉下來，沒有這個
+    // 過濾就會把已經重置掉的舊資料當成新資料收進來。
+    if ((row.progress_updated_at ?? 0) <= resetAt) continue;
 
     const remoteEntry = rowToProgress(row);
     if (remoteEntry) {
@@ -104,16 +109,32 @@ export function mergeRemoteRows(rows, localProgress, localHistory) {
   return { progress, history };
 }
 
+/* 套用重置 epoch：挑出本機該清掉的卡（評分時間早於等於 reset_at 的）。
+   回傳要刪的 key 陣列；呼叫端負責真的刪、存檔。
+   刻意不直接改傳進來的物件——純函式好測，也避免呼叫端沒預期到被就地修改。 */
+export function keysClearedByReset(localProgress, resetAt) {
+  if (!resetAt) return [];
+  const keys = [];
+  for (const key in localProgress) {
+    const entry = localProgress[key];
+    if (!entry || typeof entry !== 'object') continue;
+    if (progressStamp(entry) <= resetAt) keys.push(key);
+  }
+  return keys;
+}
+
 /* 挑出「本機比 watermark 新、需要上傳」的卡。
    history 沒有自己的時間戳，跟著同一張卡的 progress 一起上傳即可
    （歷史只在評分當下變動，跟 progress 同步發生）。 */
-export function collectLocalChanges(localProgress, localHistory, since) {
+export function collectLocalChanges(localProgress, localHistory, since, resetAt = 0) {
   const rows = [];
   for (const key in localProgress) {
     const entry = localProgress[key];
     if (!entry || typeof entry !== 'object') continue;
     const stamp = progressStamp(entry);
     if (stamp <= since) continue;
+    // 重置之前的紀錄不再上傳，否則離線裝置一連上線就會把已清掉的資料推回雲端
+    if (stamp <= resetAt) continue;
     const row = progressToRow(key, entry);
     const hist = localHistory?.[key];
     if (Array.isArray(hist) && hist.length) {

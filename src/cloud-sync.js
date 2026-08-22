@@ -8,9 +8,10 @@
 import { state, saveState } from './state.js';
 import { loadGradeHistory, writeMergedHistory } from './grade-history.js';
 import { SUPABASE_URL, SUPABASE_KEY, getSession, readStoredSession } from './cloud-auth.js';
-import { mergeRemoteRows, collectLocalChanges } from './cloud-merge.js';
+import { mergeRemoteRows, collectLocalChanges, keysClearedByReset } from './cloud-merge.js';
 
 const REST = `${SUPABASE_URL}/rest/v1/thai_cards`;
+const META = `${SUPABASE_URL}/rest/v1/thai_meta`;
 const SYNC_KEY = 'thai-review-sync-v1';
 const PAGE = 1000;          // 一次拉幾列（PostgREST 有預設上限，要自己分頁）
 const CHUNK = 500;          // 一次推幾列，避免單次 payload 過大
@@ -73,6 +74,14 @@ async function pullRows(token, since) {
   return rows;
 }
 
+/* 讀帳號層級的重置 epoch。沒有那列（從沒重置過）就回 0。 */
+async function pullResetAt(token) {
+  const res = await fetch(`${META}?select=reset_at`, { headers: headers(token) });
+  if (!res.ok) throw new Error(`meta ${res.status}`);
+  const rows = await res.json();
+  return rows?.[0]?.reset_at ?? 0;
+}
+
 async function pushRows(token, rows, userId) {
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK).map(r => ({ ...r, user_id: userId }));
@@ -110,10 +119,19 @@ async function runSync() {
   const startedAt = Date.now();
 
   try {
+    // 0) 先拉重置 epoch。順序很重要：要先知道「哪個時間點以前的都不算數」，
+    //    後面的合併跟上傳才不會把已經被別台裝置清掉的資料收回來或推回去。
+    const resetAt = await pullResetAt(token);
+    const clearedKeys = keysClearedByReset(state.progress, resetAt);
+    if (clearedKeys.length) {
+      for (const k of clearedKeys) delete state.progress[k];
+      saveState();
+    }
+
     // 1) 拉遠端變動並合併進本機
     const rows = await pullRows(token, w.pulledAt);
     const history = loadGradeHistory();
-    const { progress, history: mergedHistory } = mergeRemoteRows(rows, state.progress, history.cards);
+    const { progress, history: mergedHistory } = mergeRemoteRows(rows, state.progress, history.cards, resetAt);
 
     const changedKeys = Object.keys(progress);
     if (changedKeys.length) {
@@ -132,7 +150,7 @@ async function runSync() {
     // 2) 推本機變動。剛剛從遠端合併進來的那幾張不用再推回去（server 上本來
     //    就有），推回去只是白費頻寬。
     const pulledBack = new Set(changedKeys);
-    const outgoing = collectLocalChanges(state.progress, loadGradeHistory().cards, w.pushedAt)
+    const outgoing = collectLocalChanges(state.progress, loadGradeHistory().cards, w.pushedAt, resetAt)
       .filter(r => !pulledBack.has(r.card_key));
     if (outgoing.length) await pushRows(token, outgoing, userId);
 
@@ -146,12 +164,48 @@ async function runSync() {
     const at = Date.now();
     lastSyncAt = at;
     saveWatermark({ pulledAt, pushedAt, at });
-    return { pulled: changedKeys.length, pushed: outgoing.length };
+    return { pulled: changedKeys.length, pushed: outgoing.length, cleared: clearedKeys.length };
   } catch (e) {
     // 同步失敗不影響複習；watermark 不動，下次會重試同一段。
     console.warn('雲端同步失敗（不影響本機複習）：', e.message);
     return null;
   }
+}
+
+/* 重置所有裝置的學習進度。
+
+   做法是寫一個「重置時間」epoch 到雲端，任何評分時間早於它的紀錄，所有裝置
+   在下次同步時都會自己清掉——包含當下離線、之後才連上來的裝置，以及第一次
+   登入的新裝置。不是逐張卡寫墓碑：那樣漏寫一張就會復活一張。
+
+   雲端那幾列也一併刪掉，只是為了不讓資料表堆垃圾；正確性由 epoch 保證，
+   就算刪除失敗、或有離線裝置事後把舊紀錄推回來，也會被 epoch 濾掉。
+
+   回傳 true 代表雲端已標記成功。沒登入回 null——呼叫端要據此決定要不要
+   提示使用者「只清掉這台」。 */
+export async function resetProgressEverywhere() {
+  const session = await getSession();
+  const token = session?.access_token;
+  const userId = session?.user?.id;
+  if (!token || !userId) return null;
+
+  const resetAt = Date.now();
+  const res = await fetch(META, {
+    method: 'POST',
+    headers: { ...headers(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify([{ user_id: userId, reset_at: resetAt }]),
+  });
+  if (!res.ok) throw new Error(`reset ${res.status}`);
+
+  // 清掉雲端既有列（失敗不致命，epoch 已經生效）
+  try {
+    await fetch(`${REST}?user_id=eq.${userId}`, { method: 'DELETE', headers: headers(token) });
+  } catch { /* 留著也無妨，之後同步一律被 epoch 濾掉 */ }
+
+  // 本機 watermark 重來：pulledAt 清空讓下次同步重新對齊，
+  // pushedAt 推到 resetAt 之後，避免把剛清掉的資料又推上去。
+  saveWatermark({ pulledAt: null, pushedAt: resetAt, at: Date.now() });
+  return true;
 }
 
 /* 節流版，給 app.js 的 15 秒 ticker 呼叫。 */

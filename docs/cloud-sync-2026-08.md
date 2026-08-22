@@ -112,6 +112,39 @@ https://thai-review.lthfilmstudio.com
 
 Google provider 本來就已啟用（Roughcut production 在用），不用重開。
 
+## 重置進度：epoch 而不是逐張墓碑
+
+「重置進度」在登入狀態下要擴散到所有裝置。同步模型原本只有「這張卡被評成
+什麼」，沒有「這筆紀錄被清掉了」的概念，所以要補刪除語意。
+
+作法是 `thai_meta.reset_at`（毫秒）記一個 **epoch**：**任何
+`progress_updated_at <= reset_at` 的紀錄，一律視為已清除**。
+
+為什麼不用逐張卡寫墓碑：
+- 漏寫一張就復活一張；epoch 是一個值，不存在漏寫
+- **第一次登入的新裝置**也會正確套用（它 watermark 是空的，會把雲端所有列
+  拉下來，靠 epoch 過濾才不會把已重置的舊資料收進來）
+- 重複套用結果一樣（冪等）
+- 當下離線、事後才連上來的裝置也會被涵蓋
+
+三個地方都要用同一個 epoch 過濾，缺一就會漏：
+1. `keysClearedByReset()` — 清本機既有的
+2. `mergeRemoteRows(..., resetAt)` — 拉下來的不收
+3. `collectLocalChanges(..., resetAt)` — 本機舊的不推回去
+
+`thai_meta` 的 trigger 讓 `reset_at` **只能往前走**（`greatest`）：離線裝置
+帶著舊值上來，不能把別台已經做過的重置往回倒，否則已清掉的資料會復活。
+
+雲端那幾列也會一併 DELETE，但那只是為了不讓表堆垃圾——正確性由 epoch 保證，
+就算刪除失敗也不影響。
+
+執行順序是**先標記雲端、再清本機**：反過來的話中途失敗會變成「本機清了、
+雲端沒清」，下次同步又把資料拉回來，使用者會以為重置沒生效。
+
+UI 照 Nalin 定過的破壞性操作防呆（`feedback_destructive_typing_confirm.md`）：
+紅框紅標題、執行前揭露會清幾張卡與影響範圍（登入時明講「所有裝置」）、
+要完整輸入「重置進度」才解鎖紅色按鈕。
+
 ## Phase B 待辦
 
 - `thai_days`（每裝置一列，讀時加總）→ 連續天數、安神保護、月曆熱度

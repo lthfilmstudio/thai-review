@@ -18,7 +18,7 @@ import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addAc
 import { advanceResweepCursor } from './resweep.js';
 import { syncProgressThrottled, syncProgressOnHide } from './progress-sync.js';
 import * as cloudAuth from './cloud-auth.js';
-import { syncNow, syncThrottled, syncSoon, flushOnHide, lastSyncedAt } from './cloud-sync.js';
+import { syncNow, syncThrottled, syncSoon, flushOnHide, lastSyncedAt, resetProgressEverywhere } from './cloud-sync.js';
 import { recordGrade } from './grade-history.js';
 import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices, preloadRealAudioAvailability } from './tts.js';
@@ -750,13 +750,57 @@ async function init() {
   });
 
   // 重置進度
-  document.getElementById('btnResetProgress').addEventListener('click', () => {
-    if (confirm('確定要清除所有學習進度嗎？')) {
-      state.progress = {};
-      saveState();
-      renderStats();
-      renderContent(rerender);
+  /* 重置進度：登入後這個動作會擴散到所有裝置，所以照 Nalin 定過的破壞性操作
+     防呆走——執行前揭露影響數量、要打字確認、紅色警示，不是一個 confirm 了事。 */
+  document.getElementById('btnResetProgress').addEventListener('click', async () => {
+    const count = Object.keys(state.progress).length;
+    document.getElementById('resetCount').textContent = count;
+    const loggedIn = !!await cloudAuth.getSession();
+    document.getElementById('resetScope').innerHTML = loggedIn
+      ? '<strong class="danger-num">所有已登入的裝置</strong>（手機、平板、電腦）都會一起清空。'
+      : '只清除這台裝置（目前未登入，不會影響其他裝置）。';
+    const input = document.getElementById('resetConfirmInput');
+    const confirmBtn = document.getElementById('btnConfirmReset');
+    input.value = '';
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '確定重置';
+    document.getElementById('resetMask').classList.add('open');
+    input.focus();
+  });
+
+  document.getElementById('resetConfirmInput')?.addEventListener('input', e => {
+    document.getElementById('btnConfirmReset').disabled = e.target.value.trim() !== '重置進度';
+  });
+
+  const closeResetModal = () => document.getElementById('resetMask')?.classList.remove('open');
+  document.getElementById('btnCloseReset')?.addEventListener('click', closeResetModal);
+  document.getElementById('btnCancelReset')?.addEventListener('click', closeResetModal);
+
+  document.getElementById('btnConfirmReset')?.addEventListener('click', async e => {
+    const btn = e.currentTarget;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = '重置中…';
+
+    // 先標記雲端，再清本機：順序反過來的話，中途失敗會變成「本機清了、
+    // 雲端沒清」，下次同步又把資料拉回來，使用者會以為重置沒生效。
+    if (cloudAuth.hasStoredSession()) {
+      try {
+        await resetProgressEverywhere();
+      } catch (err) {
+        btn.textContent = '確定重置';
+        btn.disabled = false;
+        alert(`雲端重置失敗，本機也沒有清除（避免兩邊不一致）。\n${err.message}`);
+        return;
+      }
     }
+
+    state.progress = {};
+    saveState();
+    closeResetModal();
+    renderStats();
+    renderContent(rerender);
+    void updateCloudHint();
   });
 
   // 跨裝置同步：登入 / 登出，以及登入狀態下手動觸發一次同步

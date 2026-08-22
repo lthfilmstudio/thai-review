@@ -230,6 +230,29 @@
 </div>
 
 <!-- Edit card modal -->
+<!-- 重置進度：破壞性且跨裝置，走打字確認防呆 -->
+<div class="modal-mask" id="resetMask">
+  <div class="modal danger-modal">
+    <div class="modal-head">
+      <div class="modal-title danger">重置學習進度</div>
+      <button class="modal-close" id="btnCloseReset" aria-label="關閉">✕</button>
+    </div>
+    <div class="danger-body">
+      <div class="danger-line">將清除 <strong class="danger-num" id="resetCount">—</strong> 張卡片的評分與複習排程。</div>
+      <div class="danger-line" id="resetScope">這台裝置。</div>
+      <div class="danger-line danger-warn">此動作無法復原。</div>
+    </div>
+    <div class="field">
+      <label class="field-label">請輸入「<strong>重置進度</strong>」以解鎖</label>
+      <input id="resetConfirmInput" autocomplete="off" placeholder="重置進度">
+    </div>
+    <div class="btn-row">
+      <button class="btn ghost" id="btnCancelReset">取消</button>
+      <button class="btn danger" id="btnConfirmReset" disabled>確定重置</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-mask" id="editMask">
   <div class="modal edit-modal">
     <div class="modal-head">
