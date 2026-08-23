@@ -30,11 +30,23 @@ function saveResweepState(s) {
 /* 從游標位置往後切 n 張，orderedCards 是 state.lessons 攤平後、課程原始順序的
    卡片陣列（跟 allCardsWithLessonId() 一致）。游標超過總數時回傳空陣列
    （代表這一輪已經掃完，見設計書「要不要自動重掃第二輪」待定項）。 */
-export function pickResweepBatch(orderedCards, n) {
+export function pickResweepBatch(orderedCards, n, canAdvance = null) {
   if (n <= 0) return [];
   const { position } = loadResweepState();
   if (position >= orderedCards.length) return [];
-  return orderedCards.slice(position, position + n);
+  const batch = orderedCards.slice(position, position + n);
+  if (typeof canAdvance !== 'function') return batch;
+
+  // A flat cursor can only move past a contiguous prefix that this caller can
+  // prove was eligible for this resweep.  In particular, do not filter a
+  // blocked card out and then return later cards: grading one of those later
+  // cards would make the position pretend that the blocked card was answered.
+  const prefix = [];
+  for (const card of batch) {
+    if (!canAdvance(card)) break;
+    prefix.push(card);
+  }
+  return prefix;
 }
 
 /* 評完一張才呼叫，往前推進游標；clamp 到 total 避免超出範圍。

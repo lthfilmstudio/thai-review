@@ -30,7 +30,7 @@ const {
   saveRemoteDays, dailyDays,
 } = await import('../src/today.js');
 const { localDateKey } = await import('../src/state.js');
-const { advanceResweepCursor } = await import('../src/resweep.js');
+const { loadResweepState, advanceResweepCursor } = await import('../src/resweep.js');
 
 function queueCard(lessonId, thai, zh = thai) {
   return { thai, zh, _lessonId: lessonId, _cardKey: `${lessonId}:${thai}` };
@@ -373,7 +373,71 @@ test('buildDailyQueue does not duplicate a card that is both due and next in res
   const { cards: queue, resweepKeys } = buildDailyQueue(cards, progress, lessons, 0);
   const keys = queue.map(c => c._cardKey);
   assert.equal(keys.filter(k => k === 'L1:dup').length, 1);
-  assert.ok(!resweepKeys.has('L1:dup')); // 被到期複習排走了，不算重新複習掃描抽到的
+  assert.ok(resweepKeys.has('L1:dup')); // Due 同時完成 Sweep，仍只顯示一次
+});
+
+test('buildDailyQueue shows a Due cursor card once and marks it as confirmed resweep evidence', () => {
+  stored.clear();
+  const cards = [
+    queueCard('L1', 'earlier'),
+    queueCard('L1', 'later'),
+  ];
+  const lessons = [{ id: 'L1', cards: [] }];
+  const dueProgress = {
+    'L1:earlier': { nextReviewAt: Date.now() - 1000, interval: 1 },
+  };
+
+  const dueRound = buildDailyQueue(cards, dueProgress, lessons, 0);
+  assert.deepEqual([...dueRound.resweepKeys], ['L1:earlier']);
+  assert.equal(dueRound.cards.filter(c => c._cardKey === 'L1:earlier').length, 1);
+  assert.equal(loadResweepState().position, 0);
+
+  // The existing app advances only after confirming a key in resweepKeys.
+  // That one confirmation moves to the later card; it is not repeated.
+  advanceResweepCursor(1, cards.length);
+  const nextRound = buildDailyQueue(cards, {}, lessons, 0);
+  assert.equal(nextRound.cards[0]._cardKey, 'L1:later');
+  assert.deepEqual([...nextRound.resweepKeys], ['L1:later']);
+});
+
+test('buildDailyQueue keeps resweep order ahead of interleave so an earlier card cannot be skipped', () => {
+  stored.clear();
+  const cards = [
+    queueCard('L1', 'earlier'),
+    queueCard('L2', 'later'),
+    queueCard('L1', 'due'),
+  ];
+  const progress = {
+    'L1:due': { nextReviewAt: Date.now() - 1000, interval: 1 },
+  };
+  const lessons = [{ id: 'L1', cards: [] }, { id: 'L2', cards: [] }];
+
+  const round = buildDailyQueue(cards, progress, lessons, 0);
+  assert.deepEqual(round.cards.map(c => c._cardKey), ['L1:due', 'L1:earlier', 'L2:later']);
+  assert.deepEqual([...round.resweepKeys], ['L1:earlier', 'L2:later']);
+
+  // This is the only safe cursor movement the existing app API can express:
+  // the first resweep card was the one actually presented and confirmed.
+  advanceResweepCursor(1, cards.length);
+  assert.equal(loadResweepState().position, 1);
+  const following = buildDailyQueue(cards, progress, lessons, 0);
+  assert.equal(following.resweepKeys.has('L2:later'), true);
+  assert.equal(following.cards.find(c => following.resweepKeys.has(c._cardKey))._cardKey, 'L2:later');
+});
+
+test('buildDailyQueue blocks a legacy key collision instead of advancing past it', () => {
+  stored.clear();
+  const duplicateA = queueCard('L1', 'same');
+  const duplicateB = queueCard('L1', 'same');
+  const later = queueCard('L2', 'later');
+  const cards = [duplicateA, duplicateB, later];
+  const lessons = [{ id: 'L1', cards: [] }, { id: 'L2', cards: [] }];
+  const progress = {};
+
+  const round = buildDailyQueue(cards, progress, lessons, 0);
+  assert.equal(round.resweepKeys.size, 0);
+  assert.equal(loadResweepState().position, 0);
+  assert.equal(round.resweepKeys.has('L2:later'), false);
 });
 
 test('buildDailyQueue resweep portion continues from the persisted cursor position', () => {

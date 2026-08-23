@@ -31,6 +31,27 @@ test('pickResweepBatch returns empty once the cursor reaches the end', () => {
   assert.deepEqual(pickResweepBatch(cards, 5), []);
 });
 
+test('pickResweepBatch never filters past an unconfirmed card', () => {
+  stored.clear();
+  const cards = [{ thai: 'a' }, { thai: 'blocked' }, { thai: 'later' }];
+
+  // The caller cannot prove that the cursor card was eligible.  A later card
+  // must not be returned as a substitute, or grading it would skip "blocked".
+  assert.deepEqual(
+    pickResweepBatch(cards, cards.length, card => card.thai !== 'blocked'),
+    [{ thai: 'a' }],
+  );
+  assert.equal(loadResweepState().position, 0);
+
+  // Only a separately confirmed prefix may move the position.
+  advanceResweepCursor(1, cards.length);
+  assert.equal(loadResweepState().position, 1);
+  assert.deepEqual(
+    pickResweepBatch(cards, cards.length, card => card.thai !== 'blocked'),
+    [],
+  );
+});
+
 test('advanceResweepCursor clamps to total and records startedAt once', () => {
   stored.clear();
   const s1 = advanceResweepCursor(3, 5);
