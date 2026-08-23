@@ -15,7 +15,7 @@ const fallback = memoryStorage();
 globalThis.localStorage = fallback;
 
 const {
-  state, loadState, saveState, STORAGE_KEY, DEVICE_STATE_KEY,
+  state, loadState, loadStateResult, saveState, STORAGE_KEY, DEVICE_STATE_KEY,
 } = await import('../src/state.js');
 const { DAILY_KEY, loadDailyLog, logReview } = await import('../src/today.js');
 const { loadGradeHistory, recordGrade } = await import('../src/grade-history.js');
@@ -218,6 +218,7 @@ test('missing default legacy state is a valid first-run load', () => {
   resetRuntimeState();
   state.currentLessonId = 'unchanged-default';
 
+  assert.deepEqual(loadStateResult(), { status: 'ok', source: 'missing' });
   assert.equal(loadState(), true);
   assert.equal(state.currentLessonId, 'unchanged-default');
   assert.equal(fallback.getItem(STORAGE_KEY), null);
@@ -239,7 +240,8 @@ test('corrupt or unavailable state reads fail closed without mutating runtime or
     currentLessonId: state.currentLessonId,
   });
 
-  assert.equal(loadState(corrupt), false);
+  assert.deepEqual(loadStateResult(corrupt), { status: 'corrupt', reason: 'json' });
+  assert.equal(loadState(corrupt), false, 'boolean compatibility wrapper remains fail closed');
   assert.equal(corrupt.getItem(STORAGE_KEY), '{bad json');
   assert.equal(JSON.stringify({
     progress: state.progress,
@@ -252,6 +254,7 @@ test('corrupt or unavailable state reads fail closed without mutating runtime or
     getItem() { throw new Error('blocked'); },
     setItem() { throw new Error('blocked'); },
   };
+  assert.deepEqual(loadStateResult(unavailable), { status: 'unavailable', phase: 'read' });
   assert.equal(loadState(unavailable), false);
   assert.equal(JSON.stringify({
     progress: state.progress,
@@ -294,7 +297,8 @@ test('valid JSON with non-object learning containers fails closed atomically', (
     const raw = JSON.stringify({ progress: {}, favorites: {}, edits: {}, [field]: invalid });
     const learning = memoryStorage({ [STORAGE_KEY]: raw });
     const before = structuredClone(state);
-    assert.equal(loadState(learning), false, `${field} must reject a non-plain object`);
+    assert.deepEqual(loadStateResult(learning), { status: 'corrupt', reason: 'schema' },
+      `${field} must reject a non-plain object`);
     assert.deepEqual(state, before, `${field} failure must not partially mutate runtime`);
     assert.equal(learning.getItem(STORAGE_KEY), raw, `${field} failure must not rewrite raw bytes`);
   }
@@ -315,7 +319,8 @@ test('valid JSON with non-object device containers fails closed atomically', () 
     const learningRaw = JSON.stringify({ progress: { a: { grade: 'good' } }, favorites: {}, edits: {} });
     const learning = memoryStorage({ [STORAGE_KEY]: learningRaw });
     const before = structuredClone(state);
-    assert.equal(loadState(learning), false, `${field} must reject a non-plain object`);
+    assert.deepEqual(loadStateResult(learning), { status: 'corrupt', reason: 'schema' },
+      `${field} must reject a non-plain object`);
     assert.deepEqual(state, before, `${field} failure must not partially mutate runtime`);
     assert.equal(learning.getItem(STORAGE_KEY), learningRaw);
     assert.equal(fallback.getItem(DEVICE_STATE_KEY), deviceRaw);
@@ -335,7 +340,9 @@ test('migration persistence failure leaves runtime and source payload untouched'
   state.currentLessonId = 'sentinel-lesson';
   const before = structuredClone(state);
 
-  assert.equal(loadState(blockedMigration), false);
+  assert.deepEqual(loadStateResult(blockedMigration), {
+    status: 'unavailable', phase: 'migration-write',
+  });
   assert.deepEqual(state, before);
   assert.equal(values.get(STORAGE_KEY), raw);
 });

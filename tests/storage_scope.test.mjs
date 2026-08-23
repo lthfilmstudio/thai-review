@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
@@ -11,6 +12,7 @@ import {
   inspectStorageDurability,
   logoutToAnonymous,
   resolveWorkspaceId,
+  runLegacyLearningBootGate,
 } from '../src/storage-scope.js';
 
 function memoryStorage() {
@@ -54,6 +56,74 @@ test('7 個 boot states 都有明確畫面、動作與完成後 focus', () => {
     assert.equal(typeof screen.focusTarget, 'string', state);
     assert.ok(screen.focusTarget.length > 0, state);
   }
+});
+
+test('corrupt legacy learning outcome renders recoverable actions and skips ready side effects', async () => {
+  const events = [];
+  const ready = runLegacyLearningBootGate({
+    loadStateResult: () => {
+      events.push('load-state');
+      return { status: 'corrupt', reason: 'schema' };
+    },
+    onFailure: failure => events.push(['failure', failure]),
+    onReady: () => events.push('learning-side-effects'),
+  });
+
+  assert.equal(ready, false);
+  assert.equal(events.length, 2);
+  assert.equal(events[0], 'load-state');
+  assert.equal(events[1][0], 'failure');
+  assert.equal(events[1][1].state, 'recoverable-failure');
+  assert.deepEqual(events[1][1].screen.actions.map(action => action.id), ['retry', 'diagnostics']);
+  assert.equal(events[1][1].screen.focusTarget, 'boot-retry');
+  assert.match(events[1][1].diagnostics, /原始資料已保留，尚未寫入/);
+  assert.doesNotMatch(events[1][1].screen.message, /儲存空間目前不可用/,
+    'corruption must not be presented as storage unavailable');
+
+  const successEvents = [];
+  assert.equal(runLegacyLearningBootGate({
+    loadStateResult: () => ({ status: 'ok', source: 'missing' }),
+    onFailure: () => successEvents.push('failure'),
+    onReady: () => successEvents.push('learning-side-effects'),
+  }), true);
+  assert.deepEqual(successEvents, ['learning-side-effects']);
+
+  const appSource = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
+  const initStart = appSource.indexOf('async function init()');
+  const gate = appSource.indexOf('runLegacyLearningBootGate', initStart);
+  const firstDailyRead = appSource.indexOf('initDailyLog(', initStart);
+  const firstSettle = appSource.indexOf('settleStreakOnOpen(', initStart);
+  const firstLessonLoad = appSource.indexOf('loadLessonsSmart(', initStart);
+  const firstRender = appSource.indexOf('rerender();', initStart);
+  const firstSync = appSource.indexOf('syncNow();', initStart);
+  const firstListener = appSource.indexOf('addEventListener(', initStart);
+  const firstTimer = appSource.indexOf('setInterval(', initStart);
+  assert.ok(initStart >= 0 && gate > initStart);
+  const gatedInit = appSource.slice(initStart, firstDailyRead);
+  assert.match(gatedInit, /runLegacyLearningBootGate\(\{[^]*loadStateResult/);
+  assert.match(gatedInit, /if \(!learningReady\) return;/);
+  for (const [name, sideEffect] of [
+    ['daily', firstDailyRead], ['settle', firstSettle], ['lesson', firstLessonLoad],
+    ['render', firstRender], ['sync', firstSync], ['listener', firstListener], ['timer', firstTimer],
+  ]) {
+    assert.ok(sideEffect > gate, `${name} side effect must remain after the learning gate`);
+  }
+  assert.match(appSource, /boot-retry[^]*location\.reload\(\)/);
+  assert.match(appSource, /boot-diagnostics[^]*details\.hidden = false/);
+});
+
+test('unavailable legacy learning outcome uses storage-unavailable without raw-preserved claim', () => {
+  let failure;
+  assert.equal(runLegacyLearningBootGate({
+    loadStateResult: () => ({ status: 'unavailable', phase: 'read' }),
+    onFailure: value => { failure = value; },
+  }), false);
+
+  assert.equal(failure.state, 'storage-unavailable');
+  assert.deepEqual(failure.screen.actions.map(action => action.id), ['diagnostics']);
+  assert.equal(failure.screen.focusTarget, 'boot-diagnostics');
+  assert.match(failure.screen.message, /儲存空間目前不可用/);
+  assert.doesNotMatch(failure.diagnostics, /原始資料已保留|尚未寫入/);
 });
 
 test('workspace ready 前與 storage unavailable 都 fail closed，沒有假完成寫入', () => {

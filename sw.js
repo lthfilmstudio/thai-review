@@ -1,7 +1,7 @@
 /* Service Worker：app shell cache + runtime CSV cache。
    改檔後升 CACHE 版本號強制更新。 */
 
-const CACHE = 'thai-review-v88';
+const CACHE = 'thai-review-v89';
 
 const SHELL = [
   './',
@@ -12,6 +12,7 @@ const SHELL = [
   './styles/components.css',
   './src/app.js',
   './src/state.js',
+  './src/storage-scope.js',
   './src/data.js',
   './src/tts-prompts.js',
   './src/tts.js',
