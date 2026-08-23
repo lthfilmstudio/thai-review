@@ -18,6 +18,22 @@ const SVG_REAL_AUDIO = '<svg width="11" height="11" viewBox="0 0 24 24" fill="no
 const SVG_STAR_OUTLINE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
 const SVG_STAR_FILLED = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
 
+let cardAudioRenderGeneration = 0;
+
+// 每次卡片 render 都作廢前一張卡尚未完成的真人音檔 lookup。
+export function beginCardAudioRender() {
+  cardAudioRenderGeneration += 1;
+  return cardAudioRenderGeneration;
+}
+
+export function isCurrentCardAudioRender(generation) {
+  return generation === cardAudioRenderGeneration;
+}
+
+export function invalidateCardAudioRender() {
+  cardAudioRenderGeneration += 1;
+}
+
 function youglishUrl(thai) {
   // YouGlish 後端（Tomcat）擋 encoded slash，而泰文資料常有 "ค่ะ / ครับ" 這種男女變體；
   // 取 / 前第一段當搜尋詞最乾淨（是完整片語，搜得到真人影片）。
@@ -65,7 +81,11 @@ function backBody(card, reverse) {
 }
 
 export function renderCardMode(el, cards, _onGrade, opts = {}) {
+  const audioRenderGeneration = beginCardAudioRender();
   const reverse = !!opts.reverse;
+  const realAudioAvailable = opts.hasRealAudio || hasRealAudio;
+  const realAudioUrlLoader = opts.getRealAudioUrl || getRealAudioUrl;
+  const AudioCtor = opts.AudioCtor || Audio;
   const i = state.cardIndex;
   const card = cards[i];
   const pct = Math.round(((i + 1) / cards.length) * 100);
@@ -79,7 +99,7 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
   const previewEasy = formatNextReview(nextReview('easy', cur).interval);
 
   const realAudioLessonId = zhLessonIdOf(card);
-  const showRealAudio = hasRealAudio(card.thai, realAudioLessonId);
+  const showRealAudio = realAudioAvailable(card.thai, realAudioLessonId);
 
   const showReviewHint = state.mode === 'card' || state.mode === 'reverse';
   const dueCount = Number(opts.dueCount || 0);
@@ -180,12 +200,13 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
   // 狀態機，這裡只是手動點一次播放，混用會互搶播放狀態）。
   document.getElementById('realAudioBtn')?.addEventListener('click', async e => {
     e.stopPropagation();
-    const url = await getRealAudioUrl(card.thai, realAudioLessonId);
+    const url = await realAudioUrlLoader(card.thai, realAudioLessonId);
+    if (!isCurrentCardAudioRender(audioRenderGeneration)) return;
     if (!url) {
       console.warn('課堂原音載入失敗：', card.thai);
       return;
     }
-    new Audio(url).play().catch(() => {});
+    new AudioCtor(url).play().catch(() => {});
   });
 
   // AI 造句：傳卡片的泰文當 word；按下去 fetch、render；不影響翻面
