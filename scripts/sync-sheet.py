@@ -44,6 +44,7 @@ COL_ALIASES = {
     "lesson":    ["課程", "課", "堂", "lesson"],
     "start_ms":  ["start_ms", "start", "開始毫秒", "起始毫秒"],
     "end_ms":    ["end_ms", "end", "結束毫秒"],
+    "card_id":   ["card_id", "card id", "卡片 id", "卡片id", "卡片ID"],
     "scenario_id":    ["情境 id", "scenario id", "scenario_id"],
     "scenario_title": ["情境名稱", "scenario title", "scenario_title"],
     "order":          ["順序", "order", "turn"],
@@ -129,6 +130,7 @@ def rows_to_cards(rows: list[list[str]]) -> list[dict]:
     iLesson = find_col(header, "lesson")
     iStart = find_col(header, "start_ms")
     iEnd = find_col(header, "end_ms")
+    iCardId = find_col(header, "card_id")
 
     if iT < 0 or iK < 0 or iZ < 0:
         raise ValueError(f"CSV 缺少必要欄位（泰文/拼音/中文）：{' | '.join(header)}")
@@ -152,6 +154,8 @@ def rows_to_cards(rows: list[list[str]]) -> list[dict]:
             card["start_ms"] = s
         if e is not None:
             card["end_ms"] = e
+        if iCardId >= 0 and len(row) > iCardId and row[iCardId].strip():
+            card["card_id"] = row[iCardId].strip()
         cards.append(card)
     return cards
 

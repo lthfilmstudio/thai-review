@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-const { loadTabsOnly, parseDialogueRows } = await import('../src/data.js');
+const { loadTabsOnly, parseDialogueRows, rowsToCards } = await import('../src/data.js');
+
+test('rowsToCards keeps optional card_id when present and omits it for legacy headers', () => {
+  const rows = [
+    ['中文', '泰文', '目的達拼音', 'card_id'],
+    ['你好', 'สวัสดี', 'sa wat di', '550e8400-e29b-41d4-a716-446655440000'],
+  ];
+  assert.equal(rowsToCards(rows)[0].card_id, '550e8400-e29b-41d4-a716-446655440000');
+  assert.equal(Object.hasOwn(rowsToCards(rows.slice(0, 1).concat([rows[1].slice(0, 3)]))[0], 'card_id'), false);
+});
 
 test('parseDialogueRows groups one complete 6-turn A/B scenario', () => {
   const rows = [['情境 ID', '情境名稱', '順序', '說話者', '泰文', '目的達拼音', '中文']];

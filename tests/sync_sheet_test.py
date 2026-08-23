@@ -69,6 +69,15 @@ class SyncSheetDialogueTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "缺少必要欄位"):
             sync_sheet.rows_to_cards([["泰文", "中文"], ["สวัสดี", "你好"]])
 
+    def test_card_parser_keeps_optional_card_id_backward_compatibly(self):
+        rows = [
+            ["中文", "泰文", "目的達拼音", "card_id"],
+            ["你好", "สวัสดี", "sa wat di", "550e8400-e29b-41d4-a716-446655440000"],
+        ]
+        cards = sync_sheet.rows_to_cards(rows)
+        self.assertEqual(cards[0]["card_id"], "550e8400-e29b-41d4-a716-446655440000")
+        self.assertNotIn("card_id", sync_sheet.rows_to_cards(rows[:1] + [["你好", "สวัสดี", "sa wat di"]]))
+
     def test_fetch_lesson_rejects_an_empty_tab(self):
         with mock.patch.object(sync_sheet, "http_get", return_value="泰文,目的達拼音,中文\n"):
             with self.assertRaisesRegex(ValueError, "沒有可用字卡"):
