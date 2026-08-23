@@ -4,6 +4,7 @@
 import { nextReview, countDue, getDueCards, normalizeGrade } from './srs.js';
 
 export const STORAGE_KEY = 'thai-review-v1';
+export const DEVICE_STATE_KEY = 'thai-review-device-state-v1';
 export const LESSONS_CACHE_KEY = 'thai-review-lessons-v1';      // 舊版（full cache）
 export const MANIFEST_CACHE_KEY = 'thai-review-manifest-v1';    // 新版（只 tab 列表）
 export const LESSON_CACHE_PREFIX = 'thai-review-lesson-';       // 新版（單堂 cards）
@@ -188,30 +189,94 @@ export const state = {
 };
 
 export function loadState(storage = localStorage) {
+  const legacyPath = storage === localStorage;
+  const learningRead = readStoredState(storage, STORAGE_KEY);
+  if (learningRead.status === 'corrupt' || learningRead.status === 'unavailable') return false;
+  if (legacyPath && learningRead.status === 'missing') return true;
+
+  let deviceRead = learningRead;
+  if (!legacyPath) {
+    deviceRead = readStoredState(localStorage, DEVICE_STATE_KEY);
+    if (deviceRead.status === 'missing') {
+      deviceRead = readStoredState(localStorage, STORAGE_KEY);
+    }
+    if (deviceRead.status === 'corrupt' || deviceRead.status === 'unavailable') return false;
+  }
+
+  const learningState = learningRead.status === 'ok' ? learningRead.value : null;
+  const deviceState = deviceRead.status === 'ok' ? deviceRead.value : null;
+  if (hasInvalidRecord(learningState, ['progress', 'favorites', 'edits'])
+    || hasInvalidRecord(deviceState, ['settings', 'collapsed'])) return false;
+
   try {
-    const raw = storage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const s = JSON.parse(raw);
-    Object.assign(state.settings, s.settings || {});
-    const settingsMigrated = (s.settingsVersion || 1) < SETTINGS_VERSION;
-    if (settingsMigrated) state.settings.gap = 'auto';
-    state.progress = s.progress || {};
-    const migrated = migrateProgress(state.progress);
-    state.favorites = s.favorites || {};
-    const favMigrated = migrateFavorites(state.favorites);
-    state.edits = s.edits || {};
-    state.collapsed = s.collapsed || {};
-    state.currentLessonId = s.currentLessonId || null;
-    state.mode = s.mode || 'card';
-    state.lastOpenDate = s.lastOpenDate || null;
-    state.cardIndex = typeof s.cardIndex === 'number' ? s.cardIndex : 0;
-    state.listFilter = s.listFilter || 'all';
-    state.listLessonId = s.listLessonId || null;
-    state.listOrder = s.listOrder || 'thai';
+    const candidateLearning = {
+      progress: learningState?.progress || {},
+      favorites: learningState?.favorites || {},
+      edits: learningState?.edits || {},
+    };
+    const candidateDevice = {
+      settingsVersion: SETTINGS_VERSION,
+      settings: { ...state.settings, ...(deviceState?.settings || {}) },
+      collapsed: deviceState ? deviceState.collapsed || {} : state.collapsed,
+      currentLessonId: deviceState ? deviceState.currentLessonId || null : state.currentLessonId,
+      mode: deviceState ? deviceState.mode || 'card' : state.mode,
+      lastOpenDate: deviceState ? deviceState.lastOpenDate || null : state.lastOpenDate,
+      cardIndex: deviceState
+        ? (typeof deviceState.cardIndex === 'number' ? deviceState.cardIndex : 0)
+        : state.cardIndex,
+      listFilter: deviceState ? deviceState.listFilter || 'all' : state.listFilter,
+      listLessonId: deviceState ? deviceState.listLessonId || null : state.listLessonId,
+      listOrder: deviceState ? deviceState.listOrder || 'thai' : state.listOrder,
+    };
+    const settingsMigrated = !!deviceState
+      && (deviceState.settingsVersion || 1) < SETTINGS_VERSION;
+    if (settingsMigrated) candidateDevice.settings.gap = 'auto';
+    const migrated = migrateProgress(candidateLearning.progress);
+    const favMigrated = migrateFavorites(candidateLearning.favorites);
     // 有 migrate 到資料的話立刻寫回，避免 lazy 遺留舊格式
-    if (migrated || favMigrated || settingsMigrated) saveState(storage);
+    if (migrated || favMigrated || settingsMigrated) {
+      persistState(storage, candidateLearning, candidateDevice);
+    }
+    Object.assign(state, {
+      ...candidateLearning,
+      settings: candidateDevice.settings,
+      collapsed: candidateDevice.collapsed,
+      currentLessonId: candidateDevice.currentLessonId,
+      mode: candidateDevice.mode,
+      lastOpenDate: candidateDevice.lastOpenDate,
+      cardIndex: candidateDevice.cardIndex,
+      listFilter: candidateDevice.listFilter,
+      listLessonId: candidateDevice.listLessonId,
+      listOrder: candidateDevice.listOrder,
+    });
+    return true;
   } catch (e) {
     // 忽略損毀的 localStorage
+    return false;
+  }
+}
+
+function hasInvalidRecord(payload, fields) {
+  return !!payload && fields.some(field => Object.hasOwn(payload, field)
+    && (!payload[field] || typeof payload[field] !== 'object' || Array.isArray(payload[field])));
+}
+
+function readStoredState(storage, key) {
+  let raw;
+  try {
+    raw = storage.getItem(key);
+  } catch (error) {
+    return { status: 'unavailable', error };
+  }
+  if (raw == null) return { status: 'missing' };
+  try {
+    const value = JSON.parse(raw);
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return { status: 'corrupt' };
+    }
+    return { status: 'ok', value };
+  } catch (error) {
+    return { status: 'corrupt', error };
   }
 }
 
@@ -255,12 +320,14 @@ function migrateProgress(progress) {
 }
 
 export function saveState(storage = localStorage) {
-  storage.setItem(STORAGE_KEY, JSON.stringify({
-    settingsVersion: SETTINGS_VERSION,
-    settings: state.settings,
+  const learningState = {
     progress: state.progress,
     favorites: state.favorites,
     edits: state.edits,
+  };
+  const deviceState = {
+    settingsVersion: SETTINGS_VERSION,
+    settings: state.settings,
     collapsed: state.collapsed,
     currentLessonId: state.currentLessonId,
     mode: state.mode,
@@ -269,7 +336,24 @@ export function saveState(storage = localStorage) {
     listFilter: state.listFilter,
     listLessonId: state.listLessonId,
     listOrder: state.listOrder,
-  }));
+  };
+
+  return persistState(storage, learningState, deviceState);
+}
+
+function persistState(storage, learningState, deviceState) {
+  if (storage === localStorage) {
+    storage.setItem(STORAGE_KEY, JSON.stringify({ ...deviceState, ...learningState }));
+    return { learningSaved: true, deviceSaved: true };
+  }
+  storage.setItem(STORAGE_KEY, JSON.stringify(learningState));
+  try {
+    localStorage.setItem(DEVICE_STATE_KEY, JSON.stringify(deviceState));
+    return { learningSaved: true, deviceSaved: true };
+  } catch (e) {
+    console.warn('device state save failed:', e.message);
+    return { learningSaved: true, deviceSaved: false };
+  }
 }
 
 export function sourceThai(card) {
