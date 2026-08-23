@@ -15,6 +15,7 @@ import { SUPABASE_URL, SUPABASE_KEY, getSession, readStoredSession } from './clo
 import {
   mergeRemoteRows, collectLocalChanges, keysClearedByReset,
   remoteDaysFromRows, ownDaysToRows, mergeAchievements, mergeFavorites,
+  normalizeCardRows, changedDayRows,
 } from './cloud-merge.js';
 
 const REST = `${SUPABASE_URL}/rest/v1/thai_cards`;
@@ -31,14 +32,19 @@ let inFlight = null;
 /* watermark：
    pulledAt  ＝ 已經拉到哪個 row_updated_at（server 時鐘，ISO 字串）
    pushedAt  ＝ 已經推到哪個 progress updatedAt（本機時鐘，毫秒）
-   兩個時鐘刻意分開存，不互相換算——混用會在裝置時間不準時漏資料。 */
+   metaAt    ＝ 這台上次推 meta 時寫進 meta_updated_at 的值（本機時鐘，毫秒）
+   resetAt   ＝ 上次同步看到的重置 epoch，給關頁補送用（那時來不及拉雲端）
+   前兩個時鐘刻意分開存，不互相換算——混用會在裝置時間不準時漏資料。 */
 function loadWatermark() {
   try {
     const raw = localStorage.getItem(SYNC_KEY);
     const w = raw ? JSON.parse(raw) : null;
-    return { pulledAt: w?.pulledAt || null, pushedAt: w?.pushedAt || 0, at: w?.at || 0 };
+    return {
+      pulledAt: w?.pulledAt || null, pushedAt: w?.pushedAt || 0,
+      metaAt: w?.metaAt || 0, resetAt: w?.resetAt || 0, at: w?.at || 0,
+    };
   } catch {
-    return { pulledAt: null, pushedAt: 0, at: 0 };
+    return { pulledAt: null, pushedAt: 0, metaAt: 0, resetAt: 0, at: 0 };
   }
 }
 
@@ -50,6 +56,19 @@ function saveWatermark(w) {
 
 export function lastSyncedAt() {
   return loadWatermark().at;
+}
+
+/* 登出時清掉同步狀態。兩件事都必要：
+   - watermark 留著的話，改用另一個帳號登入會沿用舊的 pulledAt，比它舊的列
+     一輩子拉不下來。
+   - remote days 留著的話，登出後統計/月曆還在混入別台裝置的數字，
+     跟「這台不再同步」的說法對不上。 */
+export function clearSyncState() {
+  try {
+    localStorage.removeItem(SYNC_KEY);
+  } catch { /* 清不掉頂多多拉一輪 */ }
+  saveRemoteDays({});
+  lastSyncAt = 0;
 }
 
 function headers(token) {
@@ -142,7 +161,8 @@ async function pushMeta(token, userId, fields) {
 
 async function pushRows(token, rows, userId) {
   for (let i = 0; i < rows.length; i += CHUNK) {
-    const chunk = rows.slice(i, i + CHUNK).map(r => ({ ...r, user_id: userId }));
+    // normalizeCardRows：PostgREST 要求同一批每列 key 完全一致，否則整批 400
+    const chunk = normalizeCardRows(rows.slice(i, i + CHUNK)).map(r => ({ ...r, user_id: userId }));
     const res = await fetch(REST, {
       method: 'POST',
       headers: { ...headers(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -230,13 +250,29 @@ async function runSync() {
     const dayRows = await pullDays(token);
     saveRemoteDays(remoteDaysFromRows(dayRows, deviceId));
 
-    // 4) 結算 streak——**一定要在合併完 days 之後跑**，這樣它是看著所有裝置的
-    //    出席紀錄做決定（在手機上複習過的那天不會被誤判成缺口）。
+    // 4) 遠端的結算純量比較新的話，先收下來再結算。
+    //    比較對象是「這台上次推 meta 時寫的 meta_updated_at」，不是 startedAt——
+    //    拿 startedAt 比等於在問「別台的時鐘有沒有超前我」，正常情況永遠是否，
+    //    保護數量就永遠同步不下來，別台花掉的保護會被這台原封不動推回去。
+    if ((meta.meta_updated_at || 0) > w.metaAt && meta.protection !== null) {
+      applySyncedMeta({
+        protection: meta.protection,
+        protectionRefillCheckpoint: meta.protection_refill_checkpoint,
+        makeupPending: meta.makeup_pending,
+      });
+    }
+
+    // 5) 結算 streak——**一定要在合併完 days、收下遠端純量之後跑**，這樣它是
+    //    看著所有裝置的出席紀錄與最新的保護數量做決定（在手機上複習過的那天
+    //    不會被誤判成缺口）。結算完才讀 syncableMeta()，推上去的才是結算結果。
     settleStreakOnOpen();
 
-    // 5) 推自己的 days + 合併後的 meta
+    // 6) 推自己的 days + 合併後的 meta。只推跟雲端不一樣的日子——整份重推的話
+    //    每次同步都會白寫一年份的列（thai_days_touch 每次都會動 row_updated_at）。
     const local = syncableMeta();
-    const ownRows = ownDaysToRows(local.ownDays, deviceId);
+    const ownRows = changedDayRows(
+      ownDaysToRows(local.ownDays, deviceId),
+      dayRows.filter(r => r.device_id === deviceId));
     if (ownRows.length) await pushDays(token, ownRows, userId);
 
     const mergedAchv = mergeAchievements(loadUnlocked(), meta.achievements);
@@ -247,15 +283,6 @@ async function runSync() {
     const resweep = loadResweepState();
     const mergedResweepPos = Math.max(resweep.position || 0, meta.resweep_position || 0);
     if (mergedResweepPos !== resweep.position) setResweepPosition(mergedResweepPos);
-
-    // 遠端的結算純量比較新的話收下來（DB trigger 那邊用同一個 meta_updated_at 判斷）
-    if ((meta.meta_updated_at || 0) > startedAt && meta.protection !== null) {
-      applySyncedMeta({
-        protection: meta.protection,
-        protectionRefillCheckpoint: meta.protection_refill_checkpoint,
-        makeupPending: meta.makeup_pending,
-      });
-    }
 
     await pushMeta(token, userId, {
       protection: local.protection,
@@ -271,7 +298,7 @@ async function runSync() {
 
     const at = Date.now();
     lastSyncAt = at;
-    saveWatermark({ pulledAt, pushedAt, at });
+    saveWatermark({ pulledAt, pushedAt, metaAt: startedAt, resetAt, at });
     return { pulled: changedKeys.length, pushed: outgoing.length, cleared: clearedKeys.length };
   } catch (e) {
     // 同步失敗不影響複習；watermark 不動，下次會重試同一段。
@@ -312,7 +339,7 @@ export async function resetProgressEverywhere() {
 
   // 本機 watermark 重來：pulledAt 清空讓下次同步重新對齊，
   // pushedAt 推到 resetAt 之後，避免把剛清掉的資料又推上去。
-  saveWatermark({ pulledAt: null, pushedAt: resetAt, at: Date.now() });
+  saveWatermark({ pulledAt: null, pushedAt: resetAt, metaAt: 0, resetAt, at: Date.now() });
   return true;
 }
 
@@ -351,10 +378,12 @@ export function flushOnHide() {
   if (!session?.access_token || !session?.user?.id) return false;
 
   const w = loadWatermark();
-  const rows = collectLocalChanges(state.progress, loadGradeHistory().cards, w.pushedAt);
+  const rows = collectLocalChanges(
+    state.progress, loadGradeHistory().cards, w.pushedAt, w.resetAt, state.edits);
   if (!rows.length) return false;
 
-  const payload = rows.slice(0, MAX_FLUSH).map(r => ({ ...r, user_id: session.user.id }));
+  const payload = normalizeCardRows(rows.slice(0, MAX_FLUSH))
+    .map(r => ({ ...r, user_id: session.user.id }));
   try {
     void fetch(REST, {
       method: 'POST',

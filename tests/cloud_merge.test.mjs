@@ -6,6 +6,7 @@ const {
   mergeProgress, mergeHistory, mergeRemoteRows, collectLocalChanges,
   keysClearedByReset, HISTORY_MAX,
   remoteDaysFromRows, mergedDays, ownDaysToRows, mergeAchievements, mergeFavorites,
+  normalizeCardRows, changedDayRows, CARD_ROW_DEFAULTS,
 } = await import('../src/cloud-merge.js');
 
 function entry(overrides = {}) {
@@ -338,4 +339,86 @@ test('同一張卡的評分與編輯合併成同一列上傳，不會拆成兩�
 test('編輯沒有變動時不上傳（watermark 之前的）', () => {
   const rows = collectLocalChanges({}, {}, 3000, 0, { 'L1:a': { zh: '舊', updatedAt: 1000 } });
   assert.deepEqual(rows, []);
+});
+
+
+/* ===== PostgREST 批次上傳的形狀（2026-08-23 抓到的線上 bug）=====
+   PostgREST 要求同一個 POST body 裡每個物件的 key 完全一致，不一致會回
+   PGRST102「All object keys must match」——是整批 400，不是跳過那一列。
+   同步失敗時 watermark 不前進，下次會送同一批、再 400，永遠卡死。 */
+
+test('collectLocalChanges 本來就會產出三種不同形狀的列（這就是 400 的來源）', () => {
+  const rows = collectLocalChanges(
+    {
+      有歷史: entry({ updatedAt: 100 }),
+      沒歷史: entry({ updatedAt: 100 }),
+    },
+    { 有歷史: [[2, 1]] },
+    0, 0,
+    { 只有編輯: { 中文: '新的', updatedAt: 100 } },
+  );
+  const shapes = new Set(rows.map(r => Object.keys(r).sort().join(',')));
+  assert.equal(rows.length, 3);
+  assert.ok(shapes.size > 1, '前提要成立：沒補齊的話形狀本來就不只一種');
+});
+
+test('normalizeCardRows 補完之後每一列的 key 集合完全相同', () => {
+  const rows = normalizeCardRows(collectLocalChanges(
+    {
+      有歷史: entry({ updatedAt: 100 }),
+      沒歷史: entry({ updatedAt: 100 }),
+    },
+    { 有歷史: [[2, 1]] },
+    0, 0,
+    { 只有編輯: { 中文: '新的', updatedAt: 100 } },
+  ));
+  const shapes = new Set(rows.map(r => Object.keys(r).sort().join(',')));
+  assert.equal(shapes.size, 1);
+  assert.equal([...shapes][0], Object.keys(CARD_ROW_DEFAULTS).sort().join(','));
+});
+
+test('補齊用的三個時間戳是 0 不是 null：DB 那三欄是 NOT NULL，而且 trigger 拿它比大小決定要不要覆蓋', () => {
+  const [row] = normalizeCardRows([{ card_key: 'k', edit: { 中文: 'x' }, edit_updated_at: 5 }]);
+  assert.equal(row.progress_updated_at, 0);
+  assert.equal(row.history_updated_at, 0);
+  assert.equal(row.grade, null);
+  assert.equal(row.history, null);
+  // 真正帶了值的欄位不能被預設值蓋掉
+  assert.equal(row.edit_updated_at, 5);
+});
+
+test('normalizeCardRows 不動原本的列（呼叫端還要拿它比對）', () => {
+  const original = { card_key: 'k', grade: 'good', progress_updated_at: 9 };
+  normalizeCardRows([original]);
+  assert.deepEqual(Object.keys(original), ['card_key', 'grade', 'progress_updated_at']);
+});
+
+/* ===== 只推有變動的日子 ===== */
+
+test('changedDayRows 只挑出跟雲端不一樣的日子', () => {
+  const own = [
+    { date: '2026-08-20', device_id: 'A', reviewed: 5, games: 0, seconds: 100, game_ids: [], bridged: false },
+    { date: '2026-08-21', device_id: 'A', reviewed: 3, games: 0, seconds: 50, game_ids: [], bridged: false },
+    { date: '2026-08-22', device_id: 'A', reviewed: 1, games: 0, seconds: 10, game_ids: [], bridged: false },
+  ];
+  const remote = [
+    { date: '2026-08-20', device_id: 'A', reviewed: 5, games: 0, seconds: 100, game_ids: [], bridged: false },
+    { date: '2026-08-21', device_id: 'A', reviewed: 2, games: 0, seconds: 50, game_ids: [], bridged: false },
+  ];
+  const out = changedDayRows(own, remote);
+  assert.deepEqual(out.map(r => r.date), ['2026-08-21', '2026-08-22']);
+});
+
+test('changedDayRows 抓得到只有 bridged 或 game_ids 變動的日子（結算蓋章就是這種）', () => {
+  const base = { date: '2026-08-20', device_id: 'A', reviewed: 0, again: 0, hard: 0, good: 0, easy: 0, games: 0, seconds: 0 };
+  assert.equal(changedDayRows(
+    [{ ...base, game_ids: [], bridged: true }],
+    [{ ...base, game_ids: [], bridged: false }]).length, 1);
+  assert.equal(changedDayRows(
+    [{ ...base, game_ids: ['combo'], bridged: false }],
+    [{ ...base, game_ids: [], bridged: false }]).length, 1);
+  assert.equal(changedDayRows(
+    [{ ...base, game_ids: ['combo', 'listen'], bridged: false }],
+    [{ ...base, game_ids: ['listen', 'combo'], bridged: false }]).length, 0,
+    'game_ids 只是順序不同不算變動');
 });

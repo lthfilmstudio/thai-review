@@ -18,7 +18,7 @@ import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addAc
 import { advanceResweepCursor } from './resweep.js';
 import { syncProgressThrottled, syncProgressOnHide } from './progress-sync.js';
 import * as cloudAuth from './cloud-auth.js';
-import { syncNow, syncThrottled, syncSoon, flushOnHide, lastSyncedAt, resetProgressEverywhere } from './cloud-sync.js';
+import { syncNow, syncThrottled, syncSoon, flushOnHide, lastSyncedAt, resetProgressEverywhere, clearSyncState } from './cloud-sync.js';
 import { recordGrade } from './grade-history.js';
 import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices, preloadRealAudioAvailability } from './tts.js';
@@ -811,8 +811,12 @@ async function init() {
       if (!confirm('登出後這台裝置就不再同步（本機已有的紀錄不會被刪）。確定登出？')) return;
       btn.disabled = true;
       await cloudAuth.logout();
+      // 連同步 watermark 與別台的日誌視圖一起清掉，否則登出後統計還混著別台
+      // 的數字，換帳號登入也會沿用舊 watermark 漏拉資料。
+      clearSyncState();
       btn.disabled = false;
       void updateCloudHint();
+      rerender();   // 別台的數字剛被清掉，統計與月曆要跟著回到只有這台的值
       return;
     }
     await cloudAuth.login();   // 會整頁跳轉去 Google

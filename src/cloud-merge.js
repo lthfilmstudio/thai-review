@@ -225,6 +225,36 @@ export function editStamp(edit) {
   return (edit && typeof edit === 'object' && edit.updatedAt) || 0;
 }
 
+/* 送去 PostgREST 的每一列都必須有「完全相同的 key 集合」，否則整批會被
+   PGRST102「All object keys must match」擋掉——不是那一列被跳過，是整個
+   POST 400，該批評分全部上不去，而且 watermark 不會前進，下次還是送同一批
+   永遠卡死。collectLocalChanges() 本來就會產出三種形狀（有歷史的、沒歷史的、
+   純編輯的），所以送出前一定要補齊。
+
+   補的值不能亂補：三個 *_updated_at 在 DB 是 NOT NULL default 0，而且
+   thai_cards_merge trigger 是拿它們比大小決定「這次要不要覆蓋」——補 0 就等於
+   宣告「這一組欄位我沒有更新」，trigger 會保留雲端既有的值。補 null 會違反
+   NOT NULL；不補就是上面那個 400。 */
+export const CARD_ROW_DEFAULTS = {
+  card_key: null,
+  grade: null,
+  reviewed_at: null,
+  next_review_at: null,
+  interval_days: null,
+  ease_factor: null,
+  reps: null,
+  device_id: null,
+  progress_updated_at: 0,
+  history: null,
+  history_updated_at: 0,
+  edit: null,
+  edit_updated_at: 0,
+};
+
+export function normalizeCardRows(rows) {
+  return (rows || []).map(r => ({ ...CARD_ROW_DEFAULTS, ...r }));
+}
+
 /* 挑出「本機比 watermark 新、需要上傳」的卡。
    history 沒有自己的時間戳，跟著同一張卡的 progress 一起上傳即可
    （歷史只在評分當下變動，跟 progress 同步發生）。
@@ -258,4 +288,21 @@ export function collectLocalChanges(localProgress, localHistory, since, resetAt 
   }
 
   return [...byKey.values()];
+}
+
+/* 只挑「跟雲端上自己那台現有的列不一樣」的日子。
+   沒有這道過濾的話，每次同步都會把自己整份日誌（一年 365 列）重推一遍，
+   而 thai_days_touch trigger 每次都會改 row_updated_at，純粹是白寫。 */
+export function changedDayRows(ownRows, remoteOwnRows) {
+  const before = new Map();
+  for (const r of remoteOwnRows || []) before.set(r.date, r);
+  return (ownRows || []).filter(row => {
+    const old = before.get(row.date);
+    if (!old) return true;
+    if (DAY_COUNTERS.some(k => (row[k] || 0) !== (old[k] || 0))) return true;
+    if (!!row.bridged !== !!old.bridged) return true;
+    const a = [...(row.game_ids || [])].sort();
+    const b = [...(old.game_ids || [])].sort();
+    return a.length !== b.length || a.some((g, i) => g !== b[i]);
+  });
 }

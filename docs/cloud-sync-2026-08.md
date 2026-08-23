@@ -211,3 +211,53 @@ UI 照 Nalin 定過的破壞性操作防呆（`feedback_destructive_typing_confi
 
 「今天累積秒數」同時存在 lth-tts-proxy 的 KV（給 22:00 推播）與 `thai_days`。
 不動正在正常運作的推播管道，代價是同一個數字有兩個來源。
+
+---
+
+## 2026-08-23 上線後掃描抓到的三個問題
+
+### 1. PostgREST 批次上傳要求「每列 key 完全一致」（會讓整批評分永遠上不去）
+
+`POST /rest/v1/<table>` 帶陣列時，PostgREST 從 payload 推導**一組**欄位清單，
+陣列裡任何一個物件 key 不一樣就回 `PGRST102 All object keys must match`。
+**是整批 400，不是跳過那一列。**
+
+`collectLocalChanges()` 天生會產出三種形狀：有評分歷史的（11 key）、沒歷史的
+（9 key）、只有編輯的（3 key）。只要一批裡混到兩種，`pushRows()` 就 400；
+而 `runSync()` 的 catch 只 `console.warn`、watermark 不前進，下次同步收集到
+同一批、再 400——**靜默且永久卡死**。
+
+修法：`normalizeCardRows()` 在送出前把每列補成同一組 key。補的值不能亂補：
+
+| 欄位 | 補什麼 | 為什麼 |
+|------|--------|--------|
+| `progress_updated_at` / `history_updated_at` / `edit_updated_at` | `0` | DB 是 `NOT NULL default 0`，補 `null` 直接違反約束；而且 `thai_cards_merge` trigger 就是拿它們比大小，補 `0` 等於宣告「這組欄位我沒更新」，trigger 會保留雲端既有值 |
+| `grade` / `history` / `edit` 等資料欄 | `null` | 有上面那三個時間戳擋著，trigger 會把 old 值還原回來，不會被 null 洗掉 |
+
+驗證方式（兩者缺一不可）：
+- 真 SQL 模擬 PostgREST 的 `ON CONFLICT DO UPDATE SET <payload 欄位>`，
+  確認「只帶編輯的那列」不會洗掉既有的 grade / history
+- 真的打線上 API：修之前送異構批次得到 `400 PGRST102`，補齊後送同一批
+  得到 `401`（RLS 擋下，代表 parser 收了）
+
+### 2. 遠端結算純量的採納條件永遠不成立
+
+原本寫 `meta.meta_updated_at > startedAt`——`startedAt` 是**本機此刻**，
+所以這行等於在問「別台的時鐘有沒有超前我」，正常情況永遠是否。
+結果是保護數量根本同步不下來：A 裝置花掉的保護，B 裝置同步時會原封不動
+推回去，等於自動退還。
+
+修法：watermark 多存 `metaAt`（這台上次推 meta 時寫的值），拿它比。
+順序也一起修——採納要在 `settleStreakOnOpen()` **之前**，原本放在之後，
+就算條件成立也是「本機存遠端值、卻推本機值」，兩邊會不一致。
+
+### 3. 登出沒清同步狀態
+
+`clearSyncState()`：清 watermark（不清的話換帳號登入會沿用舊 `pulledAt`，
+比它舊的列一輩子拉不下來）＋ 清 remote days（不清的話登出後統計與月曆
+還混著別台的數字，跟「這台不再同步」對不上）。
+
+### 順手修掉的浪費
+
+`changedDayRows()`：只推跟雲端不一樣的日子。原本每次同步都重推自己整份
+日誌（一年 365 列），而 `thai_days_touch` 每次都會改 `row_updated_at`。
