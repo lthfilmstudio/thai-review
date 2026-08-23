@@ -4,7 +4,7 @@ import {
   state, currentLesson, filteredCards, favoriteCount, saveState, isSrsActive,
   allCardsWithLessonId, applyCardEdit, isFavorite, gradeOf,
 } from './state.js';
-import { renderCardMode } from './card.js';
+import { renderCardMode, invalidateCardAudioRender } from './card.js';
 import { renderListenMode, stopListen } from './listen.js';
 import { renderDialogMode } from './dialog.js';
 import { renderTodayMode } from './today.js';
@@ -353,6 +353,8 @@ function renderListsMode(el) {
 export function renderContent(onGrade) {
   const el = document.getElementById('content');
 
+  if (!['card', 'reverse', 'srs'].includes(state.mode)) invalidateCardAudioRender();
+
   if (state.mode === 'lists') {
     renderListsMode(el);
     renderStats();
@@ -379,6 +381,7 @@ export function renderContent(onGrade) {
 
   // SRS 空狀態：待複習完成（或還沒評過任何字）
   if (isSrsActive() && cards.length === 0) {
+    invalidateCardAudioRender();
     const min = nextReviewAtMin(state.progress);
     const hasAnyProgress = Object.keys(state.progress).some(k => {
       const v = state.progress[k];
@@ -411,6 +414,7 @@ export function renderContent(onGrade) {
   }
 
   if (!cards.length) {
+    invalidateCardAudioRender();
     el.innerHTML = `<div class="empty">
       <div class="empty-icon">✦</div>
       <div class="empty-title">沒有卡片</div>
