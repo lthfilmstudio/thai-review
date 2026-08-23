@@ -1083,7 +1083,7 @@ async function init() {
 
   // 完成一局遊戲也會產生要同步的資料（games / gameIds / 補救蓋章），
   // 用 hook 通知，避免 today.js 反向 import cloud-sync 造成循環相依。
-  setLogChangeHook(() => { if (cloudAuth.hasStoredSession()) syncSoon(); });
+  setLogChangeHook(storage => { if (cloudAuth.hasStoredSession()) syncSoon(storage); });
 
   // Service worker
   if ('serviceWorker' in navigator) {

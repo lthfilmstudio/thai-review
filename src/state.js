@@ -187,9 +187,9 @@ export const state = {
   dailyQueueResweepKeys: null, // Set<string> | null，評分時判斷要不要推進 resweep 游標
 };
 
-export function loadState() {
+export function loadState(storage = localStorage) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storage.getItem(STORAGE_KEY);
     if (!raw) return;
     const s = JSON.parse(raw);
     Object.assign(state.settings, s.settings || {});
@@ -209,7 +209,7 @@ export function loadState() {
     state.listLessonId = s.listLessonId || null;
     state.listOrder = s.listOrder || 'thai';
     // 有 migrate 到資料的話立刻寫回，避免 lazy 遺留舊格式
-    if (migrated || favMigrated || settingsMigrated) saveState();
+    if (migrated || favMigrated || settingsMigrated) saveState(storage);
   } catch (e) {
     // 忽略損毀的 localStorage
   }
@@ -254,8 +254,8 @@ function migrateProgress(progress) {
   return touched;
 }
 
-export function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+export function saveState(storage = localStorage) {
+  storage.setItem(STORAGE_KEY, JSON.stringify({
     settingsVersion: SETTINGS_VERSION,
     settings: state.settings,
     progress: state.progress,
@@ -305,7 +305,7 @@ export function applyCardEdit(card, lessonId) {
   };
 }
 
-export function saveCardEdit(card, patch) {
+export function saveCardEdit(card, patch, storage = localStorage) {
   if (!card) return;
   const key = card._cardKey || cardKey(card);
   const cleaned = {};
@@ -314,17 +314,17 @@ export function saveCardEdit(card, patch) {
   }
   cleaned.updatedAt = Date.now();
   state.edits[key] = cleaned;
-  saveState();
+  saveState(storage);
 }
 
 /* 清除編輯留一個空殼墓碑（各欄位空字串 + 新的 updatedAt），不是刪 key——
    刪掉的話跨裝置同步永遠傳不出去「清掉了」這件事，別台會把它加回來。
    applyCardEdit() 本來就把空字串當成「沒有覆蓋」，所以顯示行為不變。 */
-export function clearCardEdit(card) {
+export function clearCardEdit(card, storage = localStorage) {
   if (!card) return;
   const key = card._cardKey || cardKey(card);
   state.edits[key] = { thai: '', karaoke: '', zh: '', note: '', updatedAt: Date.now() };
-  saveState();
+  saveState(storage);
 }
 
 /* 收藏存成 { 泰文: { v: 0|1, ts } }。v=0 是「取消收藏」的墓碑，不是刪 key——
@@ -333,12 +333,12 @@ export function isFavorite(card) {
   return state.favorites[sourceThai(card)]?.v === 1;
 }
 
-export function toggleFavorite(card) {
+export function toggleFavorite(card, storage = localStorage) {
   if (!card) return;
   const key = sourceThai(card);
   const now = isFavorite(card) ? 0 : 1;
   state.favorites[key] = { v: now, ts: Date.now() };
-  saveState();
+  saveState(storage);
 }
 
 export function favoriteCount() {
@@ -435,7 +435,7 @@ export function srsEntryOf(idxOrCard) {
   return (v && typeof v === 'object') ? v : null;
 }
 
-export function setGrade(idxOrCard, gradeStr) {
+export function setGrade(idxOrCard, gradeStr, storage = localStorage) {
   const k = progKey(idxOrCard);
   if (!gradeStr) {
     delete state.progress[k];
@@ -444,7 +444,7 @@ export function setGrade(idxOrCard, gradeStr) {
     const prevObj = (prev && typeof prev === 'object') ? prev : {};
     state.progress[k] = nextReview(gradeStr, prevObj);
   }
-  saveState();
+  saveState(storage);
 }
 
 /* 攤平 state.lessons 成單一 cards 陣列，每張都帶 _lessonId（給 SRS 跨課程查詢用）。

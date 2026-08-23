@@ -29,7 +29,7 @@ const WEAK_CARD_MAX = 8;
    用來算剩餘預算，不是張數上限。回傳 { cards, resweepKeys }——resweepKeys
    是這批裡「從重新複習掃描抽出來」的卡的 _cardKey 集合，評分時要靠它決定
    要不要推進 resweep 游標（app.js gradeAndAdvance() 用）。 */
-export function buildDailyQueue(allCards, progress, lessons, todaySeconds) {
+export function buildDailyQueue(allCards, progress, lessons, todaySeconds, storage = localStorage) {
   const remaining = Math.max(MIN_SESSION_SEC, DAILY_BUDGET_SEC - todaySeconds);
 
   const dueLimit = Math.max(0, Math.floor(Math.min(remaining, DUE_SOFT_CAP_SEC) / SEC_PER_DUE_CARD));
@@ -46,7 +46,7 @@ export function buildDailyQueue(allCards, progress, lessons, todaySeconds) {
     const key = card._cardKey;
     keyCounts.set(key, (keyCounts.get(key) || 0) + 1);
   }
-  const cursorCard = pickResweepBatch(allCards, 1)[0];
+  const cursorCard = pickResweepBatch(allCards, 1, null, storage)[0];
   const cursorKey = cursorCard?._cardKey;
   const cursorIsUniqueDue = typeof cursorKey === 'string'
     && cursorKey.length > 0
@@ -57,6 +57,7 @@ export function buildDailyQueue(allCards, progress, lessons, todaySeconds) {
       allCards,
       resweepLimit + dueKeys.size,
       card => !dueKeys.has(card._cardKey) && keyCounts.get(card._cardKey) === 1,
+      storage,
     ).slice(0, resweepLimit)
     : [];
   // AE2: the cursor card may be Due and Sweep-eligible at the same time.  It
@@ -124,9 +125,9 @@ const SVG_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" s
 
 /* ===== 每日日誌 ===== */
 
-export function loadDailyLog() {
+export function loadDailyLog(storage = localStorage) {
   try {
-    const raw = localStorage.getItem(DAILY_KEY);
+    const raw = storage.getItem(DAILY_KEY);
     if (!raw) return { v: 1, backfilled: false, days: {} };
     const log = JSON.parse(raw);
     if (!log || typeof log.days !== 'object') return { v: 1, backfilled: false, days: {} };
@@ -136,9 +137,9 @@ export function loadDailyLog() {
   }
 }
 
-function saveDailyLog(log) {
+function saveDailyLog(log, storage = localStorage) {
   try {
-    localStorage.setItem(DAILY_KEY, JSON.stringify(log));
+    storage.setItem(DAILY_KEY, JSON.stringify(log));
   } catch (e) {
     console.warn('daily log save failed:', e.message);
   }
@@ -152,9 +153,9 @@ function saveDailyLog(log) {
 
 const REMOTE_DAYS_KEY = 'thai-review-remote-days-v1';
 
-export function loadRemoteDays() {
+export function loadRemoteDays(storage = localStorage) {
   try {
-    const raw = localStorage.getItem(REMOTE_DAYS_KEY);
+    const raw = storage.getItem(REMOTE_DAYS_KEY);
     if (!raw) return {};
     const d = JSON.parse(raw);
     return (d && typeof d === 'object') ? d : {};
@@ -163,9 +164,9 @@ export function loadRemoteDays() {
   }
 }
 
-export function saveRemoteDays(days) {
+export function saveRemoteDays(days, storage = localStorage) {
   try {
-    localStorage.setItem(REMOTE_DAYS_KEY, JSON.stringify(days || {}));
+    storage.setItem(REMOTE_DAYS_KEY, JSON.stringify(days || {}));
   } catch (e) {
     console.warn('remote days save failed:', e.message);
   }
@@ -174,15 +175,16 @@ export function saveRemoteDays(days) {
 /* 顯示用的合併視圖：自己的 ＋ 其他裝置的。所有「讀」日誌的地方都該走這支，
    「寫」的地方一律維持只寫自己那份（loadDailyLog）。
    沒登入／沒 remote 資料時等同原本的 log.days。 */
-export function dailyDays(log = loadDailyLog()) {
-  return mergedDays(log.days, loadRemoteDays());
+export function dailyDays(log = undefined, storage = localStorage) {
+  const ownLog = log === undefined ? loadDailyLog(storage) : log;
+  return mergedDays(ownLog.days, loadRemoteDays(storage));
 }
 
 /* 評分時記一筆。寫入點在 app.js gradeAndAdvance()。
    day 的四檔欄位是 again/hard/good/easy；舊資料留下的 bad/ok 欄位維持原樣不動，
    只是新的一天不會再往那兩個欄位寫。 */
-export function logReview(gradeStr, ts = Date.now()) {
-  const log = loadDailyLog();
+export function logReview(gradeStr, ts = Date.now(), storage = localStorage) {
+  const log = loadDailyLog(storage);
   const key = localDateKey(ts);
   const day = {
     reviewed: 0, again: 0, hard: 0, good: 0, easy: 0,
@@ -192,7 +194,7 @@ export function logReview(gradeStr, ts = Date.now()) {
   const grade = normalizeGrade(gradeStr);
   if (grade in day) day[grade] += 1;
   log.days[key] = day;
-  saveDailyLog(log);
+  saveDailyLog(log, storage);
 }
 
 /* 日誌變動後要通知同步的 hook。用 hook 而不是直接 import cloud-sync，是因為
@@ -210,8 +212,8 @@ export function setLogChangeHook(fn) { logChangeHook = fn; }
    同時檢查有沒有補救中的 makeupPending：今天累積滿 2 局就把昨天蓋章補回（6.1 節），
    settleStreakOnOpen() 已經在每次開 App 時把 makeupPending 算到今天最新狀態，
    這裡不用再驗證日期是否過期。 */
-export function logGame(gameId, ts = Date.now()) {
-  const log = loadDailyLog();
+export function logGame(gameId, ts = Date.now(), storage = localStorage) {
+  const log = loadDailyLog(storage);
   const key = localDateKey(ts);
   const day = { reviewed: 0, again: 0, hard: 0, good: 0, easy: 0, games: 0, seconds: 0, gameIds: [], ...(log.days[key] || {}) };
   day.games = (day.games || 0) + 1;
@@ -220,31 +222,31 @@ export function logGame(gameId, ts = Date.now()) {
 
   // 補救門檻是「今天總共 2 局」，手機玩一局、電腦玩一局也該算數，所以看合併值。
   // 蓋章仍寫進自己那份（log.days），寫進合併視圖會被當成自己的推上雲端。
-  const totalGamesToday = day.games + (loadRemoteDays()[key]?.games || 0);
+  const totalGamesToday = day.games + (loadRemoteDays(storage)[key]?.games || 0);
   if (log.makeupPending && totalGamesToday >= 2) {
     const { missedDate } = log.makeupPending;
     log.days[missedDate] = { ...ensureDay(log.days, missedDate), bridged: true };
     log.makeupPending = null;
   }
 
-  saveDailyLog(log);
-  logChangeHook?.();
+  saveDailyLog(log, storage);
+  logChangeHook?.(storage);
 }
 
 /* 累積今天實際活動秒數（app.js 的 15 秒 ticker 呼叫）。只記錄，不設目標。 */
-export function addActiveSeconds(sec, ts = Date.now()) {
+export function addActiveSeconds(sec, ts = Date.now(), storage = localStorage) {
   if (!(sec > 0)) return;
-  const log = loadDailyLog();
+  const log = loadDailyLog(storage);
   const key = localDateKey(ts);
   const day = { reviewed: 0, again: 0, hard: 0, good: 0, easy: 0, games: 0, seconds: 0, ...(log.days[key] || {}) };
   day.seconds = (day.seconds || 0) + sec;
   log.days[key] = day;
-  saveDailyLog(log);
+  saveDailyLog(log, storage);
 }
 
 /* 一次性回填：progress 只存每張卡最後一次 reviewedAt，回填是下限值，比一片空白好。 */
-export function initDailyLog(progress) {
-  const log = loadDailyLog();
+export function initDailyLog(progress, storage = localStorage) {
+  const log = loadDailyLog(storage);
   if (log.backfilled) return;
   for (const k in progress) {
     const v = progress[k];
@@ -260,7 +262,7 @@ export function initDailyLog(progress) {
     log.days[key] = day;
   }
   log.backfilled = true;
-  saveDailyLog(log);
+  saveDailyLog(log, storage);
 }
 
 /* ===== Streak ===== */
@@ -383,28 +385,28 @@ export function runStreakSettlement(log, now = Date.now(), remote = null) {
 
 /* 每次開 App 呼叫一次（app.js init()）。內部自己 load/save，呼叫端只要用回傳的
    event 決定要不要顯示提示。 */
-export function settleStreakOnOpen(now = Date.now()) {
-  const log = loadDailyLog();
-  const { log: settled, event } = runStreakSettlement(log, now, loadRemoteDays());
-  saveDailyLog(settled);
+export function settleStreakOnOpen(now = Date.now(), storage = localStorage) {
+  const log = loadDailyLog(storage);
+  const { log: settled, event } = runStreakSettlement(log, now, loadRemoteDays(storage));
+  saveDailyLog(settled, storage);
   return event;
 }
 
 /* 目前的安神保護數量，首頁狀態列顯示用。 */
-export function getProtectionCount(log = loadDailyLog()) {
-  return log.protection || 0;
+export function getProtectionCount(log = undefined, storage = localStorage) {
+  return (log === undefined ? loadDailyLog(storage) : log).protection || 0;
 }
 
 /* 補救中的補救對象（{missedDate} 或 null），首頁顯示補救 banner 用。 */
-export function getMakeupPending(log = loadDailyLog()) {
-  return log.makeupPending || null;
+export function getMakeupPending(log = undefined, storage = localStorage) {
+  return (log === undefined ? loadDailyLog(storage) : log).makeupPending || null;
 }
 
 /* ===== 跨裝置同步用的存取面（給 cloud-sync.js）===== */
 
 /* 這台自己的 days（推送用，絕對不能是合併後的視圖）＋ 結算純量。 */
-export function syncableMeta() {
-  const log = loadDailyLog();
+export function syncableMeta(storage = localStorage) {
+  const log = loadDailyLog(storage);
   return {
     ownDays: log.days,
     protection: log.protection || 0,
@@ -414,12 +416,12 @@ export function syncableMeta() {
 }
 
 /* 把雲端拉回來的結算純量寫進本機。days 不走這裡（那是 saveRemoteDays 的事）。 */
-export function applySyncedMeta({ protection, protectionRefillCheckpoint, makeupPending }) {
-  const log = loadDailyLog();
+export function applySyncedMeta({ protection, protectionRefillCheckpoint, makeupPending }, storage = localStorage) {
+  const log = loadDailyLog(storage);
   if (protection !== undefined) log.protection = protection;
   if (protectionRefillCheckpoint !== undefined) log.protectionRefillCheckpoint = protectionRefillCheckpoint;
   if (makeupPending !== undefined) log.makeupPending = makeupPending;
-  saveDailyLog(log);
+  saveDailyLog(log, storage);
 }
 
 /* ===== 未來到期預測 ===== */
@@ -490,8 +492,9 @@ function hasFullyMatureLesson() {
 }
 
 /* 組裝成就判定要的 ctx。呼叫端（評分後、進今日 tab 時）各自帶目前的 log 呼叫。 */
-export function buildAchievementCtx(log = loadDailyLog(), now = Date.now()) {
-  const days = dailyDays(log);   // 成就要看所有裝置的總和，不是單台
+export function buildAchievementCtx(log = undefined, now = Date.now(), storage = localStorage) {
+  const ownLog = log === undefined ? loadDailyLog(storage) : log;
+  const days = dailyDays(ownLog, storage);   // 成就要看所有裝置的總和，不是單台
   let maxDailyReviewed = 0;
   let totalReviewed = 0;
   for (const k in days) {
@@ -540,8 +543,8 @@ export function notifyAchievements(justUnlocked, ctx, extraMessage = '') {
   if (messages.length) showToast(messages.join('\n'));
 }
 
-export function renderAchievementsHtml(ctx) {
-  const unlocked = loadUnlocked();
+export function renderAchievementsHtml(ctx, storage = localStorage) {
+  const unlocked = loadUnlocked(storage);
   const badges = ACHIEVEMENT_DEFS.map(def => {
     const on = !!unlocked[def.id];
     return `<span class="achv-badge${on ? ' on' : ''}" title="${escapeHtml(achievementLabel(def, ctx))}">${achievementIconSvg(def)}</span>`;
@@ -588,9 +591,9 @@ function renderWeakCardsHtml(rows) {
     </div>`).join('')}</div>`;
 }
 
-function renderStatsHtml() {
-  const log = loadDailyLog();
-  const trend = accuracyTrend(dailyDays(log), trendWindow);
+function renderStatsHtml(storage = localStorage) {
+  const log = loadDailyLog(storage);
+  const trend = accuracyTrend(dailyDays(log, storage), trendWindow);
   const avg = averageAccuracy(trend);
   const weakL = weakLessons(state.progress, state.lessons);
   const weakC = weakestCards(state.progress, state.lessons, 20);
@@ -645,11 +648,11 @@ function renderLessonMapHtml() {
 let viewYear = null;
 let viewMonth = null;
 
-function renderCalendarHtml(log) {
+function renderCalendarHtml(log, storage = localStorage) {
   const now = new Date();
   if (viewYear === null) { viewYear = now.getFullYear(); viewMonth = now.getMonth(); }
 
-  const days = dailyDays(log);   // 月曆熱度要含其他裝置的複習
+  const days = dailyDays(log, storage);   // 月曆熱度要含其他裝置的複習
   const todayKey = localDateKey();
   const forecast = forecastByDay(allCardsWithLessonId(), state.progress, viewYear, viewMonth);
   const first = new Date(viewYear, viewMonth, 1);
@@ -697,13 +700,13 @@ function renderCalendarHtml(log) {
     </div>`;
 }
 
-export function renderTodayMode(el) {
+export function renderTodayMode(el, storage = localStorage) {
   // 遊戲進行中整頁交給遊戲，不畫分頁殼（原「練功」mode 的行為，合併後保留）
-  if (renderActiveGame(el, () => renderTodayMode(el))) return;
+  if (renderActiveGame(el, () => renderTodayMode(el, storage))) return;
 
-  const log = loadDailyLog();
+  const log = loadDailyLog(storage);
   const dueCount = getDueCount();
-  const days = dailyDays(log);
+  const days = dailyDays(log, storage);
   const todayLog = days[localDateKey()] || {};
   const reviewedToday = todayLog.reviewed || 0;
   const todaySeconds = todayLog.seconds || 0;
@@ -721,10 +724,10 @@ export function renderTodayMode(el) {
     ? `<span class="today-goal done">${SVG_CHECK}今天已達 1 小時複習目標</span>`
     : `<span class="today-goal">距離今天 1 小時目標還差 ${remainingMin} 分鐘</span>`;
 
-  const achvCtx = buildAchievementCtx(log);
-  notifyAchievements(checkAndUnlock(achvCtx), achvCtx);
+  const achvCtx = buildAchievementCtx(log, undefined, storage);
+  notifyAchievements(checkAndUnlock(achvCtx, storage), achvCtx);
 
-  const sweep = resweepProgress(achvCtx.totalCards);
+  const sweep = resweepProgress(achvCtx.totalCards, storage);
   const hasMore = dueCount > 0 || !sweep.done;
 
   const planHtml = hasMore
@@ -747,14 +750,14 @@ export function renderTodayMode(el) {
   const bodyHtml = statsTab === 'stats'
     ? `
       ${renderLessonMapHtml()}
-      ${renderCalendarHtml(log)}
+      ${renderCalendarHtml(log, storage)}
       <div class="home-week-panel">
         <div class="home-week-head">本週進度</div>
         <div class="home-week-stats">來過 <strong>${week.daysCame} / 7</strong> 天 · 複習 <strong>${week.reviewedTotal}</strong> 張 · 對話 <strong>${week.dialoguesCompleted}</strong> 組</div>
         ${renderWeekChip(week)}
       </div>
-      ${renderStatsHtml()}
-      ${renderAchievementsHtml(achvCtx)}
+      ${renderStatsHtml(storage)}
+      ${renderAchievementsHtml(achvCtx, storage)}
     `
     : `
       <div class="today-plan">
@@ -774,18 +777,18 @@ export function renderTodayMode(el) {
       ${bodyHtml}
     </div>`;
 
-  if (statsTab === 'plan') wireHomePanel(el, todayLog, () => renderTodayMode(el));
+  if (statsTab === 'plan') wireHomePanel(el, todayLog, () => renderTodayMode(el, storage));
 
   el.querySelectorAll('[data-today-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
       statsTab = btn.dataset.todayTab;
-      renderTodayMode(el);
+      renderTodayMode(el, storage);
     });
   });
   el.querySelectorAll('[data-trend-window]').forEach(btn => {
     btn.addEventListener('click', () => {
       trendWindow = Number(btn.dataset.trendWindow);
-      renderTodayMode(el);
+      renderTodayMode(el, storage);
     });
   });
 
@@ -793,11 +796,11 @@ export function renderTodayMode(el) {
   el.querySelector('[data-cal-prev]')?.addEventListener('click', () => {
     viewMonth -= 1;
     if (viewMonth < 0) { viewMonth = 11; viewYear -= 1; }
-    renderTodayMode(el);
+    renderTodayMode(el, storage);
   });
   el.querySelector('[data-cal-next]')?.addEventListener('click', () => {
     viewMonth += 1;
     if (viewMonth > 11) { viewMonth = 0; viewYear += 1; }
-    renderTodayMode(el);
+    renderTodayMode(el, storage);
   });
 }

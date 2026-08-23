@@ -10,7 +10,7 @@ globalThis.localStorage = {
 globalThis.location = { search: '' };
 
 const { state } = await import('../src/state.js');
-const { __setSyncTestDeps, syncNow, syncThrottled, invalidateSync, resetProgressEverywhere, flushOnHide } =
+const { __setSyncTestDeps, syncNow, syncThrottled, syncSoon, invalidateSync, resetProgressEverywhere, flushOnHide } =
   await import('../src/cloud-sync.js');
 
 const ok = (body, status = 200) => ({
@@ -20,6 +20,16 @@ const ok = (body, status = 200) => ({
 });
 
 const session = userId => ({ access_token: `token-${userId}`, user: { id: userId } });
+
+function memoryStorage(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    values,
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); },
+  };
+}
 
 function resetLocal() {
   stored.clear();
@@ -64,6 +74,259 @@ function installFetch({ userId = 'A', cards = [], onRequest } = {}) {
   });
   return { requests, restore };
 }
+
+test('sync operation keeps every learning write on its explicit storage port', async () => {
+  resetLocal();
+  const port = memoryStorage({
+    'thai-review-daily-v1': JSON.stringify({ v: 1, backfilled: true, days: {} }),
+    'thai-review-grade-history-v1': JSON.stringify({ v: 1, cards: {} }),
+  });
+  const { restore } = installFetch();
+
+  try {
+    const result = await syncNow(port);
+    assert.deepEqual(result, { pulled: 0, pushed: 0, cleared: 0 });
+    assert.equal(port.values.has('thai-review-sync-v1'), true);
+    assert.equal(port.values.has('thai-review-v1'), true);
+    assert.equal(port.values.has('thai-review-remote-days-v1'), true);
+    assert.equal(port.values.has('thai-review-achievements-v1'), true);
+    for (const key of [
+      'thai-review-sync-v1', 'thai-review-v1', 'thai-review-daily-v1',
+      'thai-review-grade-history-v1', 'thai-review-remote-days-v1',
+      'thai-review-achievements-v1', 'thai-review-resweep-v1',
+    ]) {
+      assert.equal(stored.has(key), false, `${key} must not leak to fallback storage`);
+    }
+  } finally {
+    restore();
+  }
+});
+
+test('invalidated delayed A operation cannot cross-write when B starts with another storage port', async () => {
+  resetLocal();
+  const initial = {
+    'thai-review-daily-v1': JSON.stringify({ v: 1, backfilled: true, days: {} }),
+    'thai-review-grade-history-v1': JSON.stringify({ v: 1, cards: {} }),
+    'thai-review-resweep-v1': JSON.stringify({ startedAt: null, position: 0 }),
+  };
+  const storageA = memoryStorage(initial);
+  const storageB = memoryStorage(initial);
+  const beforeA = Object.fromEntries(storageA.values);
+  let currentUser = 'A';
+  let releaseA;
+  let markAPullSeen;
+  const aPull = new Promise(resolve => { releaseA = resolve; });
+  const aPullSeen = new Promise(resolve => { markAPullSeen = resolve; });
+  const remoteBCard = {
+    card_key: 'L1:B', grade: 'good', reviewed_at: 200,
+    next_review_at: 500, interval_days: 3, ease_factor: 2.5, reps: 2,
+    progress_updated_at: 200, history: [[2, 200]], history_updated_at: 200,
+  };
+  const fetch = async (url, init = {}) => {
+    const text = String(url);
+    const token = init.headers?.Authorization || '';
+    const method = init.method || 'GET';
+    if (text.includes('/thai_meta') && method === 'GET') {
+      return ok([{ ...metaRow()[0], resweep_position: token.includes('token-B') ? 3 : 7 }]);
+    }
+    if (text.includes('/thai_cards') && method === 'GET') {
+      if (token.includes('token-A')) {
+        markAPullSeen();
+        return aPull;
+      }
+      return ok([remoteBCard]);
+    }
+    if (text.includes('/thai_days') && method === 'GET') {
+      return ok(token.includes('token-B') ? [{
+        date: '2026-08-23', device_id: 'remote-B', reviewed: 2,
+        again: 0, hard: 0, good: 2, easy: 0, games: 0, seconds: 30,
+        game_ids: [], bridged: false,
+      }] : []);
+    }
+    if (method === 'POST') return ok([]);
+    throw new Error(`unexpected request ${method} ${text}`);
+  };
+  const restore = __setSyncTestDeps({
+    getSession: async () => session(currentUser),
+    fetch,
+    now: () => 10_000,
+  });
+
+  try {
+    const first = syncNow(storageA);
+    await aPullSeen;
+    invalidateSync();
+
+    currentUser = 'B';
+    const second = await syncNow(storageB);
+    assert.equal(second?.pulled, 1);
+
+    releaseA(ok([{
+      card_key: 'L1:A', grade: 'easy', progress_updated_at: 900,
+      history: [[3, 900]], history_updated_at: 900,
+    }]));
+    assert.equal(await first, null);
+
+    assert.deepEqual(Object.fromEntries(storageA.values), beforeA,
+      'stale A must not commit after losing ownership');
+    assert.deepEqual(
+      JSON.parse(storageB.values.get('thai-review-grade-history-v1')).cards['L1:B'],
+      [[2, 200]],
+    );
+    assert.equal(JSON.parse(storageB.values.get('thai-review-resweep-v1')).position, 3);
+    assert.equal(
+      JSON.parse(storageB.values.get('thai-review-remote-days-v1'))['2026-08-23'].reviewed,
+      2,
+    );
+    assert.equal(storageB.values.has('thai-review-sync-v1'), true);
+    assert.equal(JSON.parse(storageB.values.get('thai-review-v1')).progress['L1:B'].grade, 'good');
+    assert.equal(JSON.parse(storageB.values.get('thai-review-v1')).progress['L1:A'], undefined);
+
+    for (const key of [
+      'thai-review-sync-v1', 'thai-review-v1', 'thai-review-daily-v1',
+      'thai-review-grade-history-v1', 'thai-review-remote-days-v1',
+      'thai-review-achievements-v1', 'thai-review-resweep-v1',
+    ]) {
+      assert.equal(stored.has(key), false, `${key} must not leak to fallback storage`);
+    }
+  } finally {
+    releaseA(ok([]));
+    restore();
+    invalidateSync();
+  }
+});
+
+test('syncNow automatically invalidates an in-flight operation owned by another storage port', async () => {
+  resetLocal();
+  const storageA = memoryStorage();
+  const storageB = memoryStorage();
+  let currentUser = 'A';
+  let releaseA;
+  let markAPullSeen;
+  const aPull = new Promise(resolve => { releaseA = resolve; });
+  const aPullSeen = new Promise(resolve => { markAPullSeen = resolve; });
+  const fetch = async (url, init = {}) => {
+    const text = String(url);
+    const token = init.headers?.Authorization || '';
+    const method = init.method || 'GET';
+    if (text.includes('/thai_meta') && method === 'GET') return ok(metaRow());
+    if (text.includes('/thai_cards') && method === 'GET') {
+      if (token.includes('token-A')) {
+        markAPullSeen();
+        return aPull;
+      }
+      return ok([]);
+    }
+    if (text.includes('/thai_days') && method === 'GET') return ok([]);
+    if (method === 'POST') return ok([]);
+    throw new Error(`unexpected request ${method} ${text}`);
+  };
+  const restore = __setSyncTestDeps({
+    getSession: async () => session(currentUser), fetch, now: () => 10_000,
+  });
+
+  try {
+    const first = syncNow(storageA);
+    assert.equal(syncNow(storageA), first, 'same port must still share its in-flight promise');
+    await aPullSeen;
+
+    currentUser = 'B';
+    const second = syncNow(storageB);
+    assert.notEqual(second, first, 'a different port must start a new operation');
+    assert.deepEqual(await second, { pulled: 0, pushed: 0, cleared: 0 });
+
+    releaseA(ok([]));
+    assert.equal(await first, null);
+    assert.equal(storageA.values.has('thai-review-sync-v1'), false);
+    assert.equal(storageB.values.has('thai-review-sync-v1'), true);
+    assert.equal(stored.has('thai-review-sync-v1'), false);
+  } finally {
+    releaseA(ok([]));
+    restore();
+    invalidateSync();
+  }
+});
+
+test('syncThrottled keeps independent throttle windows for different storage ports', async () => {
+  resetLocal();
+  const storageA = memoryStorage();
+  const storageB = memoryStorage();
+  let currentUser = 'A';
+  let aMetaRequests = 0;
+  let bMetaRequests = 0;
+  const fetch = async (url, init = {}) => {
+    const text = String(url);
+    const token = init.headers?.Authorization || '';
+    const method = init.method || 'GET';
+    if (text.includes('/thai_meta') && method === 'GET') {
+      if (token.includes('token-A')) {
+        aMetaRequests++;
+        return ok(metaRow());
+      }
+      bMetaRequests++;
+      return ok(metaRow());
+    }
+    if (text.includes('/thai_cards') && method === 'GET') return ok([]);
+    if (text.includes('/thai_days') && method === 'GET') return ok([]);
+    if (method === 'POST') return ok([]);
+    throw new Error(`unexpected request ${method} ${text}`);
+  };
+  const clockNow = Date.now();
+  const restore = __setSyncTestDeps({
+    getSession: async () => session(currentUser), fetch, now: () => clockNow,
+  });
+
+  try {
+    syncThrottled(storageA);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(aMetaRequests, 1);
+
+    syncThrottled(storageA);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(aMetaRequests, 1, 'same port remains throttled after its sync completes');
+
+    currentUser = 'B';
+    syncThrottled(storageB);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(bMetaRequests, 1, 'B must not inherit A throttle window');
+    assert.equal(storageB.values.has('thai-review-sync-v1'), true);
+    assert.equal(storageA.values.has('thai-review-sync-v1'), true);
+  } finally {
+    restore();
+    invalidateSync();
+  }
+});
+
+test('direct B sync cancels a pending syncSoon timer owned by storage A', async () => {
+  resetLocal();
+  const storageA = memoryStorage();
+  const storageB = memoryStorage();
+  const timers = new Map();
+  let nextTimerId = 0;
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+  globalThis.setTimeout = fn => {
+    const id = ++nextTimerId;
+    timers.set(id, fn);
+    return id;
+  };
+  globalThis.clearTimeout = id => { timers.delete(id); };
+  const { restore } = installFetch({ userId: 'B' });
+
+  try {
+    syncSoon(storageA);
+    assert.equal(timers.size, 1);
+    assert.deepEqual(await syncNow(storageB), { pulled: 0, pushed: 0, cleared: 0 });
+    assert.equal(timers.size, 0, 'B activation must cancel A queued timer');
+    assert.equal(storageA.values.has('thai-review-sync-v1'), false);
+    assert.equal(storageB.values.has('thai-review-sync-v1'), true);
+  } finally {
+    restore();
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.clearTimeout = originalClearTimeout;
+    invalidateSync();
+  }
+});
 
 test('remote progress winner 不會吞掉 local newer history 與 edit outgoing', async () => {
   resetLocal();

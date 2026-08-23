@@ -26,7 +26,7 @@ const {
   DAILY_KEY, initDailyLog, loadDailyLog, logReview,
   logGame, addActiveSeconds, streakDays, weekSummary, buildAchievementCtx,
   runStreakSettlement, settleStreakOnOpen, getProtectionCount, getMakeupPending,
-  PROTECTION_MAX, notifyAchievements, renderAchievementsHtml, buildDailyQueue,
+  PROTECTION_MAX, notifyAchievements, renderAchievementsHtml, buildDailyQueue, setLogChangeHook,
   saveRemoteDays, dailyDays,
 } = await import('../src/today.js');
 const { localDateKey } = await import('../src/state.js');
@@ -114,6 +114,26 @@ test('logGame records which game ids ran today, for per-task "done" state', () =
   const day = loadDailyLog().days['2026-08-20'];
   assert.deepEqual(day.gameIds, ['listen', 'combo']);
   assert.equal(day.games, 2);
+});
+
+test('logGame change hook receives the actual explicit or fallback storage port', () => {
+  stored.clear();
+  const explicit = {
+    values: new Map(),
+    getItem(key) { return this.values.get(key) ?? null; },
+    setItem(key, value) { this.values.set(key, String(value)); },
+    removeItem(key) { this.values.delete(key); },
+  };
+  const seen = [];
+  setLogChangeHook(storage => seen.push(storage));
+  try {
+    logGame('listen', NOON_TAIPEI(2026, 8, 20), explicit);
+    logGame('combo', NOON_TAIPEI(2026, 8, 20), undefined);
+    assert.equal(seen[0], explicit);
+    assert.equal(seen[1], globalThis.localStorage);
+  } finally {
+    setLogChangeHook(null);
+  }
 });
 
 test('addActiveSeconds accumulates seconds on the same day', () => {
