@@ -35,7 +35,11 @@ let runVersion = 0;
 let fillerRuns = 0;     // 背景中連續播過場空白的次數（保命機制）
 let warming = false;
 let dlState = null;     // { key, done, total, failed, running } 這堂課音檔下載進度
-let playbackMode = localStorage.getItem('thai-review-listen-playback-mode') || 'normal';
+const PLAYBACK_MODE_KEY = 'thai-review-listen-playback-mode';
+let playbackMode = 'normal';
+try {
+  playbackMode = localStorage.getItem(PLAYBACK_MODE_KEY) === 'lock' ? 'lock' : 'normal';
+} catch { /* device preference is optional; boot must continue */ }
 let lockSession = null;
 let lockPreparing = false;
 let lockStatus = '';
@@ -181,7 +185,7 @@ export function renderListenMode(el, cards, advanceCb) {
     stopListen();
     clearLockSession();
     playbackMode = btn.dataset.playback === 'lock' ? 'lock' : 'normal';
-    localStorage.setItem('thai-review-listen-playback-mode', playbackMode);
+    try { localStorage.setItem(PLAYBACK_MODE_KEY, playbackMode); } catch { /* optional preference */ }
     onAdvance?.('rerender');
   });
   document.getElementById('listenRateSeg')?.addEventListener('click', e => {
