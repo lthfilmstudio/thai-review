@@ -11,7 +11,7 @@ import { getDeviceId } from './srs.js';
 import { saveRemoteDays, applySyncedMeta, syncableMeta, settleStreakOnOpen } from './today.js';
 import { loadUnlocked, writeUnlocked } from './achievements.js';
 import { loadResweepState, setResweepPosition } from './resweep.js';
-import { SUPABASE_URL, SUPABASE_KEY, getSession, readStoredSession } from './cloud-auth.js';
+import { SUPABASE_URL, SUPABASE_KEY, getSession as authGetSession, readStoredSession } from './cloud-auth.js';
 import {
   mergeRemoteRows, collectLocalChanges, keysClearedByReset,
   remoteDaysFromRows, ownDaysToRows, mergeAchievements, mergeFavorites,
@@ -25,9 +25,141 @@ const SYNC_KEY = 'thai-review-sync-v1';
 const PAGE = 1000;          // 一次拉幾列（PostgREST 有預設上限，要自己分頁）
 const CHUNK = 500;          // 一次推幾列，避免單次 payload 過大
 const THROTTLE_MS = 120000; // 自動同步最密 2 分鐘一次
+const REQUEST_TIMEOUT_MS = 10000;
+const REQUEST_MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 250;
+const KEEPALIVE_MAX_BYTES = 60 * 1024; // 保守留在瀏覽器 64 KiB 上限以下
 
 let lastSyncAt = 0;
 let inFlight = null;
+let resetInFlight = null;
+let operationGeneration = 0;
+let currentOperation = null;
+
+const defaultSyncDeps = {
+  getSession: authGetSession,
+  fetch: (...args) => fetch(...args),
+  now: () => Date.now(),
+  sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+  timeoutMs: REQUEST_TIMEOUT_MS,
+  maxRetries: REQUEST_MAX_RETRIES,
+  retryDelayMs: RETRY_DELAY_MS,
+};
+let syncDeps = { ...defaultSyncDeps };
+
+/* 測試只替換 transport／session／clock，不改 production merge 語意。 */
+export function __setSyncTestDeps(overrides = {}) {
+  syncDeps = { ...defaultSyncDeps, ...overrides };
+  return () => { syncDeps = { ...defaultSyncDeps }; };
+}
+
+function createOperation() {
+  const controller = new AbortController();
+  const op = {
+    generation: ++operationGeneration,
+    controller,
+    userId: null,
+    token: null,
+  };
+  currentOperation = op;
+  return op;
+}
+
+function ownsOperation(op, userId = op?.userId) {
+  return !!op
+    && currentOperation === op
+    && op.generation === operationGeneration
+    && !op.controller.signal.aborted
+    && (!userId || op.userId === userId);
+}
+
+function ownershipError() {
+  const error = new Error('sync operation lost ownership');
+  error.code = 'SYNC_OWNERSHIP_LOST';
+  return error;
+}
+
+function assertOwnership(op, userId = op?.userId) {
+  if (!ownsOperation(op, userId)) throw ownershipError();
+}
+
+function isRetryableStatus(status) {
+  return status === 408 || status === 429 || (status >= 500 && status <= 599);
+}
+
+function isAbortError(error) {
+  return error?.name === 'AbortError' || error?.code === 'ABORT_ERR';
+}
+
+function timeoutError() {
+  const error = new Error('sync request timeout');
+  error.code = 'SYNC_TIMEOUT';
+  error.name = 'TimeoutError';
+  return error;
+}
+
+function retryDelay(attempt) {
+  return Math.max(0, Number(syncDeps.retryDelayMs) || 0) * (2 ** attempt);
+}
+
+async function request(url, init = {}, op = null) {
+  const maxRetries = Math.max(0, Number(syncDeps.maxRetries) || 0);
+  for (let attempt = 0; ; attempt++) {
+    if (op) assertOwnership(op);
+
+    const controller = new AbortController();
+    let timedOut = false;
+    let timer = null;
+    let detachOperationAbort = () => {};
+    const fetchPromise = Promise.resolve().then(() => syncDeps.fetch(url, {
+      ...init,
+      signal: controller.signal,
+    }));
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+        reject(timeoutError());
+      }, Math.max(0, Number(syncDeps.timeoutMs) || 0));
+    });
+    const pending = [fetchPromise, timeoutPromise];
+    if (op) {
+      const ownershipPromise = new Promise((_, reject) => {
+        const abort = () => {
+          controller.abort();
+          reject(ownershipError());
+        };
+        if (op.controller.signal.aborted) abort();
+        else {
+          op.controller.signal.addEventListener('abort', abort, { once: true });
+          detachOperationAbort = () => op.controller.signal.removeEventListener('abort', abort);
+        }
+      });
+      pending.push(ownershipPromise);
+    }
+
+    try {
+      const res = await Promise.race(pending);
+      if (op) assertOwnership(op);
+      if (!isRetryableStatus(res.status) || attempt >= maxRetries) return res;
+    } catch (error) {
+      if (error?.code === 'SYNC_OWNERSHIP_LOST' || (op && !ownsOperation(op))) {
+        throw ownershipError();
+      }
+      // A caller-initiated AbortSignal is never retried.  Only our own timeout
+      // and ordinary transport failures are eligible for bounded retry.
+      if (isAbortError(error) && !timedOut) throw error;
+      if (attempt >= maxRetries) throw error;
+    } finally {
+      clearTimeout(timer);
+      detachOperationAbort();
+    }
+
+    if (op) assertOwnership(op);
+    await syncDeps.sleep(retryDelay(attempt));
+    if (op) assertOwnership(op);
+  }
+}
 
 /* watermark：
    pulledAt  ＝ 已經拉到哪個 row_updated_at（server 時鐘，ISO 字串）
@@ -41,10 +173,11 @@ function loadWatermark() {
     const w = raw ? JSON.parse(raw) : null;
     return {
       pulledAt: w?.pulledAt || null, pushedAt: w?.pushedAt || 0,
+      pulledKey: w?.pulledKey || null,
       metaAt: w?.metaAt || 0, resetAt: w?.resetAt || 0, at: w?.at || 0,
     };
   } catch {
-    return { pulledAt: null, pushedAt: 0, metaAt: 0, resetAt: 0, at: 0 };
+    return { pulledAt: null, pulledKey: null, pushedAt: 0, metaAt: 0, resetAt: 0, at: 0 };
   }
 }
 
@@ -64,10 +197,25 @@ export function lastSyncedAt() {
    - remote days 留著的話，登出後統計/月曆還在混入別台裝置的數字，
      跟「這台不再同步」的說法對不上。 */
 export function clearSyncState() {
+  invalidateSync();
   try {
     localStorage.removeItem(SYNC_KEY);
   } catch { /* 清不掉頂多多拉一輪 */ }
   saveRemoteDays({});
+  lastSyncAt = 0;
+}
+
+/* 登出／切換帳號前先切斷所有舊 operation。舊 fetch 即使忽略 AbortSignal，
+   回來後也會因 generation 不同而不能碰新 workspace。 */
+export function invalidateSync() {
+  clearTimeout(settleTimer);
+  settleTimer = null;
+  const old = currentOperation;
+  operationGeneration++;
+  currentOperation = null;
+  old?.controller.abort();
+  inFlight = null;
+  resetInFlight = null;
   lastSyncAt = 0;
 }
 
@@ -79,32 +227,65 @@ function headers(token) {
   };
 }
 
-/* 拉回 watermark 之後變動的列，分頁拉到拉完為止。 */
-async function pullRows(token, since) {
+function quoteFilterValue(value) {
+  return `"${String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+}
+
+function setKeysetAfter(params, columns, cursor) {
+  if (!cursor?.[columns[0]] || !cursor?.[columns[1]]) return;
+  const [first, second] = columns;
+  const firstValue = cursor[first];
+  const secondValue = cursor[second];
+  const firstFilter = quoteFilterValue(firstValue);
+  const secondFilter = quoteFilterValue(secondValue);
+  params.set('or', `(${first}.gt.${firstFilter},and(${first}.eq.${firstFilter},${second}.gt.${secondFilter}))`);
+}
+
+function cardCursor(row) {
+  if (!row?.row_updated_at || !row?.card_key) return null;
+  return { row_updated_at: String(row.row_updated_at), card_key: String(row.card_key) };
+}
+
+function dayCursor(row) {
+  if (!row?.date || !row?.device_id) return null;
+  return { date: String(row.date), device_id: String(row.device_id) };
+}
+
+/* 拉回 watermark 之後變動的列，使用雙欄 keyset 分頁。
+   舊版只有 pulledAt 沒有 pulledKey，不能安全地從同 timestamp 繼續，故完整重拉。 */
+async function pullRows(token, watermark, op) {
   const rows = [];
-  let offset = 0;
+  let cursor = cardCursor({ row_updated_at: watermark.pulledAt, card_key: watermark.pulledKey });
   for (;;) {
     const params = new URLSearchParams({
       select: '*',
-      order: 'row_updated_at.asc',
+      order: 'row_updated_at.asc,card_key.asc',
       limit: String(PAGE),
-      offset: String(offset),
     });
-    if (since) params.set('row_updated_at', `gt.${since}`);
-    const res = await fetch(`${REST}?${params}`, { headers: headers(token) });
+    // 沒有 pulledKey 時刻意不帶 pulledAt filter，確保舊 watermark 不漏同 timestamp 的列。
+    setKeysetAfter(params, ['row_updated_at', 'card_key'], cursor);
+    const res = await request(`${REST}?${params}`, { headers: headers(token) }, op);
     if (!res.ok) throw new Error(`pull ${res.status}`);
     const page = await res.json();
     rows.push(...page);
-    if (page.length < PAGE) break;
-    offset += PAGE;
+    const nextCursor = cardCursor(page[page.length - 1]);
+    if (page.length < PAGE) {
+      cursor = nextCursor || cursor;
+      break;
+    }
+    if (!nextCursor || (cursor && nextCursor.row_updated_at === cursor.row_updated_at
+      && nextCursor.card_key === cursor.card_key)) {
+      throw new Error('pull pagination cursor missing or stalled');
+    }
+    cursor = nextCursor;
   }
-  return rows;
+  return { rows, cursor: cursor || cardCursor(rows[rows.length - 1]) };
 }
 
 /* 讀帳號層級的 meta（重置 epoch＋結算純量＋成就＋收藏＋重新複習游標）。
    沒有那列（第一次同步）回一個全空的預設值。 */
-async function pullMeta(token) {
-  const res = await fetch(`${META}?select=*`, { headers: headers(token) });
+async function pullMeta(token, op) {
+  const res = await request(`${META}?select=*`, { headers: headers(token) }, op);
   if (!res.ok) throw new Error(`meta ${res.status}`);
   const row = (await res.json())?.[0];
   return {
@@ -123,51 +304,59 @@ async function pullMeta(token) {
 /* 拉所有裝置的每日日誌。刻意每次拉全部而不做增量：日誌只有每天一列、
    資料量小（一年 365 列 × 裝置數），而且 remote 視圖是「整份覆蓋」的語意，
    增量拉會讓「別台刪掉某天」這種情況算不對。 */
-async function pullDays(token) {
+async function pullDays(token, op) {
   const rows = [];
-  let offset = 0;
+  let cursor = null;
   for (;;) {
-    const res = await fetch(`${DAYS}?select=*&order=date.asc&limit=${PAGE}&offset=${offset}`,
-      { headers: headers(token) });
+    const params = new URLSearchParams({
+      select: '*', order: 'date.asc,device_id.asc', limit: String(PAGE),
+    });
+    setKeysetAfter(params, ['date', 'device_id'], cursor);
+    const res = await request(`${DAYS}?${params}`, { headers: headers(token) }, op);
     if (!res.ok) throw new Error(`days ${res.status}`);
     const page = await res.json();
     rows.push(...page);
     if (page.length < PAGE) break;
-    offset += PAGE;
+    const nextCursor = dayCursor(page[page.length - 1]);
+    if (!nextCursor || (cursor && nextCursor.date === cursor.date
+      && nextCursor.device_id === cursor.device_id)) {
+      throw new Error('days pagination cursor missing or stalled');
+    }
+    cursor = nextCursor;
   }
   return rows;
 }
 
-async function pushDays(token, rows, userId) {
+async function pushDays(token, rows, userId, op) {
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK).map(r => ({ ...r, user_id: userId }));
-    const res = await fetch(DAYS, {
+    const res = await request(DAYS, {
       method: 'POST',
       headers: { ...headers(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(chunk),
-    });
+    }, op);
     if (!res.ok) throw new Error(`pushDays ${res.status}`);
   }
 }
 
-async function pushMeta(token, userId, fields) {
-  const res = await fetch(META, {
+async function pushMeta(token, userId, fields, op) {
+  const res = await request(META, {
     method: 'POST',
     headers: { ...headers(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify([{ user_id: userId, ...fields }]),
-  });
+  }, op);
   if (!res.ok) throw new Error(`pushMeta ${res.status}`);
 }
 
-async function pushRows(token, rows, userId) {
+async function pushRows(token, rows, userId, op) {
   for (let i = 0; i < rows.length; i += CHUNK) {
     // normalizeCardRows：PostgREST 要求同一批每列 key 完全一致，否則整批 400
     const chunk = normalizeCardRows(rows.slice(i, i + CHUNK)).map(r => ({ ...r, user_id: userId }));
-    const res = await fetch(REST, {
+    const res = await request(REST, {
       method: 'POST',
       headers: { ...headers(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(chunk),
-    });
+    }, op);
     if (!res.ok) throw new Error(`push ${res.status}`);
   }
 }
@@ -175,31 +364,42 @@ async function pushRows(token, rows, userId) {
 /* 跑一輪完整同步。回傳 { pulled, pushed } 或 null（沒登入 / 出錯）。
    同一時間只跑一輪，重複呼叫會共用同一個 promise。 */
 export function syncNow() {
+  if (resetInFlight) return Promise.resolve(null);
   if (inFlight) return inFlight;
-  inFlight = runSync().finally(() => { inFlight = null; });
-  return inFlight;
+  const op = createOperation();
+  const promise = runSync(op).finally(() => {
+    if (inFlight === promise) inFlight = null;
+    if (currentOperation === op) currentOperation = null;
+  });
+  inFlight = promise;
+  return promise;
 }
 
-async function runSync() {
+async function runSync(op) {
   let session;
   try {
-    session = await getSession();
+    session = await syncDeps.getSession();
   } catch {
     return null;
   }
+  if (!ownsOperation(op)) return null;
   const token = session?.access_token;
   const userId = session?.user?.id;
   if (!token || !userId) return null;
+  op.userId = userId;
+  op.token = token;
+  if (!ownsOperation(op, userId)) return null;
 
   const w = loadWatermark();
   // 在收集本機變更「之前」就記下時間：同步跑到一半評的分，時間戳一定大於
   // 這個值，下一輪才不會被跳過（見下面 pushedAt 的說明）。
-  const startedAt = Date.now();
+  const startedAt = syncDeps.now();
 
   try {
     // 0) 先拉 meta。順序很重要：要先知道重置 epoch「哪個時間點以前的都不算數」，
     //    後面的合併跟上傳才不會把已經被別台裝置清掉的資料收回來或推回去。
-    const meta = await pullMeta(token);
+    const meta = await pullMeta(token, op);
+    assertOwnership(op, userId);
     const resetAt = meta.reset_at;
     const clearedKeys = keysClearedByReset(state.progress, resetAt);
     if (clearedKeys.length) {
@@ -208,7 +408,9 @@ async function runSync() {
     }
 
     // 1) 拉遠端變動並合併進本機
-    const rows = await pullRows(token, w.pulledAt);
+    const pulled = await pullRows(token, w, op);
+    assertOwnership(op, userId);
+    const rows = pulled.rows;
     const history = loadGradeHistory();
     const { progress, history: mergedHistory, edits } = mergeRemoteRows(
       rows, state.progress, history.cards, resetAt, state.edits);
@@ -224,18 +426,15 @@ async function runSync() {
 
     // watermark 取「這批列裡最大的 row_updated_at」，不是取 now()——
     // 用本機時鐘當基準的話，裝置時間偏差會直接變成漏資料。
-    let pulledAt = w.pulledAt;
-    for (const r of rows) {
-      if (r.row_updated_at && (!pulledAt || r.row_updated_at > pulledAt)) pulledAt = r.row_updated_at;
-    }
+    const pulledAt = pulled.cursor?.row_updated_at || w.pulledAt || null;
+    const pulledKey = pulled.cursor?.card_key || w.pulledKey || null;
 
-    // 2) 推本機變動。剛剛從遠端合併進來的那幾張不用再推回去（server 上本來
-    //    就有），推回去只是白費頻寬。
-    const pulledBack = new Set(changedKeys);
+    // 2) 推本機變動。即使 progress 剛從遠端採納，也要保留同卡本機較新的
+    //    history／edit 欄位一起送出；DB trigger 會逐組判斷，重送同一 progress 無害。
     const outgoing = collectLocalChanges(
-      state.progress, loadGradeHistory().cards, w.pushedAt, resetAt, state.edits)
-      .filter(r => !pulledBack.has(r.card_key));
-    if (outgoing.length) await pushRows(token, outgoing, userId);
+      state.progress, loadGradeHistory().cards, w.pushedAt, resetAt, state.edits);
+    if (outgoing.length) await pushRows(token, outgoing, userId, op);
+    assertOwnership(op, userId);
 
     /* pushedAt 用「同步開始的本機時間」，不是「這批推上去的最大時間戳」。
        原因：另一台裝置的時鐘可能比較快，拉回來的紀錄會帶未來的時間戳；
@@ -247,13 +446,15 @@ async function runSync() {
     // 3) 每日日誌：拉回所有裝置的列，扣掉自己那台後存成 remote 視圖。
     //    漏掉「扣掉自己」會自己加自己，當天數字直接翻倍。
     const deviceId = getDeviceId();
-    const dayRows = await pullDays(token);
+    const dayRows = await pullDays(token, op);
+    assertOwnership(op, userId);
     saveRemoteDays(remoteDaysFromRows(dayRows, deviceId));
 
     // 4) 遠端的結算純量比較新的話，先收下來再結算。
     //    比較對象是「這台上次推 meta 時寫的 meta_updated_at」，不是 startedAt——
     //    拿 startedAt 比等於在問「別台的時鐘有沒有超前我」，正常情況永遠是否，
     //    保護數量就永遠同步不下來，別台花掉的保護會被這台原封不動推回去。
+    assertOwnership(op, userId);
     if ((meta.meta_updated_at || 0) > w.metaAt && meta.protection !== null) {
       applySyncedMeta({
         protection: meta.protection,
@@ -265,6 +466,7 @@ async function runSync() {
     // 5) 結算 streak——**一定要在合併完 days、收下遠端純量之後跑**，這樣它是
     //    看著所有裝置的出席紀錄與最新的保護數量做決定（在手機上複習過的那天
     //    不會被誤判成缺口）。結算完才讀 syncableMeta()，推上去的才是結算結果。
+    assertOwnership(op, userId);
     settleStreakOnOpen();
 
     // 6) 推自己的 days + 合併後的 meta。只推跟雲端不一樣的日子——整份重推的話
@@ -273,10 +475,12 @@ async function runSync() {
     const ownRows = changedDayRows(
       ownDaysToRows(local.ownDays, deviceId),
       dayRows.filter(r => r.device_id === deviceId));
-    if (ownRows.length) await pushDays(token, ownRows, userId);
+    if (ownRows.length) await pushDays(token, ownRows, userId, op);
+    assertOwnership(op, userId);
 
     const mergedAchv = mergeAchievements(loadUnlocked(), meta.achievements);
     const mergedFavs = mergeFavorites(state.favorites, meta.favorites);
+    assertOwnership(op, userId);
     writeUnlocked(mergedAchv);
     state.favorites = mergedFavs;
 
@@ -293,14 +497,16 @@ async function runSync() {
       achievements: mergedAchv,
       favorites: mergedFavs,
       meta_updated_at: startedAt,
-    });
+    }, op);
+    assertOwnership(op, userId);
     saveState();
 
-    const at = Date.now();
+    const at = syncDeps.now();
     lastSyncAt = at;
-    saveWatermark({ pulledAt, pushedAt, metaAt: startedAt, resetAt, at });
+    saveWatermark({ pulledAt, pulledKey, pushedAt, metaAt: startedAt, resetAt, at });
     return { pulled: changedKeys.length, pushed: outgoing.length, cleared: clearedKeys.length };
   } catch (e) {
+    if (e?.code === 'SYNC_OWNERSHIP_LOST') return null;
     // 同步失敗不影響複習；watermark 不動，下次會重試同一段。
     console.warn('雲端同步失敗（不影響本機複習）：', e.message);
     return null;
@@ -318,33 +524,65 @@ async function runSync() {
 
    回傳 true 代表雲端已標記成功。沒登入回 null——呼叫端要據此決定要不要
    提示使用者「只清掉這台」。 */
-export async function resetProgressEverywhere() {
-  const session = await getSession();
-  const token = session?.access_token;
-  const userId = session?.user?.id;
-  if (!token || !userId) return null;
-
-  const resetAt = Date.now();
-  const res = await fetch(META, {
-    method: 'POST',
-    headers: { ...headers(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify([{ user_id: userId, reset_at: resetAt }]),
+export function resetProgressEverywhere() {
+  if (resetInFlight) return resetInFlight;
+  // Reset 是破壞性 operation；先中止普通 sync，避免兩者交錯寫 watermark。
+  invalidateSync();
+  const op = createOperation();
+  const promise = runReset(op).finally(() => {
+    if (resetInFlight === promise) resetInFlight = null;
+    if (currentOperation === op) currentOperation = null;
   });
-  if (!res.ok) throw new Error(`reset ${res.status}`);
+  resetInFlight = promise;
+  return promise;
+}
 
-  // 清掉雲端既有列（失敗不致命，epoch 已經生效）
+async function runReset(op) {
   try {
-    await fetch(`${REST}?user_id=eq.${userId}`, { method: 'DELETE', headers: headers(token) });
-  } catch { /* 留著也無妨，之後同步一律被 epoch 濾掉 */ }
+    const session = await syncDeps.getSession();
+    if (!ownsOperation(op)) return null;
+    const token = session?.access_token;
+    const userId = session?.user?.id;
+    if (!token || !userId) return null;
+    op.userId = userId;
+    op.token = token;
+    assertOwnership(op, userId);
 
-  // 本機 watermark 重來：pulledAt 清空讓下次同步重新對齊，
-  // pushedAt 推到 resetAt 之後，避免把剛清掉的資料又推上去。
-  saveWatermark({ pulledAt: null, pushedAt: resetAt, metaAt: 0, resetAt, at: Date.now() });
-  return true;
+    const resetAt = syncDeps.now();
+    const res = await request(META, {
+      method: 'POST',
+      headers: { ...headers(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ user_id: userId, reset_at: resetAt }]),
+    }, op);
+    if (!res.ok) throw new Error(`reset ${res.status}`);
+    // epoch 已經寫入遠端，但後續本機寫入仍須確認 ownership。
+    assertOwnership(op, userId);
+
+    // 清掉雲端既有列（失敗不致命，epoch 已經生效）
+    try {
+      await request(`${REST}?user_id=eq.${userId}`, { method: 'DELETE', headers: headers(token) }, op);
+    } catch (e) {
+      if (e?.code === 'SYNC_OWNERSHIP_LOST') return null;
+      /* 留著也無妨，之後同步一律被 epoch 濾掉 */
+    }
+
+    // 本機 watermark 重來：pulledAt 清空讓下次同步重新對齊，
+    // pushedAt 推到 resetAt 之後，避免把剛清掉的資料又推上去。
+    assertOwnership(op, userId);
+    saveWatermark({ pulledAt: null, pulledKey: null, pushedAt: resetAt, metaAt: 0,
+      resetAt, at: syncDeps.now() });
+    return true;
+  } catch (e) {
+    if (e?.code === 'SYNC_OWNERSHIP_LOST') return null;
+    throw e;
+  } finally {
+    if (currentOperation === op) currentOperation = null;
+  }
 }
 
 /* 節流版，給 app.js 的 15 秒 ticker 呼叫。 */
 export function syncThrottled() {
+  if (resetInFlight) return;
   if (Date.now() - lastSyncAt < THROTTLE_MS) return;
   lastSyncAt = Date.now();   // 先卡住，避免慢請求期間被重複觸發
   void syncNow();
@@ -382,15 +620,27 @@ export function flushOnHide() {
     state.progress, loadGradeHistory().cards, w.pushedAt, w.resetAt, state.edits);
   if (!rows.length) return false;
 
-  const payload = normalizeCardRows(rows.slice(0, MAX_FLUSH))
+  const candidates = normalizeCardRows(rows.slice(0, MAX_FLUSH))
     .map(r => ({ ...r, user_id: session.user.id }));
+  const encoder = new TextEncoder();
+  let payload = [];
+  let body = '[]';
+  for (const row of candidates) {
+    const nextBody = JSON.stringify([...payload, row]);
+    if (encoder.encode(nextBody).byteLength >= KEEPALIVE_MAX_BYTES) break;
+    payload = [...payload, row];
+    body = nextBody;
+  }
+  // 單筆就超過上限時不發 keepalive，留給一般 sync；這裡不碰 watermark。
+  if (!payload.length) return false;
   try {
-    void fetch(REST, {
+    // 一次只送一個請求；剩餘資料交給下次普通 sync，避免多個 keepalive 合計超額。
+    void Promise.resolve(syncDeps.fetch(REST, {
       method: 'POST',
       headers: { ...headers(session.access_token), Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(payload),
+      body,
       keepalive: true,
-    }).catch(() => {});
+    })).catch(() => {});
   } catch {
     return false;
   }
