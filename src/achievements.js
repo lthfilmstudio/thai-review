@@ -39,9 +39,9 @@ export function achievementIconSvg(def) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 }
 
-export function loadUnlocked() {
+export function loadUnlocked(storage = localStorage) {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = storage.getItem(KEY);
     if (!raw) return {};
     const v = JSON.parse(raw);
     return (v && typeof v === 'object') ? v : {};
@@ -52,21 +52,21 @@ export function loadUnlocked() {
 
 /* 跨裝置同步用：把合併好的解鎖清單整份寫回。合併語意（聯集取較早解鎖時間）
    歸 src/cloud-merge.js 的 mergeAchievements，這裡只負責落地。 */
-export function writeUnlocked(unlocked) {
-  saveUnlocked(unlocked);
+export function writeUnlocked(unlocked, storage = localStorage) {
+  saveUnlocked(unlocked, storage);
 }
 
-function saveUnlocked(unlocked) {
+function saveUnlocked(unlocked, storage = localStorage) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(unlocked));
+    storage.setItem(KEY, JSON.stringify(unlocked));
   } catch (e) {
     console.warn('achievements save failed:', e.message);
   }
 }
 
 /* 檢查 ctx 是否觸發新成就，寫入 localStorage，回傳這次新解鎖的清單（給呼叫端顯示 toast）。 */
-export function checkAndUnlock(ctx) {
-  const unlocked = loadUnlocked();
+export function checkAndUnlock(ctx, storage = localStorage) {
+  const unlocked = loadUnlocked(storage);
   const justUnlocked = [];
   for (const def of ACHIEVEMENT_DEFS) {
     if (unlocked[def.id]) continue;
@@ -75,7 +75,7 @@ export function checkAndUnlock(ctx) {
       justUnlocked.push(def);
     }
   }
-  if (justUnlocked.length) saveUnlocked(unlocked);
+  if (justUnlocked.length) saveUnlocked(unlocked, storage);
   return justUnlocked;
 }
 

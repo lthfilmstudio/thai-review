@@ -31,7 +31,9 @@ const RETRY_DELAY_MS = 250;
 const KEEPALIVE_MAX_BYTES = 60 * 1024; // 保守留在瀏覽器 64 KiB 上限以下
 
 let lastSyncAt = 0;
+let lastSyncStorage = null;
 let inFlight = null;
+let inFlightStorage = null;
 let resetInFlight = null;
 let operationGeneration = 0;
 let currentOperation = null;
@@ -53,13 +55,14 @@ export function __setSyncTestDeps(overrides = {}) {
   return () => { syncDeps = { ...defaultSyncDeps }; };
 }
 
-function createOperation() {
+function createOperation(storage = localStorage) {
   const controller = new AbortController();
   const op = {
     generation: ++operationGeneration,
     controller,
     userId: null,
     token: null,
+    storage,
   };
   currentOperation = op;
   return op;
@@ -167,9 +170,9 @@ async function request(url, init = {}, op = null) {
    metaAt    ＝ 這台上次推 meta 時寫進 meta_updated_at 的值（本機時鐘，毫秒）
    resetAt   ＝ 上次同步看到的重置 epoch，給關頁補送用（那時來不及拉雲端）
    前兩個時鐘刻意分開存，不互相換算——混用會在裝置時間不準時漏資料。 */
-function loadWatermark() {
+function loadWatermark(storage = localStorage) {
   try {
-    const raw = localStorage.getItem(SYNC_KEY);
+    const raw = storage.getItem(SYNC_KEY);
     const w = raw ? JSON.parse(raw) : null;
     return {
       pulledAt: w?.pulledAt || null, pushedAt: w?.pushedAt || 0,
@@ -181,14 +184,14 @@ function loadWatermark() {
   }
 }
 
-function saveWatermark(w) {
+function saveWatermark(w, storage = localStorage) {
   try {
-    localStorage.setItem(SYNC_KEY, JSON.stringify(w));
+    storage.setItem(SYNC_KEY, JSON.stringify(w));
   } catch { /* 存不進去頂多下次多拉一輪，不影響正確性 */ }
 }
 
-export function lastSyncedAt() {
-  return loadWatermark().at;
+export function lastSyncedAt(storage = localStorage) {
+  return loadWatermark(storage).at;
 }
 
 /* 登出時清掉同步狀態。兩件事都必要：
@@ -196,13 +199,14 @@ export function lastSyncedAt() {
      一輩子拉不下來。
    - remote days 留著的話，登出後統計/月曆還在混入別台裝置的數字，
      跟「這台不再同步」的說法對不上。 */
-export function clearSyncState() {
+export function clearSyncState(storage = localStorage) {
   invalidateSync();
   try {
-    localStorage.removeItem(SYNC_KEY);
+    storage.removeItem(SYNC_KEY);
   } catch { /* 清不掉頂多多拉一輪 */ }
-  saveRemoteDays({});
+  saveRemoteDays({}, storage);
   lastSyncAt = 0;
+  lastSyncStorage = null;
 }
 
 /* 登出／切換帳號前先切斷所有舊 operation。舊 fetch 即使忽略 AbortSignal，
@@ -210,13 +214,16 @@ export function clearSyncState() {
 export function invalidateSync() {
   clearTimeout(settleTimer);
   settleTimer = null;
+  settleTimerStorage = null;
   const old = currentOperation;
   operationGeneration++;
   currentOperation = null;
   old?.controller.abort();
   inFlight = null;
+  inFlightStorage = null;
   resetInFlight = null;
   lastSyncAt = 0;
+  lastSyncStorage = null;
 }
 
 function headers(token) {
@@ -363,15 +370,23 @@ async function pushRows(token, rows, userId, op) {
 
 /* 跑一輪完整同步。回傳 { pulled, pushed } 或 null（沒登入 / 出錯）。
    同一時間只跑一輪，重複呼叫會共用同一個 promise。 */
-export function syncNow() {
+export function syncNow(storage = localStorage) {
+  if ((inFlight && inFlightStorage !== storage)
+      || (settleTimer !== null && settleTimerStorage !== storage)) {
+    invalidateSync();
+  }
   if (resetInFlight) return Promise.resolve(null);
   if (inFlight) return inFlight;
-  const op = createOperation();
+  const op = createOperation(storage);
   const promise = runSync(op).finally(() => {
-    if (inFlight === promise) inFlight = null;
+    if (inFlight === promise) {
+      inFlight = null;
+      inFlightStorage = null;
+    }
     if (currentOperation === op) currentOperation = null;
   });
   inFlight = promise;
+  inFlightStorage = storage;
   return promise;
 }
 
@@ -390,7 +405,7 @@ async function runSync(op) {
   op.token = token;
   if (!ownsOperation(op, userId)) return null;
 
-  const w = loadWatermark();
+  const w = loadWatermark(op.storage);
   // 在收集本機變更「之前」就記下時間：同步跑到一半評的分，時間戳一定大於
   // 這個值，下一輪才不會被跳過（見下面 pushedAt 的說明）。
   const startedAt = syncDeps.now();
@@ -404,14 +419,14 @@ async function runSync(op) {
     const clearedKeys = keysClearedByReset(state.progress, resetAt);
     if (clearedKeys.length) {
       for (const k of clearedKeys) delete state.progress[k];
-      saveState();
+      saveState(op.storage);
     }
 
     // 1) 拉遠端變動並合併進本機
     const pulled = await pullRows(token, w, op);
     assertOwnership(op, userId);
     const rows = pulled.rows;
-    const history = loadGradeHistory();
+    const history = loadGradeHistory(op.storage);
     const { progress, history: mergedHistory, edits } = mergeRemoteRows(
       rows, state.progress, history.cards, resetAt, state.edits);
 
@@ -420,9 +435,9 @@ async function runSync(op) {
     if (changedKeys.length || editKeys.length) {
       for (const k of changedKeys) state.progress[k] = progress[k];
       for (const k of editKeys) state.edits[k] = edits[k];
-      saveState();
+      saveState(op.storage);
     }
-    writeMergedHistory(mergedHistory);
+    writeMergedHistory(mergedHistory, op.storage);
 
     // watermark 取「這批列裡最大的 row_updated_at」，不是取 now()——
     // 用本機時鐘當基準的話，裝置時間偏差會直接變成漏資料。
@@ -432,7 +447,7 @@ async function runSync(op) {
     // 2) 推本機變動。即使 progress 剛從遠端採納，也要保留同卡本機較新的
     //    history／edit 欄位一起送出；DB trigger 會逐組判斷，重送同一 progress 無害。
     const outgoing = collectLocalChanges(
-      state.progress, loadGradeHistory().cards, w.pushedAt, resetAt, state.edits);
+      state.progress, loadGradeHistory(op.storage).cards, w.pushedAt, resetAt, state.edits);
     if (outgoing.length) await pushRows(token, outgoing, userId, op);
     assertOwnership(op, userId);
 
@@ -448,7 +463,7 @@ async function runSync(op) {
     const deviceId = getDeviceId();
     const dayRows = await pullDays(token, op);
     assertOwnership(op, userId);
-    saveRemoteDays(remoteDaysFromRows(dayRows, deviceId));
+    saveRemoteDays(remoteDaysFromRows(dayRows, deviceId), op.storage);
 
     // 4) 遠端的結算純量比較新的話，先收下來再結算。
     //    比較對象是「這台上次推 meta 時寫的 meta_updated_at」，不是 startedAt——
@@ -460,33 +475,33 @@ async function runSync(op) {
         protection: meta.protection,
         protectionRefillCheckpoint: meta.protection_refill_checkpoint,
         makeupPending: meta.makeup_pending,
-      });
+      }, op.storage);
     }
 
     // 5) 結算 streak——**一定要在合併完 days、收下遠端純量之後跑**，這樣它是
     //    看著所有裝置的出席紀錄與最新的保護數量做決定（在手機上複習過的那天
     //    不會被誤判成缺口）。結算完才讀 syncableMeta()，推上去的才是結算結果。
     assertOwnership(op, userId);
-    settleStreakOnOpen();
+    settleStreakOnOpen(undefined, op.storage);
 
     // 6) 推自己的 days + 合併後的 meta。只推跟雲端不一樣的日子——整份重推的話
     //    每次同步都會白寫一年份的列（thai_days_touch 每次都會動 row_updated_at）。
-    const local = syncableMeta();
+    const local = syncableMeta(op.storage);
     const ownRows = changedDayRows(
       ownDaysToRows(local.ownDays, deviceId),
       dayRows.filter(r => r.device_id === deviceId));
     if (ownRows.length) await pushDays(token, ownRows, userId, op);
     assertOwnership(op, userId);
 
-    const mergedAchv = mergeAchievements(loadUnlocked(), meta.achievements);
+    const mergedAchv = mergeAchievements(loadUnlocked(op.storage), meta.achievements);
     const mergedFavs = mergeFavorites(state.favorites, meta.favorites);
     assertOwnership(op, userId);
-    writeUnlocked(mergedAchv);
+    writeUnlocked(mergedAchv, op.storage);
     state.favorites = mergedFavs;
 
-    const resweep = loadResweepState();
+    const resweep = loadResweepState(op.storage);
     const mergedResweepPos = Math.max(resweep.position || 0, meta.resweep_position || 0);
-    if (mergedResweepPos !== resweep.position) setResweepPosition(mergedResweepPos);
+    if (mergedResweepPos !== resweep.position) setResweepPosition(mergedResweepPos, op.storage);
 
     await pushMeta(token, userId, {
       protection: local.protection,
@@ -499,11 +514,12 @@ async function runSync(op) {
       meta_updated_at: startedAt,
     }, op);
     assertOwnership(op, userId);
-    saveState();
+    saveState(op.storage);
 
     const at = syncDeps.now();
     lastSyncAt = at;
-    saveWatermark({ pulledAt, pulledKey, pushedAt, metaAt: startedAt, resetAt, at });
+    lastSyncStorage = op.storage;
+    saveWatermark({ pulledAt, pulledKey, pushedAt, metaAt: startedAt, resetAt, at }, op.storage);
     return { pulled: changedKeys.length, pushed: outgoing.length, cleared: clearedKeys.length };
   } catch (e) {
     if (e?.code === 'SYNC_OWNERSHIP_LOST') return null;
@@ -524,11 +540,11 @@ async function runSync(op) {
 
    回傳 true 代表雲端已標記成功。沒登入回 null——呼叫端要據此決定要不要
    提示使用者「只清掉這台」。 */
-export function resetProgressEverywhere() {
+export function resetProgressEverywhere(storage = localStorage) {
   if (resetInFlight) return resetInFlight;
   // Reset 是破壞性 operation；先中止普通 sync，避免兩者交錯寫 watermark。
   invalidateSync();
-  const op = createOperation();
+  const op = createOperation(storage);
   const promise = runReset(op).finally(() => {
     if (resetInFlight === promise) resetInFlight = null;
     if (currentOperation === op) currentOperation = null;
@@ -570,7 +586,7 @@ async function runReset(op) {
     // pushedAt 推到 resetAt 之後，避免把剛清掉的資料又推上去。
     assertOwnership(op, userId);
     saveWatermark({ pulledAt: null, pulledKey: null, pushedAt: resetAt, metaAt: 0,
-      resetAt, at: syncDeps.now() });
+      resetAt, at: syncDeps.now() }, op.storage);
     return true;
   } catch (e) {
     if (e?.code === 'SYNC_OWNERSHIP_LOST') return null;
@@ -581,11 +597,14 @@ async function runReset(op) {
 }
 
 /* 節流版，給 app.js 的 15 秒 ticker 呼叫。 */
-export function syncThrottled() {
+export function syncThrottled(storage = localStorage) {
   if (resetInFlight) return;
+  if (lastSyncStorage !== storage) lastSyncAt = 0;
   if (Date.now() - lastSyncAt < THROTTLE_MS) return;
+  const pending = syncNow(storage);
   lastSyncAt = Date.now();   // 先卡住，避免慢請求期間被重複觸發
-  void syncNow();
+  lastSyncStorage = storage;
+  void pending;
 }
 
 /* 評分後的即時同步（去抖動）。
@@ -595,10 +614,17 @@ export function syncThrottled() {
    ：停手 SETTLE_MS 才送，中途再評分就重新計時。 */
 const SETTLE_MS = 4000;
 let settleTimer = null;
+let settleTimerStorage = null;
 
-export function syncSoon() {
+export function syncSoon(storage = localStorage) {
   clearTimeout(settleTimer);
-  settleTimer = setTimeout(() => { void syncNow(); }, SETTLE_MS);
+  settleTimerStorage = storage;
+  settleTimer = setTimeout(() => {
+    const queuedStorage = settleTimerStorage;
+    settleTimer = null;
+    settleTimerStorage = null;
+    void syncNow(queuedStorage);
+  }, SETTLE_MS);
 }
 
 /* 關頁/切背景時的保險：只補送「還沒推上去的」那幾筆，不做拉取——關頁當下
@@ -611,13 +637,13 @@ export function syncSoon() {
    沒送完的下次開 App 會補推（watermark 沒動）。 */
 const MAX_FLUSH = 60;
 
-export function flushOnHide() {
+export function flushOnHide(storage = localStorage) {
   const session = readStoredSession();
   if (!session?.access_token || !session?.user?.id) return false;
 
-  const w = loadWatermark();
+  const w = loadWatermark(storage);
   const rows = collectLocalChanges(
-    state.progress, loadGradeHistory().cards, w.pushedAt, w.resetAt, state.edits);
+    state.progress, loadGradeHistory(storage).cards, w.pushedAt, w.resetAt, state.edits);
   if (!rows.length) return false;
 
   const candidates = normalizeCardRows(rows.slice(0, MAX_FLUSH))

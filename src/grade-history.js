@@ -8,9 +8,9 @@ const MAX_PER_CARD = 5;
 const GRADE_CODE = { again: 0, hard: 1, good: 2, easy: 3 };
 const IMPROVEMENT_AGE_SECONDS = 14 * 24 * 60 * 60;
 
-function load() {
+function load(storage = localStorage) {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = storage.getItem(KEY);
     if (!raw) return { v: 1, cards: {} };
     const h = JSON.parse(raw);
     if (!h || typeof h.cards !== 'object') return { v: 1, cards: {} };
@@ -20,34 +20,34 @@ function load() {
   }
 }
 
-function save(h) {
+function save(h, storage = localStorage) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(h));
+    storage.setItem(KEY, JSON.stringify(h));
   } catch (e) {
     console.warn('grade history save failed:', e.message);
   }
 }
 
-export function loadGradeHistory() {
-  return load();
+export function loadGradeHistory(storage = localStorage) {
+  return load(storage);
 }
 
 /* 跨裝置同步用的批次寫入：把合併好的 { cardKey: [[code, ts], ...] } 覆蓋進去。
    合併語意歸 src/cloud-merge.js 的 mergeHistory，這裡只負責落地。 */
-export function writeMergedHistory(merged) {
+export function writeMergedHistory(merged, storage = localStorage) {
   const keys = Object.keys(merged || {});
   if (!keys.length) return false;
-  const h = load();
+  const h = load(storage);
   for (const k of keys) h.cards[k] = merged[k];
-  save(h);
+  save(h, storage);
   return true;
 }
 
 /* 記一筆評分。gradeStr 不是四檔之一就略過（例如清掉評分時 setGrade 傳 undefined）。 */
-export function recordGrade(cardKey, gradeStr, ts = Date.now()) {
+export function recordGrade(cardKey, gradeStr, ts = Date.now(), storage = localStorage) {
   const code = GRADE_CODE[gradeStr];
   if (code === undefined || !cardKey) return false;
-  const h = load();
+  const h = load(storage);
   const list = h.cards[cardKey] || [];
   const [previousGrade, previousTs] = list[list.length - 1] || [];
   const nowSeconds = Math.round(ts / 1000);
@@ -58,6 +58,6 @@ export function recordGrade(cardKey, gradeStr, ts = Date.now()) {
   list.push([code, Math.round(ts / 1000)]);
   while (list.length > MAX_PER_CARD) list.shift();
   h.cards[cardKey] = list;
-  save(h);
+  save(h, storage);
   return improvementMoment;
 }

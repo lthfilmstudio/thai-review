@@ -4,9 +4,9 @@
 
 const RESWEEP_KEY = 'thai-review-resweep-v1';
 
-export function loadResweepState() {
+export function loadResweepState(storage = localStorage) {
   try {
-    const raw = localStorage.getItem(RESWEEP_KEY);
+    const raw = storage.getItem(RESWEEP_KEY);
     if (!raw) return { startedAt: null, position: 0 };
     const s = JSON.parse(raw);
     if (!s || typeof s !== 'object') return { startedAt: null, position: 0 };
@@ -19,9 +19,9 @@ export function loadResweepState() {
   }
 }
 
-function saveResweepState(s) {
+function saveResweepState(s, storage = localStorage) {
   try {
-    localStorage.setItem(RESWEEP_KEY, JSON.stringify(s));
+    storage.setItem(RESWEEP_KEY, JSON.stringify(s));
   } catch (e) {
     console.warn('resweep state save failed:', e.message);
   }
@@ -30,9 +30,9 @@ function saveResweepState(s) {
 /* 從游標位置往後切 n 張，orderedCards 是 state.lessons 攤平後、課程原始順序的
    卡片陣列（跟 allCardsWithLessonId() 一致）。游標超過總數時回傳空陣列
    （代表這一輪已經掃完，見設計書「要不要自動重掃第二輪」待定項）。 */
-export function pickResweepBatch(orderedCards, n, canAdvance = null) {
+export function pickResweepBatch(orderedCards, n, canAdvance = null, storage = localStorage) {
   if (n <= 0) return [];
-  const { position } = loadResweepState();
+  const { position } = loadResweepState(storage);
   if (position >= orderedCards.length) return [];
   const batch = orderedCards.slice(position, position + n);
   if (typeof canAdvance !== 'function') return batch;
@@ -51,24 +51,24 @@ export function pickResweepBatch(orderedCards, n, canAdvance = null) {
 
 /* 評完一張才呼叫，往前推進游標；clamp 到 total 避免超出範圍。
    第一次呼叫順便記下 startedAt。 */
-export function advanceResweepCursor(delta, total) {
-  const s = loadResweepState();
+export function advanceResweepCursor(delta, total, storage = localStorage) {
+  const s = loadResweepState(storage);
   if (!s.startedAt) s.startedAt = Date.now();
   s.position = Math.min(total, Math.max(0, s.position + delta));
-  saveResweepState(s);
+  saveResweepState(s, storage);
   return s;
 }
 
 /* 今日頁進度列用：{ position, total, done }。 */
 /* 跨裝置同步用：把合併好的游標寫回（別台掃得比較前面時往前跳）。
    刻意不做 clamp／不動 startedAt——合併規則歸呼叫端，這裡只落地。 */
-export function setResweepPosition(position) {
-  const s = loadResweepState();
-  saveResweepState({ ...s, position });
+export function setResweepPosition(position, storage = localStorage) {
+  const s = loadResweepState(storage);
+  saveResweepState({ ...s, position }, storage);
 }
 
-export function resweepProgress(total) {
-  const { position } = loadResweepState();
+export function resweepProgress(total, storage = localStorage) {
+  const { position } = loadResweepState(storage);
   const clamped = Math.min(position, total);
   return { position: clamped, total, done: total > 0 && clamped >= total };
 }
