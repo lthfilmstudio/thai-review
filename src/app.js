@@ -1,7 +1,7 @@
 /* 入口：init → 載入狀態 → 抓資料 → 綁事件。 */
 
 import {
-  state, loadState, saveState, localDateKey,
+  state, loadStateResult, saveState, localDateKey,
   DEMO_LESSONS, DEFAULT_SHEET_URL,
   filteredCards, setGrade, shuffleCurrentLesson, isSrsActive, cardKey,
   saveLessonsCache, loadLessonsCache, clearLessonsCache,
@@ -24,6 +24,7 @@ import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices, preloadRealAudioAvailability } from './tts.js';
 import { stopListen } from './listen.js';
 import { exitDialogueGame } from './game-dialogue.js';
+import { runLegacyLearningBootGate } from './storage-scope.js';
 import {
   renderSidebar, renderTopbarTitle, renderStats, renderContent,
   openDrawer, closeDrawer, openModal, closeModal, applyTheme,
@@ -427,6 +428,27 @@ function showLoading(msg) {
   }
 }
 
+function renderLegacyLearningBootFailure({ state: bootState, screen, diagnostics }) {
+  const el = document.getElementById('content');
+  if (!el) return;
+  const actions = screen.actions.map(action => `
+    <button class="btn ${action.id === 'retry' ? 'primary' : 'ghost'}"
+      id="boot-${action.id}" type="button">${action.label}</button>`).join('');
+  el.innerHTML = `<div class="empty" data-boot-state="${bootState}">
+    <div class="empty-icon">!</div>
+    <div class="empty-title">${screen.title}</div>
+    <div class="empty-sub">${screen.message}</div>
+    <div class="btn-row">${actions}</div>
+    <div class="empty-sub" id="boot-diagnostic-details" hidden>${diagnostics}</div>
+  </div>`;
+  document.getElementById('boot-retry')?.addEventListener('click', () => location.reload());
+  document.getElementById('boot-diagnostics')?.addEventListener('click', () => {
+    const details = document.getElementById('boot-diagnostic-details');
+    if (details) details.hidden = false;
+  });
+  document.getElementById(screen.focusTarget)?.focus();
+}
+
 function updateSyncHint() {
   const el = document.getElementById('syncHint');
   if (!el) return;
@@ -559,7 +581,11 @@ function onFreshLessons(fresh) {
 }
 
 async function init() {
-  loadState();
+  const learningReady = runLegacyLearningBootGate({
+    loadStateResult,
+    onFailure: renderLegacyLearningBootFailure,
+  });
+  if (!learningReady) return;
   initDailyLog(state.progress);
   applyTheme();
 

@@ -189,10 +189,17 @@ export const state = {
 };
 
 export function loadState(storage = localStorage) {
+  return loadStateResult(storage).status === 'ok';
+}
+
+export function loadStateResult(storage = localStorage) {
   const legacyPath = storage === localStorage;
   const learningRead = readStoredState(storage, STORAGE_KEY);
-  if (learningRead.status === 'corrupt' || learningRead.status === 'unavailable') return false;
-  if (legacyPath && learningRead.status === 'missing') return true;
+  if (learningRead.status === 'corrupt') {
+    return { status: 'corrupt', reason: learningRead.reason };
+  }
+  if (learningRead.status === 'unavailable') return { status: 'unavailable', phase: 'read' };
+  if (legacyPath && learningRead.status === 'missing') return { status: 'ok', source: 'missing' };
 
   let deviceRead = learningRead;
   if (!legacyPath) {
@@ -200,13 +207,18 @@ export function loadState(storage = localStorage) {
     if (deviceRead.status === 'missing') {
       deviceRead = readStoredState(localStorage, STORAGE_KEY);
     }
-    if (deviceRead.status === 'corrupt' || deviceRead.status === 'unavailable') return false;
+    if (deviceRead.status === 'corrupt') {
+      return { status: 'corrupt', reason: deviceRead.reason };
+    }
+    if (deviceRead.status === 'unavailable') return { status: 'unavailable', phase: 'read' };
   }
 
   const learningState = learningRead.status === 'ok' ? learningRead.value : null;
   const deviceState = deviceRead.status === 'ok' ? deviceRead.value : null;
   if (hasInvalidRecord(learningState, ['progress', 'favorites', 'edits'])
-    || hasInvalidRecord(deviceState, ['settings', 'collapsed'])) return false;
+    || hasInvalidRecord(deviceState, ['settings', 'collapsed'])) {
+    return { status: 'corrupt', reason: 'schema' };
+  }
 
   try {
     const candidateLearning = {
@@ -235,7 +247,11 @@ export function loadState(storage = localStorage) {
     const favMigrated = migrateFavorites(candidateLearning.favorites);
     // 有 migrate 到資料的話立刻寫回，避免 lazy 遺留舊格式
     if (migrated || favMigrated || settingsMigrated) {
-      persistState(storage, candidateLearning, candidateDevice);
+      try {
+        persistState(storage, candidateLearning, candidateDevice);
+      } catch {
+        return { status: 'unavailable', phase: 'migration-write' };
+      }
     }
     Object.assign(state, {
       ...candidateLearning,
@@ -249,10 +265,9 @@ export function loadState(storage = localStorage) {
       listLessonId: candidateDevice.listLessonId,
       listOrder: candidateDevice.listOrder,
     });
-    return true;
+    return { status: 'ok', source: learningRead.status === 'missing' ? 'missing' : 'stored' };
   } catch (e) {
-    // 忽略損毀的 localStorage
-    return false;
+    return { status: 'corrupt', reason: 'schema' };
   }
 }
 
@@ -272,11 +287,11 @@ function readStoredState(storage, key) {
   try {
     const value = JSON.parse(raw);
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      return { status: 'corrupt' };
+      return { status: 'corrupt', reason: 'schema' };
     }
     return { status: 'ok', value };
   } catch (error) {
-    return { status: 'corrupt', error };
+    return { status: 'corrupt', reason: 'json', error };
   }
 }
 

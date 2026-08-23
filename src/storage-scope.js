@@ -91,6 +91,37 @@ export function bootScreenFor(state) {
   return structuredClone(screen);
 }
 
+export function runLegacyLearningBootGate({ loadStateResult, onFailure, onReady } = {}) {
+  if (typeof loadStateResult !== 'function' || typeof onFailure !== 'function') {
+    throw codedError(
+      'LEGACY_BOOT_ADAPTER_INCOMPLETE',
+      'legacy boot requires loadStateResult and onFailure',
+    );
+  }
+  let outcome;
+  try {
+    outcome = loadStateResult();
+  } catch {
+    outcome = { status: 'unavailable', phase: 'read' };
+  }
+  if (outcome?.status === 'ok') {
+    onReady?.(outcome);
+    return true;
+  }
+
+  const unavailable = outcome?.status === 'unavailable';
+  const state = unavailable ? 'storage-unavailable' : 'recoverable-failure';
+  onFailure({
+    state,
+    screen: bootScreenFor(state),
+    diagnostics: unavailable
+      ? '瀏覽器未能完成安全讀取或必要寫入，請確認儲存權限與可用空間後重試。'
+      : '原始資料已保留，尚未寫入。學習資料未通過安全驗證，請重試或保留此畫面供診斷。',
+    outcome,
+  });
+  return false;
+}
+
 export function createWorkspaceBoot() {
   let current = {
     state: 'checking-session',
