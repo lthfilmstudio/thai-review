@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Build read-only stable-card-ID proposals from a local catalog snapshot.
+"""Build read-only stable-card-ID proposals from a local or live snapshot.
 
-This command never contacts or writes Google Sheets.  It reads a local
-``data.json`` snapshot and emits a deterministic manifest that can be reviewed
-before a separately approved Sheet mutation.  The proposed IDs are UUIDv5
-values derived from the published spreadsheet identity, lesson gid, canonical
+The default mode never contacts Google Sheets.  ``--live`` performs only
+metadata and values reads through the Google Sheets API, then emits a
+deterministic manifest that can be reviewed before a separately approved Sheet
+mutation.  The proposed IDs are UUIDv5
+values derived from the canonical editable spreadsheet identity, lesson gid, canonical
 content fingerprint, and the occurrence rank of identical content.  A local
 catalog cannot prove a Google Sheet row binding, so this output is never a
 write payload and must be checked against a live Sheet before mutation.
@@ -26,6 +27,15 @@ from typing import Any
 DEFAULT_DATA_PATH = Path("data.json")
 REPORT_TYPE = "stable-card-id-backfill-dry-run"
 SCHEMA_VERSION = 2
+LIVE_REPORT_TYPE = "stable-card-id-backfill-live-verified"
+LIVE_SCHEMA_VERSION = 3
+DEFAULT_EDITABLE_SPREADSHEET_ID = "11yWETpjSLs6B3w1y9LMI2DK5Rn0waUBbAqazenn2xFs"
+CANONICAL_SPREADSHEET_ID = DEFAULT_EDITABLE_SPREADSHEET_ID
+DEFAULT_SERVICE_ACCOUNT_PATH = Path("/Users/lth/.config/thai-review/sheets-service-account.json")
+LESSON_HEADERS = (
+    ("中文", "泰文", "目的達拼音"),
+    ("中文", "泰文", "目的達拼音", "start_ms", "end_ms"),
+)
 CARD_FIELDS = (
     "thai",
     "karaoke",
@@ -37,7 +47,6 @@ CARD_FIELDS = (
     "start_ms",
     "end_ms",
 )
-PUBLISHED_SHEET_RE = re.compile(r"/d/(?:e/)?([A-Za-z0-9_-]{20,})")
 CANONICAL_UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
     re.IGNORECASE,
@@ -56,15 +65,15 @@ def load_data(path: Path) -> dict[str, Any]:
     return data
 
 
-def spreadsheet_id(source_url: str) -> str:
-    match = PUBLISHED_SHEET_RE.search(str(source_url or ""))
-    if match:
-        return match.group(1)
-    # A fixture may intentionally omit a Google URL.  Keep the namespace
-    # deterministic without pretending that an unknown source was verified.
-    return "unknown-source-" + hashlib.sha256(
-        str(source_url or "").encode("utf-8")
-    ).hexdigest()[:16]
+def canonical_spreadsheet_id(
+    data: dict[str, Any], explicit_id: str | None = None,
+) -> str:
+    """Return the explicit identity used for UUID proposals in every mode."""
+    return (
+        _text(explicit_id)
+        or _text(data.get("canonical_spreadsheet_id"))
+        or CANONICAL_SPREADSHEET_ID
+    )
 
 
 def _text(value: Any) -> str:
@@ -174,9 +183,11 @@ def learning_intersections(
 def build_dry_run(
     data: dict[str, Any],
     learning_snapshot: dict[str, Any] | None = None,
+    *,
+    spreadsheet_id_value: str | None = None,
 ) -> dict[str, Any]:
     source_url = _text(data.get("source_url"))
-    sheet_id = spreadsheet_id(source_url)
+    sheet_id = canonical_spreadsheet_id(data, spreadsheet_id_value)
     rows: list[dict[str, Any]] = []
     aliases: defaultdict[str, list[int]] = defaultdict(list)
     seen_existing: defaultdict[str, list[int]] = defaultdict(list)
@@ -278,6 +289,7 @@ def build_dry_run(
         "source": {
             "source_url": source_url,
             "spreadsheet_id": sheet_id,
+            "canonical_spreadsheet_id": sheet_id,
         },
         "catalog": {
             "generated_at": data.get("generated_at"),
@@ -313,19 +325,288 @@ def load_learning_snapshot(path: Path) -> dict[str, Any]:
     return snapshot
 
 
+def _row_values(row: Any, width: int = 6) -> list[Any]:
+    if not isinstance(row, list):
+        return [""] * width
+    return list(row[:width]) + [""] * max(0, width - len(row))
+
+
+def _live_card_from_row(row: list[Any], header: tuple[str, ...]) -> dict[str, Any]:
+    values = _row_values(row)
+    card = {
+        "thai": _text(values[1]),
+        "karaoke": _text(values[2]),
+        "zh": _text(values[0]),
+        "type": "word",
+        "note": "",
+        "audio_url": "",
+        "lesson": "",
+    }
+    if len(header) == 5:
+        card["start_ms"] = _live_ms(values[3])
+        card["end_ms"] = _live_ms(values[4])
+    return card
+
+
+def _live_ms(value: Any) -> int | float | None:
+    if value is None or _text(value) == "":
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        # Match sync-sheet.py: non-numeric timing annotations are ignored by
+        # the catalog parser, while A:E raw values remain in the manifest.
+        return None
+    if number < 0:
+        return None
+    return int(number) if number == int(number) else number
+
+
+def _live_content_matches(local: dict[str, Any], live: dict[str, Any]) -> bool:
+    normalized = dict(local)
+    for field, default in {
+        "type": "word", "note": "", "audio_url": "", "lesson": "",
+        "start_ms": None, "end_ms": None,
+    }.items():
+        normalized.setdefault(field, default)
+    return content_fingerprint(normalized) == content_fingerprint(live)
+
+
+def build_verified_manifest(
+    data: dict[str, Any],
+    snapshot: dict[str, Any],
+    *,
+    published_source_url: str | None = None,
+    canonical_id: str | None = None,
+) -> dict[str, Any]:
+    """Compare an editable read-only snapshot to data.json and bind by row.
+
+    ``snapshot`` is deliberately a small API-shaped value object, making all
+    mutation-preparation logic testable without Google credentials.  Every
+    non-empty card row is matched in catalog order; physical row numbers are
+    retained so blank rows cannot shift a future write target.
+    """
+    source_url = _text(data.get("source_url"))
+    if published_source_url is not None and _text(published_source_url) != source_url:
+        raise ValueError("published source URL 與 data.json 不一致")
+    live_id = _text(snapshot.get("spreadsheet_id"))
+    if not live_id:
+        raise ValueError("live snapshot 缺少 spreadsheet_id")
+    proposal_namespace = canonical_spreadsheet_id(data, canonical_id)
+    lessons = data.get("lessons")
+    live_lessons = snapshot.get("sheets")
+    if not isinstance(lessons, list) or not isinstance(live_lessons, list):
+        raise ValueError("live snapshot 缺少 sheets")
+    if len(lessons) != len(live_lessons):
+        raise ValueError(f"lesson tab 數量不一致：local={len(lessons)} live={len(live_lessons)}")
+
+    proposals: list[dict[str, Any]] = []
+    seen_ids: dict[str, int] = {}
+    occurrence: defaultdict[tuple[str, str], int] = defaultdict(int)
+    total_cards = 0
+    for lesson_index, (lesson, live_sheet) in enumerate(zip(lessons, live_lessons)):
+        if not isinstance(lesson, dict) or not isinstance(live_sheet, dict):
+            raise ValueError("lesson 或 live sheet 不是物件")
+        expected_gid = _text(lesson.get("gid"))
+        expected_title = _text(lesson.get("title"))
+        live_gid = _text(live_sheet.get("gid") or live_sheet.get("sheetId"))
+        live_title = _text(live_sheet.get("title"))
+        if live_gid != expected_gid or live_title != expected_title:
+            raise ValueError(
+                f"第 {lesson_index + 1} 個 lesson tab identity drift："
+                f"expected={expected_title}/{expected_gid} live={live_title}/{live_gid}"
+            )
+        if int(live_sheet.get("order", lesson_index)) != lesson_index:
+            raise ValueError(f"{expected_title} tab order drift")
+        values = live_sheet.get("values")
+        if not isinstance(values, list) or not values:
+            raise ValueError(f"{expected_title} 缺少 A:F values/header")
+        raw_header_values = [_text(value) for value in _row_values(values[0])[:5]]
+        while raw_header_values and not raw_header_values[-1]:
+            raw_header_values.pop()
+        raw_header = tuple(raw_header_values)
+        if raw_header not in LESSON_HEADERS:
+            raise ValueError(f"{expected_title} header drift：{raw_header!r}")
+        f_header = _text(_row_values(values[0])[5]).lower()
+        if f_header not in {"", "card_id", "card id", "卡片 id", "卡片id"}:
+            raise ValueError(f"{expected_title} F header drift：{f_header!r}")
+        header = raw_header
+        card_rows = []
+        for physical_row, raw_row in enumerate(values[1:], start=2):
+            row = _row_values(raw_row)
+            # A blank physical row is intentionally retained in the scan but
+            # does not consume a catalog ordinal.
+            if _text(row[1]):
+                card_rows.append((physical_row, row))
+            elif any(_text(value) for value in row):
+                raise ValueError(f"{expected_title}!A{physical_row}:F{physical_row} 有孤兒或漂移資料")
+        local_cards = lesson.get("cards")
+        if not isinstance(local_cards, list):
+            raise ValueError(f"{expected_title} local cards 不是陣列")
+        if len(card_rows) != len(local_cards):
+            raise ValueError(
+                f"{expected_title} card count drift：local={len(local_cards)} live={len(card_rows)}"
+            )
+        for ordinal, (local_card, (physical_row, row)) in enumerate(zip(local_cards, card_rows), start=1):
+            if not isinstance(local_card, dict):
+                raise ValueError(f"{expected_title} local card {ordinal} 不是物件")
+            live_card = _live_card_from_row(row, header)
+            if not _live_content_matches(local_card, live_card):
+                raise ValueError(f"{expected_title}!A{physical_row}:E{physical_row} content drift")
+            fingerprint = content_fingerprint(local_card)
+            occurrence[(expected_gid, fingerprint)] += 1
+            old_id = _text(row[5])
+            if old_id and not is_uuid(old_id):
+                raise ValueError(f"{expected_title}!F{physical_row} invalid card_id：{old_id}")
+            canonical_old = old_id.lower() if old_id else None
+            if canonical_old and canonical_old in seen_ids:
+                raise ValueError(f"duplicate live card_id：{canonical_old}")
+            proposed = canonical_old or proposed_card_id(
+                proposal_namespace, expected_gid, fingerprint, occurrence[(expected_gid, fingerprint)]
+            )
+            proposed_key = proposed.lower() if is_uuid(proposed) else proposed
+            if proposed_key in seen_ids:
+                raise ValueError(f"duplicate proposed card_id：{proposed}")
+            seen_ids[proposed_key] = len(proposals)
+            proposals.append({
+                "spreadsheet_id": live_id,
+                "published_source_url": source_url,
+                "gid": expected_gid,
+                "tab_title": expected_title,
+                "target_column": "F",
+                "sheet_row": physical_row,
+                "catalog_ordinal": ordinal,
+                "legacy_alias": legacy_alias(_text(lesson.get("id")), local_card),
+                "content_fingerprint": fingerprint,
+                "old_card_id": canonical_old,
+                "proposed_card_id": proposed,
+                "before_values_A_to_E": row[:5],
+                "before_row_hash": hashlib.sha256(
+                    json.dumps(row[:5], ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                ).hexdigest(),
+                "binding_status": "verified_editable_sheet_snapshot",
+            })
+            total_cards += 1
+
+    if len(seen_ids) != total_cards:
+        raise ValueError("proposed card_id 不唯一")
+    return {
+        "schema_version": LIVE_SCHEMA_VERSION,
+        "report_type": LIVE_REPORT_TYPE,
+        "source": {
+            "source_url": source_url,
+            "published_source_url": source_url,
+            "spreadsheet_id": live_id,
+            "canonical_spreadsheet_id": proposal_namespace,
+        },
+        "catalog": {"generated_at": data.get("generated_at")},
+        "binding_status": "verified_editable_sheet_snapshot",
+        "write_guard": "read_only_manifest_only",
+        "summary": {
+            "lesson_count": len(lessons),
+            "card_count": total_cards,
+            "unique_card_id_count": len(seen_ids),
+            "existing_card_id_count": sum(row["old_card_id"] is not None for row in proposals),
+            "proposed_new_card_id_count": sum(row["old_card_id"] is None for row in proposals),
+        },
+        "proposals": proposals,
+    }
+
+
+def _quote_a1_title(title: str) -> str:
+    return "'" + title.replace("'", "''") + "'"
+
+
+def fetch_live_snapshot(service: Any, spreadsheet_id_value: str) -> dict[str, Any]:
+    """Fetch metadata and A:F values only; this function has no write call."""
+    metadata = service.spreadsheets().get(
+        spreadsheetId=spreadsheet_id_value,
+        fields="spreadsheetId,properties(title),sheets(properties(sheetId,title,index))",
+    ).execute()
+    returned_id = _text(metadata.get("spreadsheetId"))
+    if returned_id and returned_id != spreadsheet_id_value:
+        raise ValueError(
+            f"live spreadsheet ID mismatch：requested={spreadsheet_id_value} returned={returned_id}"
+        )
+    sheets = metadata.get("sheets") or []
+    ordered = sorted(
+        (sheet.get("properties") or {} for sheet in sheets),
+        key=lambda props: int(props.get("index", 0)),
+    )
+    lesson_meta = [props for props in ordered if _text(props.get("title")) != "生活對話"]
+    if not lesson_meta:
+        raise ValueError("live Sheet 找不到 lesson tabs")
+    ranges = [_quote_a1_title(_text(props["title"])) + "!A:F" for props in lesson_meta]
+    response = service.spreadsheets().values().batchGet(
+        spreadsheetId=spreadsheet_id_value,
+        ranges=ranges,
+        majorDimension="ROWS",
+        valueRenderOption="UNFORMATTED_VALUE",
+    ).execute()
+    value_ranges = response.get("valueRanges") or []
+    if len(value_ranges) != len(lesson_meta):
+        raise ValueError("live Sheet values 回傳數量與 tabs 不一致")
+    return {
+        "spreadsheet_id": returned_id or spreadsheet_id_value,
+        "sheets": [
+            {
+                "gid": _text(props.get("sheetId")),
+                "sheetId": _text(props.get("sheetId")),
+                "title": _text(props.get("title")),
+                "order": index,
+                "values": value_range.get("values") or [],
+            }
+            for index, (props, value_range) in enumerate(zip(lesson_meta, value_ranges))
+        ],
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA_PATH)
     parser.add_argument("--learning-snapshot", type=Path)
     parser.add_argument("--out", type=Path, help="寫入本機 manifest JSON；省略則輸出 stdout")
+    parser.add_argument(
+        "--live", action="store_true",
+        help="只讀取 editable Sheet metadata/A:F values 並嚴格比對；沒有寫入選項",
+    )
+    parser.add_argument("--spreadsheet-id", default=DEFAULT_EDITABLE_SPREADSHEET_ID)
+    parser.add_argument("--service-account", type=Path, default=DEFAULT_SERVICE_ACCOUNT_PATH)
     args = parser.parse_args(argv)
 
     try:
-        learning_snapshot = (
-            load_learning_snapshot(args.learning_snapshot)
-            if args.learning_snapshot else None
-        )
-        report = build_dry_run(load_data(args.data), learning_snapshot)
+        data = load_data(args.data)
+        if args.live:
+            if not args.service_account.is_file():
+                raise ValueError(f"找不到 service account：{args.service_account}")
+            try:
+                from google.oauth2 import service_account
+                from googleapiclient.discovery import build
+            except ImportError as exc:
+                raise ValueError(
+                    "live mode 需要以 `uv run --with google-api-python-client "
+                    "--with google-auth python3 scripts/backfill-card-ids.py --live` 執行"
+                ) from exc
+            credentials = service_account.Credentials.from_service_account_file(
+                str(args.service_account),
+                scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+            )
+            service = build("sheets", "v4", credentials=credentials, cache_discovery=False)
+            snapshot = fetch_live_snapshot(service, args.spreadsheet_id)
+            report = build_verified_manifest(
+                data,
+                snapshot,
+                published_source_url=_text(data.get("source_url")),
+                canonical_id=args.spreadsheet_id,
+            )
+        else:
+            learning_snapshot = (
+                load_learning_snapshot(args.learning_snapshot)
+                if args.learning_snapshot else None
+            )
+            report = build_dry_run(
+                data, learning_snapshot, spreadsheet_id_value=args.spreadsheet_id
+            )
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
@@ -335,10 +616,13 @@ def main(argv: list[str] | None = None) -> int:
     else:
         sys.stdout.buffer.write(serialize_report(report))
     summary = report["summary"]
+    status = "live-verified" if args.live else "dry-run"
+    collision = (
+        f", {summary['collision_group_count']} collision groups"
+        if "collision_group_count" in summary else ""
+    )
     print(
-        "dry-run: "
-        f"{summary['card_count']} cards, "
-        f"{summary['collision_group_count']} collision groups, "
+        f"{status}: {summary['card_count']} cards{collision}, "
         f"{summary['unique_card_id_count']} unique proposed IDs",
         file=sys.stderr,
     )

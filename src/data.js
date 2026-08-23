@@ -44,6 +44,7 @@ const COL_ALIASES = {
   lesson:    ['課程', '課', '堂', 'lesson'],
   start_ms:  ['start_ms', 'start', '開始毫秒', '起始毫秒'],
   end_ms:    ['end_ms', 'end', '結束毫秒'],
+  card_id:   ['card_id', 'card id', '卡片 id', '卡片id', '卡片ID'],
   scenario_id:    ['情境 id', 'scenario id', 'scenario_id'],
   scenario_title: ['情境名稱', 'scenario title', 'scenario_title'],
   order:          ['順序', 'order', 'turn'],
@@ -59,7 +60,7 @@ function findCol(header, key) {
   return -1;
 }
 
-function rowsToCards(rows) {
+export function rowsToCards(rows) {
   if (!rows.length) return [];
   const header = rows[0].map(h => h.trim().toLowerCase());
   const iT = findCol(header, 'thai');
@@ -71,6 +72,7 @@ function rowsToCards(rows) {
   const iLesson = findCol(header, 'lesson');
   const iStart = findCol(header, 'start_ms');
   const iEnd = findCol(header, 'end_ms');
+  const iCardId = findCol(header, 'card_id');
   if (iT < 0 || iK < 0 || iZ < 0) {
     throw new Error(`CSV 缺少必要欄位（泰文/拼音/中文）。目前 header：${rows[0].join(' | ')}`);
   }
@@ -82,7 +84,7 @@ function rowsToCards(rows) {
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     if (!row || !row[iT]) continue;
-    cards.push({
+    const card = {
       thai: (row[iT] || '').trim(),
       karaoke: (row[iK] || '').trim(),
       zh: (row[iZ] || '').trim(),
@@ -92,7 +94,11 @@ function rowsToCards(rows) {
       lesson: iLesson >= 0 ? (row[iLesson] || '').trim() : '',
       start_ms: iStart >= 0 ? toMs(row[iStart]) : null,
       end_ms: iEnd >= 0 ? toMs(row[iEnd]) : null,
-    });
+    };
+    if (iCardId >= 0 && String(row[iCardId] || '').trim()) {
+      card.card_id = String(row[iCardId]).trim();
+    }
+    cards.push(card);
   }
   return cards;
 }

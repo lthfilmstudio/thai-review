@@ -20,7 +20,136 @@ def catalog(cards, *, source_url="https://docs.google.com/spreadsheets/d/e/test-
     }
 
 
+def live_snapshot(lesson, *, rows=None, spreadsheet_id="editable-sheet-id"):
+    if rows is None:
+        rows = [["中文", "泰文", "目的達拼音"], *[
+            [card.get("zh", ""), card.get("thai", ""), card.get("karaoke", "")]
+            for card in lesson["cards"]
+        ]]
+    return {
+        "spreadsheet_id": spreadsheet_id,
+        "sheets": [{
+            "gid": lesson["gid"], "sheetId": lesson["gid"],
+            "title": lesson["title"], "order": 0, "values": rows,
+        }],
+    }
+
+
 class BackfillCardIdsTest(unittest.TestCase):
+    def test_verified_manifest_binds_physical_rows_and_preserves_existing_id(self):
+        existing = "550E8400-E29B-41D4-A716-446655440000"
+        lesson = {"id": "L1", "gid": "1", "title": "初 1", "cards": [
+            {"thai": "第一", "karaoke": "dii", "zh": "一", "type": "word"},
+            {"thai": "第二", "karaoke": "song", "zh": "二", "type": "word", "card_id": existing},
+        ]}
+        data = {"source_url": "https://example.test/pubhtml", "lessons": [lesson]}
+        snapshot = live_snapshot(lesson, rows=[
+            ["中文", "泰文", "目的達拼音"],
+            ["一", "第一", "dii"],
+            ["", "", ""],
+            ["二", "第二", "song", "", "", existing],
+        ])
+        report = backfill_card_ids.build_verified_manifest(data, snapshot)
+        self.assertEqual([row["sheet_row"] for row in report["proposals"]], [2, 4])
+        self.assertEqual([row["catalog_ordinal"] for row in report["proposals"]], [1, 2])
+        self.assertEqual(report["proposals"][1]["old_card_id"], existing.lower())
+        self.assertEqual(report["binding_status"], "verified_editable_sheet_snapshot")
+        self.assertEqual(report["summary"]["unique_card_id_count"], 2)
+        self.assertEqual(len({row["proposed_card_id"] for row in report["proposals"]}), 2)
+
+    def test_orphan_nonblank_rows_abort_but_truly_blank_physical_row_is_allowed(self):
+        lesson = {"id": "L1", "gid": "1", "title": "初 1", "cards": [
+            {"thai": "第一", "karaoke": "dii", "zh": "一", "type": "word"},
+        ]}
+        data = {"source_url": "https://example.test/pubhtml", "lessons": [lesson]}
+        for orphan in (["只有中文", "", ""], ["", "", "只有拼音"], ["", "", "", 10, ""]):
+            rows = [["中文", "泰文", "目的達拼音"], orphan, ["一", "第一", "dii"]]
+            with self.subTest(orphan=orphan), self.assertRaisesRegex(ValueError, "孤兒"):
+                backfill_card_ids.build_verified_manifest(data, live_snapshot(lesson, rows=rows))
+        rows = [["中文", "泰文", "目的達拼音"], ["", "", "", "", ""], ["一", "第一", "dii"]]
+        report = backfill_card_ids.build_verified_manifest(data, live_snapshot(lesson, rows=rows))
+        self.assertEqual(report["proposals"][0]["sheet_row"], 3)
+
+    def test_local_and_verified_modes_share_explicit_canonical_namespace(self):
+        lesson = {"id": "L1", "gid": "1", "title": "初 1", "cards": [
+            {"thai": "第一", "karaoke": "dii", "zh": "一", "type": "word"},
+        ]}
+        data = {"source_url": "https://example.test/pubhtml", "lessons": [lesson]}
+        canonical = "canonical-sheet-for-fixture"
+        local = backfill_card_ids.build_dry_run(data, spreadsheet_id_value=canonical)
+        live = backfill_card_ids.build_verified_manifest(
+            data,
+            live_snapshot(lesson, spreadsheet_id="editable-returned-id"),
+            canonical_id=canonical,
+        )
+        self.assertEqual(local["proposals"][0]["proposed_card_id"], live["proposals"][0]["proposed_card_id"])
+        self.assertEqual(live["source"]["spreadsheet_id"], "editable-returned-id")
+        self.assertEqual(live["source"]["canonical_spreadsheet_id"], canonical)
+
+    def test_fetch_live_snapshot_aborts_when_api_returns_a_different_spreadsheet_id(self):
+        class Request:
+            def __init__(self, value):
+                self.value = value
+
+            def execute(self):
+                return self.value
+
+        class Values:
+            def batchGet(self, **kwargs):
+                return Request({"valueRanges": []})
+
+        class Spreadsheets:
+            def get(self, **kwargs):
+                return Request({"spreadsheetId": "returned-id", "sheets": []})
+
+            def values(self):
+                return Values()
+
+        class Service:
+            def spreadsheets(self):
+                return Spreadsheets()
+
+        with self.assertRaisesRegex(ValueError, "spreadsheet ID mismatch"):
+            backfill_card_ids.fetch_live_snapshot(Service(), "requested-id")
+
+    def test_verified_manifest_accepts_a_to_e_and_optional_card_id_header(self):
+        lesson = {"id": "L1", "gid": "1", "title": "初 1", "cards": [
+            {"thai": "第一", "karaoke": "dii", "zh": "一", "type": "word", "start_ms": 10, "end_ms": 20},
+        ]}
+        data = {"source_url": "https://example.test/pubhtml", "lessons": [lesson]}
+        snapshot = live_snapshot(lesson, rows=[
+            ["中文", "泰文", "目的達拼音", "start_ms", "end_ms", "card_id"],
+            ["一", "第一", "dii", 10, 20, ""],
+        ])
+        report = backfill_card_ids.build_verified_manifest(data, snapshot)
+        self.assertEqual(report["proposals"][0]["before_values_A_to_E"], ["一", "第一", "dii", 10, 20])
+
+    def test_verified_manifest_aborts_on_header_content_and_row_drift(self):
+        lesson = {"id": "L1", "gid": "1", "title": "初 1", "cards": [
+            {"thai": "第一", "karaoke": "dii", "zh": "一", "type": "word"},
+        ]}
+        data = {"source_url": "https://example.test/pubhtml", "lessons": [lesson]}
+        cases = [
+            [["bad", "泰文", "目的達拼音"], ["一", "第一", "dii"]],
+            [["中文", "泰文", "目的達拼音"], ["改", "第一", "dii"]],
+            [["中文", "泰文", "目的達拼音"], ["一", "第一", "dii", "", "", "not-uuid"]],
+        ]
+        for rows in cases:
+            with self.subTest(rows=rows), self.assertRaises(ValueError):
+                backfill_card_ids.build_verified_manifest(data, live_snapshot(lesson, rows=rows))
+
+    def test_verified_manifest_aborts_on_duplicate_live_ids(self):
+        duplicate = "550e8400-e29b-41d4-a716-446655440000"
+        lesson = {"id": "L1", "gid": "1", "title": "初 1", "cards": [
+            {"thai": "一", "karaoke": "yi", "zh": "一", "type": "word"},
+            {"thai": "二", "karaoke": "er", "zh": "二", "type": "word"},
+        ]}
+        rows = [["中文", "泰文", "目的達拼音"], ["一", "一", "yi", "", "", duplicate], ["二", "二", "er", "", "", duplicate]]
+        with self.assertRaisesRegex(ValueError, "duplicate live card_id"):
+            backfill_card_ids.build_verified_manifest(
+                {"source_url": "https://example.test/pubhtml", "lessons": [lesson]},
+                live_snapshot(lesson, rows=rows),
+            )
     def test_dry_run_contains_identity_manifest_and_collision_details(self):
         report = backfill_card_ids.build_dry_run(catalog([
             {"thai": "ซ้ำ", "karaoke": "sam", "zh": "一"},
