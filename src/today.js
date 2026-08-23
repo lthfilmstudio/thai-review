@@ -38,10 +38,33 @@ export function buildDailyQueue(allCards, progress, lessons, todaySeconds) {
   const dueSec = dueCards.length * SEC_PER_DUE_CARD;
 
   const resweepLimit = Math.max(0, Math.floor(Math.max(RESWEEP_FLOOR_SEC, remaining - dueSec) / SEC_PER_RESWEEP_CARD));
-  // 多抓一點份量，濾掉跟到期複習重疊的卡之後才不會不夠
-  const resweepRaw = resweepLimit > 0 ? pickResweepBatch(allCards, resweepLimit + dueKeys.size) : [];
-  const resweepCards = resweepRaw.filter(c => !dueKeys.has(c._cardKey)).slice(0, resweepLimit);
-  const resweepKeys = new Set(resweepCards.map(c => c._cardKey));
+  // 多抓一點份量，但只接受從 cursor 開始的「連續、唯一、非 Due」前綴。
+  // 不能把中間卡 filter 掉再取後面的卡：app 只有在 resweep card 被確認
+  // 後以 advanceResweepCursor(1) 推進，後面的卡若先被交錯答掉就會跳過它。
+  const keyCounts = new Map();
+  for (const card of allCards) {
+    const key = card._cardKey;
+    keyCounts.set(key, (keyCounts.get(key) || 0) + 1);
+  }
+  const cursorCard = pickResweepBatch(allCards, 1)[0];
+  const cursorKey = cursorCard?._cardKey;
+  const cursorIsUniqueDue = typeof cursorKey === 'string'
+    && cursorKey.length > 0
+    && keyCounts.get(cursorKey) === 1
+    && dueKeys.has(cursorKey);
+  const resweepCards = resweepLimit > 0
+    ? pickResweepBatch(
+      allCards,
+      resweepLimit + dueKeys.size,
+      card => !dueKeys.has(card._cardKey) && keyCounts.get(card._cardKey) === 1,
+    ).slice(0, resweepLimit)
+    : [];
+  // AE2: the cursor card may be Due and Sweep-eligible at the same time.  It
+  // is already present once in dueCards, so only mark its key as confirmed
+  // evidence; never append it (or later resweep cards) a second time.
+  const resweepKeys = cursorIsUniqueDue
+    ? new Set([cursorKey])
+    : new Set(resweepCards.map(c => c._cardKey));
   const resweepSec = resweepCards.length * SEC_PER_RESWEEP_CARD;
 
   const usedKeys = new Set([...dueKeys, ...resweepKeys]);
@@ -58,7 +81,18 @@ export function buildDailyQueue(allCards, progress, lessons, todaySeconds) {
     }
   }
 
-  return { cards: interleaveByLesson([...dueCards, ...resweepCards, ...weakCards]), resweepKeys };
+  // Keep the resweep prefix in course order.  Interleaving it with Due/Weak
+  // cards can put a later resweep card before the cursor's next card; the
+  // existing app API has no card ID to prove that such an out-of-order grade
+  // is safe to count toward the flat cursor.
+  return {
+    cards: [
+      ...interleaveByLesson(dueCards),
+      ...resweepCards,
+      ...interleaveByLesson(weakCards),
+    ],
+    resweepKeys,
+  };
 }
 
 /* 輕量交錯：依 _lessonId 分桶、round-robin 輪流各取一張，桶內原本排序不變

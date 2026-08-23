@@ -1,0 +1,10 @@
+{
+  "progress": {
+    "gid-1:碰撞": {"grade": "good"}
+  },
+  "grade_history": {
+    "cards": {
+      "gid-1:碰撞": [[2, 123]]
+    }
+  }
+}
