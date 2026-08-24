@@ -25,6 +25,23 @@ const EMPTY_LOCAL_COUNTS = {
   resweep: 0,
 };
 
+function fixtureStableSerialize(value) {
+  if (Array.isArray(value)) return `[${value.map(fixtureStableSerialize).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${fixtureStableSerialize(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function fixtureStableHash(serialized) {
+  let hash = 2166136261;
+  for (const char of serialized) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
 function fact(sourceStore, sourceKey, legacyAlias, value) {
   return { sourceStore, sourceKey, legacyAlias, value };
 }
@@ -411,6 +428,87 @@ test('lineage evidence 必須精確匹配獨立 trusted revision manifest', () =
     assert.equal(plan.resolved.length, 0);
     assert.equal(plan.quarantined[0].reason, 'incomplete_lineage_evidence');
   }
+});
+
+test('compact production lineage evidence 仍須完整 manifest、partition 與守恆', () => {
+  const legacySnapshot = snapshot([
+    fact('state', 'progress/stable', 'L1:stable', { interval: 3 }),
+    fact('state', 'progress/collision', 'L1:collision', { interval: 1 }),
+  ]);
+  const evidence = {
+    kind: 'production-lineage-evidence-v2',
+    completeness: 'complete',
+    expectedRevisions: ['deploy:r1', 'deploy:r2'],
+    resolvedAliases: { 'L1:stable': CARD_A },
+    unresolvedReasons: { 'L1:collision': 'historical_collision' },
+    collisionAliases: ['L1:collision'],
+    canonicalCardIds: [CARD_A],
+    summary: {
+      currentAliasCount: 2,
+      resolvedAliasCount: 1,
+      unresolvedAliasCount: 1,
+      historicalCollisionAliasCount: 1,
+    },
+  };
+  evidence.evidenceId = `production-lineage-evidence-v2:fnv1a32:${fixtureStableHash(fixtureStableSerialize(evidence))}`;
+  const manifest = {
+    kind: 'trusted-lineage-revision-manifest-v1',
+    projectName: 'thai-review',
+    environment: 'production',
+    sourceManifestSha256: undefined,
+    evidenceId: evidence.evidenceId,
+    revisions: ['deploy:r1', 'deploy:r2'],
+  };
+  evidence.source = {
+    projectName: 'thai-review',
+    environment: 'production',
+    deploymentManifestSha256: 'deployment-sha',
+  };
+  manifest.sourceManifestSha256 = evidence.source.deploymentManifestSha256;
+  const { evidenceId: staleEvidenceId, ...evidenceCore } = evidence;
+  evidence.evidenceId = `production-lineage-evidence-v2:fnv1a32:${fixtureStableHash(fixtureStableSerialize(evidenceCore))}`;
+  manifest.evidenceId = evidence.evidenceId;
+  const plan = planLegacyMigration({
+    legacySnapshot,
+    lineageEvidence: evidence,
+    trustedRevisionManifest: manifest,
+  });
+  assert.equal(plan.summary.resolved, 1);
+  assert.equal(plan.summary.quarantined, 1);
+  assert.equal(plan.quarantined[0].reason, 'historical_collision');
+  assert.equal(plan.audit.collisionAliasCount, 1);
+
+  const tampered = structuredClone(evidence);
+  tampered.canonicalCardIds = [];
+  const blocked = planLegacyMigration({
+    legacySnapshot,
+    lineageEvidence: tampered,
+    trustedRevisionManifest: manifest,
+  });
+  assert.equal(blocked.summary.resolved, 0);
+  assert.equal(blocked.summary.quarantined, 2);
+  assert.deepEqual([...new Set(blocked.quarantined.map(row => row.reason))], ['incomplete_lineage_evidence']);
+
+  const selfConsistentTamper = structuredClone(evidence);
+  selfConsistentTamper.resolvedAliases['L1:stable'] = CARD_B;
+  selfConsistentTamper.canonicalCardIds = [CARD_B];
+  const { evidenceId: ignored, ...tamperedCore } = selfConsistentTamper;
+  selfConsistentTamper.evidenceId = `production-lineage-evidence-v2:fnv1a32:${fixtureStableHash(fixtureStableSerialize(tamperedCore))}`;
+  const trustBound = planLegacyMigration({
+    legacySnapshot,
+    lineageEvidence: selfConsistentTamper,
+    trustedRevisionManifest: manifest,
+  });
+  assert.equal(trustBound.summary.resolved, 0);
+  assert.equal(trustBound.quarantined[0].reason, 'incomplete_lineage_evidence');
+
+  const wrongSourceTrust = { ...manifest, projectName: 'other-project' };
+  const sourceBound = planLegacyMigration({
+    legacySnapshot,
+    lineageEvidence: evidence,
+    trustedRevisionManifest: wrongSourceTrust,
+  });
+  assert.equal(sourceBound.summary.resolved, 0);
 });
 
 test('historical alias 的 stable card ID 在每個 revision 也必須只出現一次', () => {

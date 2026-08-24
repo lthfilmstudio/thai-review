@@ -620,7 +620,7 @@ function normalizeLineageEvidence(evidence, trustedRevisionManifest) {
       || requiredRevisions.some(revision => (
         typeof revision !== 'string' || !revision.trim() || revision !== revision.trim()
       ))
-      || evidence?.kind !== 'production-lineage-evidence-v1'
+      || !['production-lineage-evidence-v1', 'production-lineage-evidence-v2'].includes(evidence?.kind)
       || typeof evidence?.evidenceId !== 'string'
       || !evidence.evidenceId.trim()
       || evidence.evidenceId !== evidence.evidenceId.trim()
@@ -630,9 +630,12 @@ function normalizeLineageEvidence(evidence, trustedRevisionManifest) {
       || new Set(expected).size !== expected.length
       || expected.some(revision => typeof revision !== 'string' || !revision.trim())
       || stableSerialize(expected) !== stableSerialize(requiredRevisions)
-      || !Array.isArray(snapshots)
-      || snapshots.length !== expected.length) {
+      || (evidence.kind === 'production-lineage-evidence-v1'
+        && (!Array.isArray(snapshots) || snapshots.length !== expected.length))) {
     return { complete: false, snapshots: [] };
+  }
+  if (evidence.kind === 'production-lineage-evidence-v2') {
+    return normalizeCompactLineageEvidence(evidence, trustedRevisionManifest);
   }
   const byRevision = new Map();
   for (const snapshot of snapshots) {
@@ -678,6 +681,11 @@ function normalizeLineageEvidence(evidence, trustedRevisionManifest) {
   return {
     complete: true,
     snapshots: normalizedSnapshots,
+    collisionAliases: new Set(normalizedSnapshots.flatMap(snapshot => (
+      Object.entries(snapshot.aliases)
+        .filter(([, candidates]) => Array.isArray(candidates) && candidates.length > 1)
+        .map(([alias]) => alias)
+    ))),
     lineageProvenance,
     canonicalCardIdProven(cardId) {
       const normalized = cardId.toLowerCase();
@@ -690,6 +698,78 @@ function normalizeLineageEvidence(evidence, trustedRevisionManifest) {
         aliasResolutionCache.set(alias, resolveHistoricalLineage(alias, normalizedSnapshots));
       }
       return aliasResolutionCache.get(alias);
+    },
+  };
+}
+
+function normalizeCompactLineageEvidence(evidence, trustedRevisionManifest) {
+  const resolvedAliases = evidence?.resolvedAliases;
+  const unresolvedReasons = evidence?.unresolvedReasons;
+  const collisionAliases = evidence?.collisionAliases;
+  const canonicalCardIds = evidence?.canonicalCardIds;
+  if (!resolvedAliases || typeof resolvedAliases !== 'object' || Array.isArray(resolvedAliases)
+      || !unresolvedReasons || typeof unresolvedReasons !== 'object' || Array.isArray(unresolvedReasons)
+      || !Array.isArray(collisionAliases) || new Set(collisionAliases).size !== collisionAliases.length
+      || !Array.isArray(canonicalCardIds) || new Set(canonicalCardIds).size !== canonicalCardIds.length) {
+    return { complete: false, snapshots: [] };
+  }
+  const resolvedEntries = Object.entries(resolvedAliases);
+  const unresolvedEntries = Object.entries(unresolvedReasons);
+  const resolvedKeys = new Set(resolvedEntries.map(([alias]) => alias));
+  const unresolvedKeys = new Set(unresolvedEntries.map(([alias]) => alias));
+  const resolvedIds = [...new Set(resolvedEntries.map(([, cardId]) => cardId))].sort();
+  const { evidenceId, ...evidenceCore } = evidence;
+  const expectedEvidenceId = `production-lineage-evidence-v2:fnv1a32:${smallStableHash(stableSerialize(evidenceCore))}`;
+  const validReasons = new Set([
+    'missing_historical_evidence', 'historical_collision', 'invalid_lineage_identity',
+    'duplicate_stable_card_id', 'lineage_changed',
+  ]);
+  if (evidenceId !== expectedEvidenceId
+      || trustedRevisionManifest?.evidenceId !== evidenceId
+      || trustedRevisionManifest?.sourceManifestSha256 !== evidence?.source?.deploymentManifestSha256
+      || trustedRevisionManifest?.projectName !== evidence?.source?.projectName
+      || trustedRevisionManifest?.environment !== evidence?.source?.environment
+      || resolvedEntries.some(([alias, cardId]) => !alias.trim() || !stableCardId(cardId))
+      || unresolvedEntries.some(([alias, reason]) => !alias.trim() || !validReasons.has(reason))
+      || [...resolvedKeys].some(alias => unresolvedKeys.has(alias))
+      || collisionAliases.some(alias => (
+        typeof alias !== 'string'
+        || !alias.trim()
+        || resolvedKeys.has(alias)
+        || (unresolvedKeys.has(alias) && unresolvedReasons[alias] !== 'historical_collision')
+      ))
+      || resolvedIds.length !== resolvedEntries.length
+      || stableSerialize([...canonicalCardIds].sort()) !== stableSerialize(resolvedIds)
+      || evidence?.summary?.resolvedAliasCount !== resolvedEntries.length
+      || evidence?.summary?.unresolvedAliasCount !== unresolvedEntries.length
+      || evidence?.summary?.currentAliasCount !== resolvedEntries.length + unresolvedEntries.length
+      || evidence?.summary?.historicalCollisionAliasCount !== collisionAliases.length) {
+    return { complete: false, snapshots: [] };
+  }
+  const canonicalSet = new Set(canonicalCardIds);
+  return {
+    complete: true,
+    snapshots: [],
+    collisionAliases: new Set(collisionAliases),
+    lineageProvenance: {
+      evidenceId: evidence.evidenceId,
+      digest: `fnv1a32:${smallStableHash(stableSerialize({ evidence, trustedRevisionManifest }))}`,
+      revisionManifest: {
+        kind: trustedRevisionManifest.kind,
+        revisions: structuredClone(trustedRevisionManifest.revisions),
+      },
+    },
+    canonicalCardIdProven(cardId) {
+      return canonicalSet.has(cardId.toLowerCase());
+    },
+    resolveAlias(alias) {
+      if (Object.hasOwn(resolvedAliases, alias)) {
+        return { status: 'resolved', cardId: resolvedAliases[alias].toLowerCase() };
+      }
+      return {
+        status: 'quarantine',
+        reason: unresolvedReasons[alias] || 'missing_historical_evidence',
+      };
     },
   };
 }
@@ -727,13 +807,7 @@ function nonempty(value) {
   return value !== '';
 }
 
-function migrationAudit(facts, snapshots) {
-  const collisionAliases = new Set();
-  for (const snapshot of snapshots) {
-    for (const [alias, candidates] of Object.entries(snapshot?.aliases || {})) {
-      if (Array.isArray(candidates) && candidates.length > 1) collisionAliases.add(alias);
-    }
-  }
+function migrationAudit(facts, collisionAliases = new Set()) {
   const factsByAlias = new Map();
   for (const row of facts) {
     const alias = typeof row.legacyAlias === 'string' ? row.legacyAlias.trim() : '';
@@ -884,7 +958,10 @@ export function planLegacyMigration({
     planSignature,
     ...planCore,
     conservation,
-    audit: migrationAudit(facts, normalizedEvidence.complete ? snapshots : []),
+    audit: migrationAudit(
+      facts,
+      normalizedEvidence.complete ? normalizedEvidence.collisionAliases : new Set(),
+    ),
   };
 }
 
