@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  captureLegacyLearningSnapshot,
   commitLegacyMigration,
   evaluateLegacyClaim,
+  inspectNamespacedLocalCounts,
   planLegacyMigration,
 } from '../src/storage-scope.js';
 
@@ -81,6 +83,95 @@ function workspaceCounts(workspaceId = 'user:A', revision = 'local-empty-1') {
 function emptyRemotePull(workspaceId = 'user:A', receiptId = 'remote-empty-1') {
   return { completed: true, rowCount: 0, workspaceId, receiptId };
 }
+
+function memoryStorage(initial = {}, workspaceId = null) {
+  const values = new Map(Object.entries(initial));
+  const writes = [];
+  return {
+    workspaceId,
+    writes,
+    getItem(key) { return values.has(key) ? values.get(key) : null; },
+    setItem(key, value) { writes.push(['set', key, value]); values.set(key, value); },
+    removeItem(key) { writes.push(['remove', key]); values.delete(key); },
+    raw(key) { return values.get(key); },
+  };
+}
+
+test('legacy snapshot 唯讀拆出學習 facts，忽略裝置偏好並保持來源 bytes', () => {
+  const initial = {
+    'thai-review-v1': JSON.stringify({
+      settings: { theme: 'dark' },
+      currentLessonId: 'L1',
+      progress: { 'L1:หนึ่ง': { interval: 3 }, 'L1:สอง': { interval: 1 } },
+      edits: { 'L1:หนึ่ง': { thai: 'หนึ่งใหม่' } },
+      favorites: { หนึ่ง: { v: 1, ts: 9 } },
+    }),
+    'thai-review-daily-v1': JSON.stringify({
+      v: 1,
+      days: { '2026-08-23': { reviewed: 2 }, '2026-08-24': { games: 1 } },
+      protection: 1,
+    }),
+    'thai-review-grade-history-v1': JSON.stringify({ v: 1, cards: { 'L1:หนึ่ง': [[2, 1]] } }),
+    'thai-review-achievements-v1': JSON.stringify({ streak7: 123 }),
+    'thai-review-resweep-v1': JSON.stringify({ startedAt: 100, position: 2 }),
+  };
+  const storage = memoryStorage(initial);
+  const before = structuredClone(initial);
+  const first = captureLegacyLearningSnapshot(storage);
+  const second = captureLegacyLearningSnapshot(storage);
+  assert.equal(first.status, 'ok');
+  assert.equal(first.snapshot.facts.length, 10);
+  assert.equal(first.snapshot.snapshotId, second.snapshot.snapshotId);
+  assert.equal(first.snapshot.facts.filter(row => row.sourceStore === 'state').length, 2);
+  assert.equal(first.snapshot.facts.filter(row => row.sourceStore === 'favorites').length, 1);
+  assert.equal(first.snapshot.facts.some(row => row.sourceKey === 'settings'), false);
+  assert.equal(first.snapshot.facts.some(row => row.sourceKey === 'currentLessonId'), false);
+  assert.deepEqual(storage.writes, []);
+  for (const [key, raw] of Object.entries(before)) assert.equal(storage.raw(key), raw);
+});
+
+test('legacy 任一 learning store corrupt 時不產生半套 snapshot，也不寫來源', () => {
+  const storage = memoryStorage({
+    'thai-review-v1': JSON.stringify({ progress: { 'L1:ok': { interval: 1 } } }),
+    'thai-review-grade-history-v1': '{broken',
+  });
+  const result = captureLegacyLearningSnapshot(storage);
+  assert.equal(result.status, 'corrupt');
+  assert.equal(result.snapshot, undefined);
+  assert.deepEqual(storage.writes, []);
+
+  const nullStore = captureLegacyLearningSnapshot(memoryStorage({
+    'thai-review-achievements-v1': 'null',
+  }));
+  assert.equal(nullStore.status, 'corrupt');
+  assert.equal(nullStore.snapshot, undefined);
+});
+
+test('namespaced local counts 精確覆蓋十個 stores，unknown fact 也阻擋空帳號 claim', () => {
+  const storage = memoryStorage({
+    'thai-review-v1': JSON.stringify({ progress: {}, favorites: {}, edits: {}, unexpected: { keep: true } }),
+    'thai-review-daily-v1': JSON.stringify({ v: 1, days: {} }),
+  }, 'user:A');
+  const inspected = inspectNamespacedLocalCounts(storage, 'user:A');
+  assert.deepEqual(Object.keys(inspected.counts), Object.keys(EMPTY_LOCAL_COUNTS));
+  assert.equal(inspected.counts.state, 1);
+  assert.equal(typeof inspected.revision, 'string');
+  assert.equal(evaluateLegacyClaim({
+    namespacedLocalCounts: inspected,
+    firstRemotePull: emptyRemotePull(),
+    targetWorkspaceId: 'user:A',
+  }).status, 'not-offered');
+  assert.throws(() => inspectNamespacedLocalCounts(storage, 'user:B'), /another workspace/);
+});
+
+test('全空 namespaced stores 產生可綁定、可重現的 zero counts revision', () => {
+  const storage = memoryStorage({}, 'user:A');
+  const first = inspectNamespacedLocalCounts(storage, 'user:A');
+  const second = inspectNamespacedLocalCounts(storage, 'user:A');
+  assert.deepEqual(first.counts, EMPTY_LOCAL_COUNTS);
+  assert.deepEqual(first, second);
+  assert.deepEqual(storage.writes, []);
+});
 
 /* This fake proves the synchronous transactional-port contract only. It is not
    evidence that a real browser IndexedDB upgrade/abort is atomic. */
@@ -673,7 +764,7 @@ test('plan signature、journal 與 resolved record 保留 trusted lineage proven
   assert.deepEqual(journal.lineageProvenance, plan.lineageProvenance);
 });
 
-test('daily／achievements 等 workspace facts 可直接保留，canonical event identity 不改寫', () => {
+test('daily／achievements／favorites workspace facts 可直接保留，canonical event identity 不改寫', () => {
   const event = {
     eventId: 'event-1',
     cardId: CARD_A,
@@ -682,6 +773,10 @@ test('daily／achievements 等 workspace facts 可直接保留，canonical event
   const legacy = snapshot([
     { ...fact('daily', 'days/2026-08-23', null, { reviewed: 2 }), identityKind: 'workspace' },
     { ...fact('achievements', 'streak7', null, 123), identityKind: 'workspace' },
+    {
+      ...fact('favorites', 'หนึ่ง', null, { thai: 'หนึ่ง', favorite: { v: 1, ts: 9 } }),
+      identityKind: 'workspace',
+    },
     {
       ...fact('events', 'event-1', null, event),
       identityKind: 'canonical',
@@ -698,8 +793,9 @@ test('daily／achievements 等 workspace facts 可直接保留，canonical event
     lineageEvidence: evidence,
     trustedRevisionManifest: trustedRevisionManifest(evidence.expectedRevisions),
   });
-  assert.equal(plan.summary.resolved, 3);
+  assert.equal(plan.summary.resolved, 4);
   assert.equal(plan.summary.quarantined, 0);
+  assert.equal(plan.resolved.find(row => row.sourceStore === 'favorites').migrationKind, 'workspace_fact');
   assert.deepEqual(plan.resolved.find(row => row.sourceStore === 'events').value, event);
   assert.equal(plan.resolved.find(row => row.sourceStore === 'events').value.userWorkspace, undefined);
 });
