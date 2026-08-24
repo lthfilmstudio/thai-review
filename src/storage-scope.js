@@ -79,6 +79,205 @@ export const LEARNING_STORE_KEYS = Object.freeze({
   installation: 'thai-review-installation-v1',
 });
 
+const CLAIM_LOCAL_STORES = Object.freeze([
+  'state', 'daily', 'history', 'achievements', 'events',
+  'outbox', 'cycle', 'cursors', 'remoteDays', 'resweep',
+]);
+
+const LEGACY_DEVICE_STATE_FIELDS = new Set([
+  'settingsVersion', 'settings', 'collapsed', 'currentLessonId', 'mode',
+  'lastOpenDate', 'cardIndex', 'listFilter', 'listLessonId', 'listOrder',
+]);
+
+function plainRecord(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function requireRecord(value, label) {
+  if (!plainRecord(value)) throw codedError('LEARNING_STORE_CORRUPT', `${label} must be an object`);
+  return value;
+}
+
+function readLearningStores(storage) {
+  if (!storage || typeof storage.getItem !== 'function') {
+    throw codedError('STORAGE_UNAVAILABLE', 'learning storage is unavailable');
+  }
+  const stores = {};
+  for (const name of CLAIM_LOCAL_STORES) {
+    let raw;
+    try { raw = storage.getItem(LEARNING_STORE_KEYS[name]); }
+    catch { throw codedError('STORAGE_UNAVAILABLE', `cannot read ${name} learning store`); }
+    if (raw == null) {
+      stores[name] = null;
+      continue;
+    }
+    try {
+      stores[name] = JSON.parse(raw);
+      if (stores[name] === null) {
+        throw codedError('LEARNING_STORE_CORRUPT', `${name} learning store cannot be null`);
+      }
+    }
+    catch { throw codedError('LEARNING_STORE_CORRUPT', `${name} learning store is not valid JSON`); }
+  }
+  return stores;
+}
+
+function keyedFacts(logicalStore, sourceStore, record, identityKind = 'legacy_alias') {
+  return Object.entries(record).map(([sourceKey, value]) => ({
+    logicalStore,
+    sourceStore,
+    sourceKey,
+    ...(identityKind === 'legacy_alias' ? { legacyAlias: sourceKey } : { identityKind }),
+    value: structuredClone(value),
+  }));
+}
+
+function genericFacts(logicalStore, value) {
+  if (value === null) return [];
+  if (Array.isArray(value)) {
+    return value.map((entry, index) => ({
+      logicalStore,
+      sourceStore: logicalStore,
+      sourceKey: String(index),
+      identityKind: 'unknown',
+      value: structuredClone(entry),
+    }));
+  }
+  const record = requireRecord(value, logicalStore);
+  return keyedFacts(logicalStore, logicalStore, record, 'unknown');
+}
+
+function extractLearningFacts(stores, { legacy = false } = {}) {
+  const facts = [];
+  const stateStore = stores.state;
+  if (stateStore !== null) {
+    const root = requireRecord(stateStore, 'state');
+    for (const field of ['progress', 'favorites', 'edits']) {
+      if (Object.hasOwn(root, field)) requireRecord(root[field], `state.${field}`);
+    }
+    facts.push(...keyedFacts('state', 'state', root.progress || {}));
+    facts.push(...keyedFacts('state', 'edits', root.edits || {}));
+    facts.push(...Object.entries(root.favorites || {}).map(([thai, value]) => ({
+      logicalStore: 'state',
+      sourceStore: 'favorites',
+      sourceKey: thai,
+      identityKind: 'workspace',
+      value: { thai, favorite: structuredClone(value) },
+    })));
+    for (const [field, value] of Object.entries(root)) {
+      if (['progress', 'favorites', 'edits'].includes(field)
+          || (legacy && LEGACY_DEVICE_STATE_FIELDS.has(field))) continue;
+      facts.push({
+        logicalStore: 'state',
+        sourceStore: 'state_unknown',
+        sourceKey: field,
+        identityKind: 'unknown',
+        value: structuredClone(value),
+      });
+    }
+  }
+
+  const dailyStore = stores.daily;
+  if (dailyStore !== null) {
+    const daily = requireRecord(dailyStore, 'daily');
+    if (Object.hasOwn(daily, 'days')) requireRecord(daily.days, 'daily.days');
+    facts.push(...keyedFacts('daily', 'daily', daily.days || {}, 'workspace'));
+    const meta = {};
+    for (const field of ['protection', 'protectionRefillCheckpoint', 'makeupPending']) {
+      if (daily[field] !== undefined && daily[field] !== null && daily[field] !== 0) meta[field] = daily[field];
+    }
+    if (Object.keys(meta).length) {
+      facts.push({
+        logicalStore: 'daily', sourceStore: 'daily', sourceKey: 'meta',
+        identityKind: 'workspace', value: structuredClone(meta),
+      });
+    }
+    for (const [field, value] of Object.entries(daily)) {
+      if (['v', 'backfilled', 'days', 'protection', 'protectionRefillCheckpoint', 'makeupPending'].includes(field)) continue;
+      facts.push({
+        logicalStore: 'daily', sourceStore: 'daily', sourceKey: `unknown:${field}`,
+        identityKind: 'unknown', value: structuredClone(value),
+      });
+    }
+  }
+
+  const historyStore = stores.history;
+  if (historyStore !== null) {
+    const history = requireRecord(historyStore, 'history');
+    if (Object.hasOwn(history, 'cards')) requireRecord(history.cards, 'history.cards');
+    facts.push(...keyedFacts('history', 'history', history.cards || {}));
+    for (const [field, value] of Object.entries(history)) {
+      if (['v', 'cards'].includes(field)) continue;
+      facts.push({
+        logicalStore: 'history', sourceStore: 'history', sourceKey: `unknown:${field}`,
+        identityKind: 'unknown', value: structuredClone(value),
+      });
+    }
+  }
+
+  if (stores.achievements !== null) {
+    facts.push(...keyedFacts(
+      'achievements', 'achievements', requireRecord(stores.achievements, 'achievements'), 'workspace',
+    ));
+  }
+  if (stores.remoteDays !== null) {
+    facts.push(...keyedFacts(
+      'remoteDays', 'remoteDays', requireRecord(stores.remoteDays, 'remoteDays'), 'workspace',
+    ));
+  }
+  for (const name of ['events', 'outbox', 'cycle', 'cursors']) {
+    facts.push(...genericFacts(name, stores[name]));
+  }
+  if (stores.resweep !== null) {
+    const resweep = requireRecord(stores.resweep, 'resweep');
+    const meaningful = Object.keys(resweep).some(key => resweep[key] !== null && resweep[key] !== 0 && resweep[key] !== '');
+    if (meaningful) {
+      facts.push({
+        logicalStore: 'resweep', sourceStore: 'resweep', sourceKey: 'legacy-cursor',
+        identityKind: 'legacy_cursor', value: structuredClone(resweep),
+      });
+    }
+  }
+  return facts;
+}
+
+export function captureLegacyLearningSnapshot(storage) {
+  try {
+    const stores = readLearningStores(storage);
+    const facts = extractLearningFacts(stores, { legacy: true });
+    const signature = stableSerialize(facts);
+    return {
+      status: 'ok',
+      snapshot: {
+        kind: 'legacy-learning-snapshot-v1',
+        snapshotId: `legacy-learning-fnv1a32-${smallStableHash(signature)}`,
+        facts,
+      },
+    };
+  } catch (error) {
+    return {
+      status: error?.code === 'STORAGE_UNAVAILABLE' ? 'unavailable' : 'corrupt',
+      error,
+    };
+  }
+}
+
+export function inspectNamespacedLocalCounts(storage, workspaceId) {
+  const workspace = requiredIdentity(workspaceId);
+  if (storage?.workspaceId !== workspace) {
+    throw codedError('CLAIM_WORKSPACE_MISMATCH', 'local counts belong to another workspace');
+  }
+  const stores = readLearningStores(storage);
+  const facts = extractLearningFacts(stores);
+  const counts = Object.fromEntries(CLAIM_LOCAL_STORES.map(name => [name, 0]));
+  for (const fact of facts) counts[fact.logicalStore] += 1;
+  return {
+    workspaceId: workspace,
+    revision: `local-learning-fnv1a32-${smallStableHash(stableSerialize(stores))}`,
+    counts,
+  };
+}
+
 const workspaceStorageBindings = new WeakMap();
 
 function codedError(code, message) {
@@ -434,11 +633,6 @@ export async function logoutToAnonymous({
   return workspaceId;
 }
 
-const CLAIM_LOCAL_STORES = Object.freeze([
-  'state', 'daily', 'history', 'achievements', 'events',
-  'outbox', 'cycle', 'cursors', 'remoteDays', 'resweep',
-]);
-
 function allCountsZero(counts) {
   return !!counts && CLAIM_LOCAL_STORES.every(name => {
     const value = counts[name];
@@ -607,7 +801,7 @@ function stableCardId(value) {
     && isStableCardId(value);
 }
 
-const WORKSPACE_FACT_STORES = new Set(['daily', 'achievements', 'remoteDays']);
+const WORKSPACE_FACT_STORES = new Set(['daily', 'achievements', 'remoteDays', 'favorites']);
 
 function normalizeLineageEvidence(evidence, trustedRevisionManifest) {
   const expected = evidence?.expectedRevisions;
