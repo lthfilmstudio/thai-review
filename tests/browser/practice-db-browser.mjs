@@ -3,6 +3,7 @@ import {
   openPracticeDatabase,
   createPracticeTransactionPort,
   createLegacyMigrationTransactionPort,
+  hydrateWorkspaceSnapshot,
 } from '../../src/practice-db.js';
 import { commitPracticeAttempt } from '../../src/practice-commit.js';
 import { buildPracticeAttemptEvent } from '../../src/practice-events.js';
@@ -11,6 +12,7 @@ import {
   evaluateLegacyClaim,
   planLegacyMigration,
 } from '../../src/storage-scope.js';
+import { projectHydratedWorkspaceState } from '../../src/state.js';
 
 const DB_NAME = 'thai-review-practice-browser-acceptance-v1';
 const resultEl = document.getElementById('result');
@@ -288,16 +290,74 @@ async function run() {
       || dueRollbackReadBack.outbox?.marker !== 'due-outbox-conflict') {
     throw new Error(`Due rollback leaked partial rows: ${JSON.stringify(dueRollbackReadBack)}`);
   }
+
+  const addCollisionWorkspace = 'user:add-collision';
+  const addCollisionPort = createLegacyMigrationTransactionPort(reopened, {
+    workspaceId: addCollisionWorkspace,
+    assertBootActive: workspaceId => {
+      if (workspaceId !== addCollisionWorkspace) throw new Error('add collision workspace is stale');
+    },
+    inspectLocalEligibility: emptyLocalEligibility,
+  });
+  const addCollisionSrs = {
+    workspaceId: addCollisionWorkspace,
+    cardId: '19191919-1919-4919-8919-191919191919',
+    version: 0,
+    state: { grade: 'good' },
+    sourceEventId: null,
+  };
+  let authoritativeAddCollisionError = null;
+  try {
+    await addCollisionPort.transaction(async tx => {
+      await tx.putSrs(addCollisionSrs);
+      await tx.putProjection({
+        workspaceId: addCollisionWorkspace,
+        name: 'daily',
+        schemaVersion: 1,
+        projectorVersion: 'browser-add-collision-v1',
+        facts: [],
+      });
+      await tx.putSrs(addCollisionSrs);
+    });
+  } catch (error) {
+    authoritativeAddCollisionError = error.code || error.name;
+  }
+  if (!authoritativeAddCollisionError) {
+    throw new Error('authoritative duplicate add did not abort');
+  }
+  closeConnection(reopened);
+  reopened = trackConnection(await openPracticeDatabase({ name: DB_NAME }));
+  const authoritativeAddRollback = {
+    srs: await rawIndexCount(
+      reopened.database, 'srs_v2', 'by_workspace', addCollisionWorkspace,
+    ),
+    projections: await rawIndexCount(
+      reopened.database, 'projections', 'by_workspace', addCollisionWorkspace,
+    ),
+  };
+  if (authoritativeAddRollback.srs !== 0 || authoritativeAddRollback.projections !== 0) {
+    throw new Error(
+      `authoritative add collision leaked rows: ${JSON.stringify(authoritativeAddRollback)}`,
+    );
+  }
   const legacySnapshot = {
     snapshotId: 'browser-legacy-copy-1',
     facts: [
       {
         sourceStore: 'state', sourceKey: 'progress/unique', legacyAlias: 'L1:unique',
-        value: { grade: 'good' },
+        value: {
+          grade: 'hard', reviewedAt: 1, nextReviewAt: 2,
+          interval: 3, easeFactor: 2.2, reps: 2, updatedAt: 1,
+          deviceId: 'legacy-device',
+        },
       },
       {
         sourceStore: 'history', sourceKey: 'cards/collision', legacyAlias: 'L1:collision',
         value: [[0, 123]],
+      },
+      {
+        sourceStore: 'daily', sourceKey: '2026-08-24', identityKind: 'workspace',
+        value: { reviewed: 1 },
       },
     ],
   };
@@ -375,9 +435,9 @@ async function run() {
     plan: migrationPlan,
     authorization: confirmation.authorization,
   };
-  const conflictPlanRow = migrationPlan.resolved[0];
-  if (!conflictPlanRow || migrationPlan.resolved.length !== 1) {
-    throw new Error('browser migration fixture must have exactly one resolved row');
+  const conflictPlanRow = migrationPlan.resolved.find(row => row.sourceStore === 'state');
+  if (!conflictPlanRow || migrationPlan.resolved.length !== 2) {
+    throw new Error('browser migration fixture must have SRS and workspace resolved rows');
   }
   const migrationConflictRecordId = migrationResolvedRecordId(
     'user:B', legacySnapshot.snapshotId, conflictPlanRow, 0,
@@ -428,11 +488,19 @@ async function run() {
     journalCount: await rawIndexCount(
       reopened.database, 'claim_journals', 'by_workspace', 'user:B',
     ),
+    srsCount: await rawIndexCount(
+      reopened.database, 'srs_v2', 'by_workspace', 'user:B',
+    ),
+    projectionCount: await rawIndexCount(
+      reopened.database, 'projections', 'by_workspace', 'user:B',
+    ),
   };
   if (migrationRollbackReadBack.conflict?.marker !== 'migration-add-conflict'
       || migrationRollbackReadBack.resolvedCount !== 1
       || migrationRollbackReadBack.quarantineCount !== 0
-      || migrationRollbackReadBack.journalCount !== 0) {
+      || migrationRollbackReadBack.journalCount !== 0
+      || migrationRollbackReadBack.srsCount !== 0
+      || migrationRollbackReadBack.projectionCount !== 0) {
     throw new Error(
       `migration rollback leaked partial rows: ${JSON.stringify(migrationRollbackReadBack)}`,
     );
@@ -458,13 +526,58 @@ async function run() {
     },
     inspectLocalEligibility: emptyLocalEligibility,
   });
+  const hydration = await hydrateWorkspaceSnapshot(migrationReload, {
+    workspaceId: 'user:B',
+    assertActive: workspaceId => {
+      if (workspaceId !== 'user:B') throw new Error('hydration workspace is stale');
+    },
+  });
+  const hydratedState = projectHydratedWorkspaceState(hydration);
   const migrationSecond = await commitLegacyMigration({
     ...migrationInput, transactionalPort: migrationPortReloaded,
   });
+  const migratedPracticePort = createPracticeTransactionPort(migrationReload, {
+    workspaceId: 'user:B',
+    assertActive: workspaceId => {
+      if (workspaceId !== 'user:B') throw new Error('migrated practice workspace is stale');
+    },
+  });
+  const migratedDueEventId = '20202020-2020-4020-8020-202020202020';
+  const migratedDue = await commitPracticeAttempt({
+    port: migratedPracticePort,
+    workspaceId: 'user:B',
+    attempt: {
+      eventId: migratedDueEventId,
+      roundId: '21212121-2121-4121-8121-212121212121',
+      cycleId: '23232323-2323-4323-8323-232323232323',
+      cycleOrdinal: 1,
+      cardId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      attemptId: '24242424-2424-4424-8424-242424242424',
+      dayKey: '2026-08-25',
+      lane: 'due',
+      phase: 'first',
+      result: 'success',
+      formalGrade: 'good',
+    },
+    now: Date.parse('2026-08-25T10:00:00.000Z'),
+    createId: () => migratedDueEventId,
+    deviceId: 'workspace-installation-B',
+  });
+  const migratedDueSrs = await rawGet(
+    migrationReload.database,
+    'srs_v2',
+    ['user:B', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'],
+  );
   const migrationCounts = {
     resolved: await rawCount(migrationReload.database, 'legacy_imports'),
     quarantined: await rawCount(migrationReload.database, 'quarantine'),
     journals: await rawCount(migrationReload.database, 'claim_journals'),
+    materializedSrs: await rawIndexCount(
+      migrationReload.database, 'srs_v2', 'by_workspace', 'user:B',
+    ),
+    materializedProjections: await rawIndexCount(
+      migrationReload.database, 'projections', 'by_workspace', 'user:B',
+    ),
   };
   const journal = await rawGet(
     migrationReload.database, 'claim_journals', ['user:B', legacySnapshot.snapshotId],
@@ -507,6 +620,11 @@ async function run() {
       observedError: dueRollbackError,
       presetOutboxSurvived: dueRollbackReadBack.outbox?.marker === 'due-outbox-conflict',
     },
+    authoritativeAddRollback: {
+      status: 'passed',
+      observedError: authoritativeAddCollisionError,
+      ...authoritativeAddRollback,
+    },
     reloadReadBack: {
       eventId: eventRow?.event?.eventId || null,
       srsVersion: srsRow?.version ?? null,
@@ -522,6 +640,20 @@ async function run() {
       summary: migrationFirst.summary,
       counts: migrationCounts,
       journalStatus: journal?.status || null,
+      hydration: {
+        srsCardIds: hydration.srs.map(row => row.cardId),
+        projectionNames: hydration.projections.map(row => row.name),
+        progressKeys: Object.keys(hydratedState.progress),
+      },
+      legacyDueUpgrade: {
+        status: migratedDue.status,
+        beforeVersion: migratedDue.event?.srsBeforeVersion ?? null,
+        afterVersion: migratedDue.event?.srsAfterVersion ?? null,
+        storedVersion: migratedDueSrs?.version ?? null,
+        interval: migratedDueSrs?.state?.interval ?? null,
+        reps: migratedDueSrs?.state?.reps ?? null,
+        easeFactor: migratedDueSrs?.state?.easeFactor ?? null,
+      },
       atomicRollback: {
         status: 'passed',
         observedError: migrationRollbackError,
@@ -543,11 +675,31 @@ async function run() {
       || output.reloadReadBack.outboxStatus !== 'pending'
       || Object.values(counts).some(count => count !== 1)
       || foreignRow !== null
+      || output.authoritativeAddRollback.srs !== 0
+      || output.authoritativeAddRollback.projections !== 0
       || output.migration.firstStatus !== 'applied'
       || output.migration.secondStatus !== 'already-applied'
-      || output.migration.summary.resolved !== 1
+      || output.migration.summary.resolved !== 2
       || output.migration.summary.quarantined !== 1
-      || Object.values(migrationCounts).some(count => count !== 1)
+      || output.migration.summary.materializedSrs !== 1
+      || output.migration.summary.materializedProjectionFacts !== 1
+      || migrationCounts.resolved !== 2
+      || migrationCounts.quarantined !== 1
+      || migrationCounts.journals !== 1
+      || migrationCounts.materializedSrs !== 1
+      || migrationCounts.materializedProjections !== 1
+      || output.migration.hydration.srsCardIds.join(',')
+        !== 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+      || output.migration.hydration.progressKeys.join(',')
+        !== 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+      || output.migration.hydration.projectionNames.join(',') !== 'daily'
+      || output.migration.legacyDueUpgrade.status !== 'committed'
+      || output.migration.legacyDueUpgrade.beforeVersion !== 0
+      || output.migration.legacyDueUpgrade.afterVersion !== 1
+      || output.migration.legacyDueUpgrade.storedVersion !== 1
+      || output.migration.legacyDueUpgrade.interval !== 7
+      || output.migration.legacyDueUpgrade.reps !== 3
+      || output.migration.legacyDueUpgrade.easeFactor !== 2.2
       || output.migration.journalStatus !== 'completed') {
     throw new Error(`reload read-back mismatch: ${JSON.stringify(output)}`);
   }

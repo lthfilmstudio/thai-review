@@ -16,6 +16,7 @@ globalThis.localStorage = fallback;
 
 const {
   state, loadState, loadStateResult, saveState, STORAGE_KEY, DEVICE_STATE_KEY,
+  projectHydratedWorkspaceState,
 } = await import('../src/state.js');
 const { DAILY_KEY, loadDailyLog, logReview } = await import('../src/today.js');
 const { loadGradeHistory, recordGrade } = await import('../src/grade-history.js');
@@ -448,4 +449,71 @@ test('undefined storage preserves fallback behavior and corrupt injected payload
   assert.deepEqual(loadResweepState(unavailable), { startedAt: null, position: 0 });
   assert.throws(() => saveState(unavailable), /blocked/,
     'state save keeps its existing error behavior when an injected port is unavailable');
+});
+
+test('hydration 純轉換只投影 stable-card SRS 與版本化 projections，不改 global state', () => {
+  const cardId = '550e8400-e29b-41d4-a716-446655440000';
+  const hydration = {
+    kind: 'practice-workspace-hydration-v1',
+    schemaVersion: 1,
+    workspaceId: 'user:A',
+    srs: [{
+      workspaceId: 'user:A', cardId, version: 0,
+      state: { grade: 'good', nextReviewAt: 20 }, sourceEventId: null,
+    }],
+    projections: [{
+      workspaceId: 'user:A', name: 'daily', schemaVersion: 1,
+      projectorVersion: 'legacy-workspace-facts-v1',
+      facts: [{ sourceStore: 'daily', sourceKey: '2026-08-24', value: { reviewed: 1 } }],
+    }],
+    quarantine: [{ cardId: 'must-not-leak' }],
+    audit: [{ cardId: 'must-not-leak' }],
+  };
+  const before = structuredClone(hydration);
+  state.progress = { sentinel: { grade: 'easy' } };
+
+  const projected = projectHydratedWorkspaceState(hydration);
+
+  assert.deepEqual(projected.progress, {
+    [cardId]: { grade: 'good', nextReviewAt: 20 },
+  });
+  assert.deepEqual(Object.keys(projected.projections), ['daily']);
+  assert.equal(projected.quarantine, undefined);
+  assert.equal(projected.audit, undefined);
+  assert.deepEqual(state.progress, { sentinel: { grade: 'easy' } });
+  projected.progress[cardId].grade = 'again';
+  assert.deepEqual(hydration, before);
+});
+
+test('hydration 拒絕 ownership SRS keys、非整數 reps 與 prototype projection names', () => {
+  const cardId = '550e8400-e29b-41d4-a716-446655440000';
+  const base = {
+    kind: 'practice-workspace-hydration-v1', schemaVersion: 1, workspaceId: 'user:A',
+    srs: [{
+      workspaceId: 'user:A', cardId, version: 0,
+      state: { grade: 'good' }, sourceEventId: null,
+    }],
+    projections: [],
+  };
+  assert.throws(() => projectHydratedWorkspaceState({
+    ...base,
+    srs: [{ ...base.srs[0], state: { grade: 'good', workspaceId: 'user:A' } }],
+  }), /invalid hydrated SRS row/);
+  assert.throws(() => projectHydratedWorkspaceState({
+    ...base,
+    srs: [{ ...base.srs[0], state: { grade: 'good', reps: 1.5 } }],
+  }), /invalid hydrated SRS row/);
+  assert.throws(() => projectHydratedWorkspaceState({
+    ...base,
+    srs: [{ ...base.srs[0], version: Number.MAX_SAFE_INTEGER + 1 }],
+  }), /invalid hydrated SRS row/);
+  for (const name of ['__proto__', 'prototype', 'constructor']) {
+    assert.throws(() => projectHydratedWorkspaceState({
+      ...base,
+      projections: [{
+        workspaceId: 'user:A', name, schemaVersion: 1,
+        projectorVersion: 'legacy-workspace-facts-v1', facts: [],
+      }],
+    }), /invalid hydrated projection row/);
+  }
 });
