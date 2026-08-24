@@ -173,8 +173,29 @@ test('全空 namespaced stores 產生可綁定、可重現的 zero counts revisi
   assert.deepEqual(storage.writes, []);
 });
 
-/* This fake proves the synchronous transactional-port contract only. It is not
-   evidence that a real browser IndexedDB upgrade/abort is atomic. */
+test('inspectNamespacedLocalCounts 的 production shape 可直接通過空 workspace claim gate', () => {
+  const legacy = snapshot([
+    fact('state', 'progress/unique', 'L1:unique', { grade: 'good' }),
+  ]);
+  const plan = planLegacyMigration({ legacySnapshot: legacy, ...completeLineage([
+    ['r1', { 'L1:unique': [CARD_A] }],
+    ['r2', { 'L1:unique': [CARD_A] }],
+  ]) });
+  const inspected = inspectNamespacedLocalCounts(memoryStorage({}, 'user:A'), 'user:A');
+  const offer = evaluateLegacyClaim({
+    accountLabel: 'nalin@example.test',
+    namespacedLocalCounts: inspected,
+    firstRemotePull: emptyRemotePull(),
+    legacyFactCount: legacy.facts.length,
+    targetWorkspaceId: 'user:A',
+    legacySnapshot: legacy,
+    migrationPlan: plan,
+  });
+  assert.equal(offer.status, 'offer');
+});
+
+/* In-memory transactional-port fake. It is not evidence that a real browser
+   IndexedDB upgrade/abort is atomic. */
 function fakeTransactionalPort({
   crashBeforeCommit = false,
   localEligibility = {
@@ -1077,6 +1098,11 @@ test('migration crash 後無半套寫入，重跑冪等且 resolved + quarantine
     authorization,
   });
   const afterFirst = structuredClone([...store.values.entries()]);
+  store.setLocalEligibility({
+    workspaceId: 'user:A',
+    revision: 'local-now-nonempty',
+    counts: { ...EMPTY_LOCAL_COUNTS, events: 1 },
+  });
   const second = await commitLegacyMigration({
     transactionalPort: store,
     eligibilityGuard: eligibilityGuard(),
@@ -1116,7 +1142,7 @@ test('migration crash 後無半套寫入，重跑冪等且 resolved + quarantine
   assert.notStrictEqual(records[1].value, plan.quarantined[0].value);
 });
 
-test('不同 snapshot 的 migration records 使用獨立 key，不互相覆寫', async () => {
+test('先前匯入資料存在時，不同 snapshot 的 claim fail closed', async () => {
   const entries = [
     ['r1', { 'L1:unique': [CARD_A] }],
     ['r2', { 'L1:unique': [CARD_A] }],
@@ -1147,21 +1173,25 @@ test('不同 snapshot 的 migration records 使用獨立 key，不互相覆寫',
     plan: firstPlan,
     authorization: firstAuthorization,
   });
-  await commitLegacyMigration({
+  store.setLocalEligibility({
+    workspaceId: 'user:A',
+    revision: 'local-prior-imports',
+    counts: { ...EMPTY_LOCAL_COUNTS, events: 2 },
+  });
+  await assert.rejects(commitLegacyMigration({
     transactionalPort: store,
     eligibilityGuard: eligibilityGuard(),
     workspaceId: 'user:A',
     plan: secondPlan,
     authorization: secondAuthorization,
-  });
+  }), error => error.code === 'CLAIM_ELIGIBILITY_STALE');
 
-  assert.equal(store.values.size, 4, '2 snapshot records + 2 claim journals');
+  assert.equal(store.values.size, 2, 'first snapshot record + journal only');
   const snapshotRecords = [...store.values.entries()]
     .filter(([key]) => !key.includes(':claim-journal:'));
   assert.match(snapshotRecords[0][0], /snapshot:legacy-copy-1/);
   assert.deepEqual(snapshotRecords[0][1].value, { grade: 'good' });
-  assert.match(snapshotRecords[1][0], /snapshot:legacy-copy-2/);
-  assert.deepEqual(snapshotRecords[1][1].value, { grade: 'easy' });
+  assert.equal(snapshotRecords.some(([key]) => key.includes('legacy-copy-2')), false);
 });
 
 test('相同 source key 的重複 facts 仍逐筆保存，不被 storage key 覆寫', async () => {

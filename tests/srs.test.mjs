@@ -56,6 +56,13 @@ test('easeFactor moves down on hard, flat on good, up on easy, floored at 1.3', 
   assert.ok(Math.abs(nextReview('easy', prev).easeFactor - 1.45) < 1e-9);
 });
 
+test('nextReview accepts an injected per-workspace installation ID', () => {
+  stored.delete('thai-review-device-id');
+  const result = nextReview('good', {}, 1234, { deviceId: 'workspace-installation-A' });
+  assert.equal(result.deviceId, 'workspace-installation-A');
+  assert.equal(stored.has('thai-review-device-id'), false);
+});
+
 test('cardStatus derives new/learning/review/mature from reps+interval, no extra field', () => {
   assert.equal(cardStatus(undefined), 'new');
   assert.equal(cardStatus({ reps: 0, interval: 1 }), 'learning'); // just came back from "again"

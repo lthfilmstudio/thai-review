@@ -15,7 +15,7 @@ export function normalizeGrade(gradeStr) {
   return LEGACY_GRADE_MAP[gradeStr] ?? gradeStr;
 }
 
-export function nextReview(gradeStr, prev = {}, now = Date.now()) {
+export function nextReview(gradeStr, prev = {}, now = Date.now(), { deviceId } = {}) {
   let { interval = 0, easeFactor = 2.5, reps = 0 } = prev;
   const q = GRADE_Q[gradeStr] ?? 4;
   easeFactor = Math.max(1.3, easeFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
@@ -40,7 +40,7 @@ export function nextReview(gradeStr, prev = {}, now = Date.now()) {
     easeFactor,
     reps,
     updatedAt: now,
-    deviceId: getDeviceId(),
+    deviceId: deviceId || getDeviceId(),
   };
 }
 

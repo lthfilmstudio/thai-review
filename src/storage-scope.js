@@ -634,9 +634,10 @@ export async function logoutToAnonymous({
 }
 
 function allCountsZero(counts) {
-  return !!counts && CLAIM_LOCAL_STORES.every(name => {
-    const value = counts[name];
-    return Object.hasOwn(counts, name)
+  const values = counts?.counts ?? counts;
+  return !!values && CLAIM_LOCAL_STORES.every(name => {
+    const value = values[name];
+    return Object.hasOwn(values, name)
       && typeof value === 'number'
       && Number.isFinite(value)
       && Number.isInteger(value)
@@ -1198,9 +1199,9 @@ function assertClaimAuthorization(authorization, workspace, plan) {
   }
 }
 
-/* This is a synchronous transactional-port contract. verifyRemotePull and
-   tx.getClaimEligibility are fail-closed adapter guards; real runtime coordinator
-   wiring and browser IndexedDB create/upgrade/abort atomicity need separate proof. */
+/* Transactional-port contract. Every tx method may be async so the production
+   adapter can use real IndexedDB requests. Network/UI work stays outside the
+   transaction; the port resolves only after the native transaction completes. */
 export async function commitLegacyMigration({
   transactionalPort,
   eligibilityGuard,
@@ -1234,19 +1235,7 @@ export async function commitLegacyMigration({
   const journalKey = `workspace:${encodeURIComponent(workspace)}:claim-journal:${encodeURIComponent(verifiedPlan.snapshotId)}`;
 
   return transactionalPort.transaction(async tx => {
-    if (typeof tx.getClaimEligibility !== 'function') {
-      throw codedError(
-        'CLAIM_ELIGIBILITY_REVALIDATION_REQUIRED',
-        'transactional local eligibility evidence is required',
-      );
-    }
-    const localEligibility = tx.getClaimEligibility(workspace);
-    if (localEligibility?.workspaceId !== workspace
-        || localEligibility?.revision !== authorization.localRevision
-        || !allCountsZero(localEligibility?.counts)) {
-      throw codedError('CLAIM_ELIGIBILITY_STALE', 'local claim eligibility is stale');
-    }
-    const existing = tx.get(journalKey);
+    const existing = await tx.get(journalKey);
     if (existing?.status === 'completed') {
       if (existing.planId !== verifiedPlan.planId
           || existing.planSignature !== verifiedPlan.planSignature) {
@@ -1254,8 +1243,20 @@ export async function commitLegacyMigration({
       }
       return { status: 'already-applied', summary: structuredClone(existing.summary) };
     }
+    if (typeof tx.getClaimEligibility !== 'function') {
+      throw codedError(
+        'CLAIM_ELIGIBILITY_REVALIDATION_REQUIRED',
+        'transactional local eligibility evidence is required',
+      );
+    }
+    const localEligibility = await tx.getClaimEligibility(workspace);
+    if (localEligibility?.workspaceId !== workspace
+        || localEligibility?.revision !== authorization.localRevision
+        || !allCountsZero(localEligibility?.counts)) {
+      throw codedError('CLAIM_ELIGIBILITY_STALE', 'local claim eligibility is stale');
+    }
 
-    verifiedPlan.resolved.forEach((row, index) => {
+    const recordWrites = verifiedPlan.resolved.map((row, index) => (
       tx.set(migrationRecordKey(workspace, verifiedPlan.snapshotId, 'resolved', row, index), {
         sourceSnapshotId: verifiedPlan.snapshotId,
         sourceStore: row.sourceStore,
@@ -1264,9 +1265,9 @@ export async function commitLegacyMigration({
         cardId: row.cardId,
         lineageProvenance: structuredClone(verifiedPlan.lineageProvenance),
         value: structuredClone(row.value),
-      });
-    });
-    verifiedPlan.quarantined.forEach((row, index) => {
+      })
+    ));
+    recordWrites.push(...verifiedPlan.quarantined.map((row, index) => (
       tx.set(migrationRecordKey(workspace, verifiedPlan.snapshotId, 'legacy_unresolved', row, index), {
         sourceSnapshotId: verifiedPlan.snapshotId,
         sourceStore: row.sourceStore,
@@ -1274,14 +1275,15 @@ export async function commitLegacyMigration({
         legacyAlias: row.legacyAlias,
         reason: row.reason,
         value: structuredClone(row.value),
-      });
-    });
+      })
+    )));
+    await Promise.all(recordWrites);
     const summary = {
       ...structuredClone(verifiedPlan.summary),
       conservationValid: true,
       audit: structuredClone(verifiedPlan.audit),
     };
-    tx.set(journalKey, {
+    await tx.set(journalKey, {
       status: 'completed',
       planId: verifiedPlan.planId,
       planSignature: verifiedPlan.planSignature,
