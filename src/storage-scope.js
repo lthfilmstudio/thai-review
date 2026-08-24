@@ -4,6 +4,7 @@
    learning read/write reaches a store. */
 
 import { isStableCardId } from './card-identity.js';
+import { isSrsStateSnapshot } from './srs.js';
 
 const BOOT_SCREENS = Object.freeze({
   'checking-session': {
@@ -804,6 +805,49 @@ function stableCardId(value) {
 
 const WORKSPACE_FACT_STORES = new Set(['daily', 'achievements', 'remoteDays', 'favorites']);
 
+function buildLegacyMaterializations(resolved) {
+  const progressByCard = new Map();
+  for (const row of resolved) {
+    if (row.sourceStore !== 'state'
+        || !stableCardId(row.cardId)) continue;
+    const rows = progressByCard.get(row.cardId) || [];
+    rows.push(row);
+    progressByCard.set(row.cardId, rows);
+  }
+
+  const srs = [];
+  for (const [cardId, rows] of progressByCard) {
+    if (rows.length !== 1 || !isSrsStateSnapshot(rows[0].value)) continue;
+    const row = rows[0];
+    row.materialization = 'srs_v2';
+    srs.push({
+      cardId,
+      state: structuredClone(row.value),
+      sourceStore: row.sourceStore,
+      sourceKey: row.sourceKey,
+    });
+  }
+
+  const projectionGroups = new Map();
+  for (const row of resolved) {
+    if (row.migrationKind !== 'workspace_fact' || !WORKSPACE_FACT_STORES.has(row.sourceStore)) {
+      continue;
+    }
+    row.materialization = `projection:${row.sourceStore}`;
+    const facts = projectionGroups.get(row.sourceStore) || [];
+    facts.push({
+      sourceStore: row.sourceStore,
+      sourceKey: row.sourceKey,
+      value: structuredClone(row.value),
+    });
+    projectionGroups.set(row.sourceStore, facts);
+  }
+  const projections = [...projectionGroups.entries()]
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([name, facts]) => ({ name, facts }));
+  return { schemaVersion: 1, srs, projections };
+}
+
 function normalizeLineageEvidence(evidence, trustedRevisionManifest) {
   const expected = evidence?.expectedRevisions;
   const snapshots = evidence?.snapshots;
@@ -1062,6 +1106,7 @@ function migrationPlanCore(plan) {
     lineageProvenance: plan?.lineageProvenance,
     resolved: plan?.resolved,
     quarantined: plan?.quarantined,
+    materializations: plan?.materializations,
     summary: plan?.summary,
   };
 }
@@ -1130,10 +1175,24 @@ export function planLegacyMigration({
     else quarantined.push({ ...row, reason: lineage.reason });
   }
 
+  const materializations = buildLegacyMaterializations(resolved);
+  const materializedSrs = materializations.srs.length;
+  const materializedProjectionFacts = materializations.projections
+    .reduce((count, projection) => count + projection.facts.length, 0);
+  const materialized = materializedSrs + materializedProjectionFacts;
+  const auditOnly = resolved.length - materialized;
+  if (auditOnly < 0) {
+    throw codedError('MIGRATION_MATERIALIZATION_INVALID', 'materialized fact count exceeds resolved facts');
+  }
+
   const summary = {
     original: facts.length,
     resolved: resolved.length,
     quarantined: quarantined.length,
+    materialized,
+    materializedSrs,
+    materializedProjectionFacts,
+    auditOnly,
   };
   const conservation = {
     valid: summary.resolved + summary.quarantined === summary.original,
@@ -1145,6 +1204,7 @@ export function planLegacyMigration({
     lineageProvenance,
     resolved,
     quarantined,
+    materializations,
     summary,
   };
   const planSignature = migrationPlanSignature(planCore);
@@ -1256,6 +1316,58 @@ export async function commitLegacyMigration({
       throw codedError('CLAIM_ELIGIBILITY_STALE', 'local claim eligibility is stale');
     }
 
+    const materializations = verifiedPlan.materializations;
+    if (!materializations || materializations.schemaVersion !== 1
+        || !Array.isArray(materializations.srs)
+        || !Array.isArray(materializations.projections)) {
+      throw codedError('MIGRATION_PLAN_INVALID', 'legacy materialization plan is invalid');
+    }
+    for (const method of ['getSrs', 'putSrs', 'getProjection', 'putProjection']) {
+      if (typeof tx[method] !== 'function') {
+        throw codedError('PRACTICE_ADAPTER_INCOMPLETE', `migration transaction.${method} is required`);
+      }
+    }
+
+    const srsRows = [];
+    for (const row of materializations.srs) {
+      if (await tx.getSrs(row.cardId)) {
+        throw codedError(
+          'MIGRATION_AUTHORITATIVE_CONFLICT',
+          'legacy migration cannot overwrite authoritative SRS',
+        );
+      }
+      srsRows.push({
+        workspaceId: workspace,
+        cardId: row.cardId,
+        version: 0,
+        state: structuredClone(row.state),
+        sourceEventId: null,
+        migration: {
+          kind: 'legacy-progress-v1',
+          snapshotId: verifiedPlan.snapshotId,
+          sourceStore: row.sourceStore,
+          sourceKey: row.sourceKey,
+        },
+      });
+    }
+    const projectionRows = [];
+    for (const row of materializations.projections) {
+      if (await tx.getProjection(row.name)) {
+        throw codedError(
+          'MIGRATION_AUTHORITATIVE_CONFLICT',
+          'legacy migration cannot overwrite an authoritative projection',
+        );
+      }
+      projectionRows.push({
+        workspaceId: workspace,
+        name: row.name,
+        schemaVersion: 1,
+        projectorVersion: 'legacy-workspace-facts-v1',
+        sourceSnapshotId: verifiedPlan.snapshotId,
+        facts: structuredClone(row.facts),
+      });
+    }
+
     const recordWrites = verifiedPlan.resolved.map((row, index) => (
       tx.set(migrationRecordKey(workspace, verifiedPlan.snapshotId, 'resolved', row, index), {
         sourceSnapshotId: verifiedPlan.snapshotId,
@@ -1277,6 +1389,10 @@ export async function commitLegacyMigration({
         value: structuredClone(row.value),
       })
     )));
+    recordWrites.push(
+      ...srsRows.map(row => tx.putSrs(row)),
+      ...projectionRows.map(row => tx.putProjection(row)),
+    );
     await Promise.all(recordWrites);
     const summary = {
       ...structuredClone(verifiedPlan.summary),

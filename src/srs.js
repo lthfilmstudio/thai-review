@@ -6,6 +6,27 @@
 
 const DAY_MS = 86400000;
 const GRADE_Q = { again: 0, hard: 3, good: 4, easy: 5 };
+const SRS_SNAPSHOT_GRADES = new Set(['again', 'hard', 'good', 'easy', 'bad', 'ok']);
+const SRS_SNAPSHOT_FIELDS = new Set([
+  'grade', 'reviewedAt', 'nextReviewAt', 'interval', 'easeFactor',
+  'reps', 'updatedAt', 'deviceId',
+]);
+const SRS_INTEGER_FIELDS = [
+  'reviewedAt', 'nextReviewAt', 'interval', 'reps', 'updatedAt',
+];
+
+export function isSrsStateSnapshot(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+      || Object.keys(value).some(key => !SRS_SNAPSHOT_FIELDS.has(key))
+      || !SRS_SNAPSHOT_GRADES.has(value.grade)) return false;
+  for (const field of SRS_INTEGER_FIELDS) {
+    if (value[field] !== undefined
+        && (!Number.isSafeInteger(value[field]) || value[field] < 0)) return false;
+  }
+  if (value.easeFactor !== undefined
+      && (!Number.isFinite(value.easeFactor) || value.easeFactor <= 0)) return false;
+  return value.deviceId === undefined || typeof value.deviceId === 'string';
+}
 
 /* 舊版三檔資料（bad/ok/good）讀出來時要能對回新四檔，才能讓清單篩選 / 對話字源
    在混合新舊資料時正確分類，不需要另外寫 migration 改寫已存的 grade 字串。 */

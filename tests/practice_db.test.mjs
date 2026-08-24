@@ -5,6 +5,7 @@ import {
   PRACTICE_DB_STORES,
   createLegacyMigrationTransactionPort,
   createPracticeTransactionPort,
+  hydrateWorkspaceSnapshot,
   openPracticeDatabase,
   upgradePracticeSchema,
 } from '../src/practice-db.js';
@@ -215,4 +216,62 @@ test('runtime and migration ports recheck workspace after native transaction com
     migrationPort.transaction(() => 'done'),
     { code: 'WORKSPACE_INVALIDATED' },
   );
+});
+
+test('hydration 只讀指定 workspace，回傳與 IndexedDB rows 隔離的 clone', async () => {
+  const cardA = '550e8400-e29b-41d4-a716-446655440000';
+  const cardB = '550e8400-e29b-41d4-a716-446655440001';
+  const rows = {
+    srsV2: [
+      { workspaceId: 'user:A', cardId: cardA, version: 0, state: { grade: 'good' } },
+      { workspaceId: 'user:B', cardId: cardB, version: 2, state: { grade: 'easy' } },
+    ],
+    projections: [
+      {
+        workspaceId: 'user:A', name: 'daily', schemaVersion: 1,
+        projectorVersion: 'legacy-workspace-facts-v1', facts: [],
+      },
+      {
+        workspaceId: 'user:B', name: 'daily', schemaVersion: 1,
+        projectorVersion: 'legacy-workspace-facts-v1', facts: [{ foreign: true }],
+      },
+    ],
+  };
+  const logicalByPhysical = Object.fromEntries(
+    Object.entries(PRACTICE_DB_STORES).map(([logical, physical]) => [physical, logical]),
+  );
+  const database = {
+    transaction() {
+      const transaction = {
+        error: null,
+        abort() {},
+        objectStore(physicalName) {
+          const logical = logicalByPhysical[physicalName];
+          return {
+            index() {
+              return {
+                getAll(workspaceId) {
+                  return successfulRequest(
+                    (rows[logical] || []).filter(row => row.workspaceId === workspaceId),
+                  );
+                },
+              };
+            },
+          };
+        },
+      };
+      setImmediate(() => transaction.oncomplete?.());
+      return transaction;
+    },
+  };
+  const snapshot = await hydrateWorkspaceSnapshot({ database, assertOpen() {} }, {
+    workspaceId: 'user:A', assertActive() {},
+  });
+  assert.deepEqual(snapshot, {
+    kind: 'practice-workspace-hydration-v1', schemaVersion: 1, workspaceId: 'user:A',
+    srs: [rows.srsV2[0]], projections: [rows.projections[0]],
+  });
+  snapshot.srs[0].state.grade = 'again';
+  assert.equal(rows.srsV2[0].state.grade, 'good');
+  assert.equal(snapshot.srs.some(row => row.workspaceId === 'user:B'), false);
 });

@@ -205,17 +205,33 @@ function fakeTransactionalPort({
   },
 } = {}) {
   const values = new Map();
+  const srs = new Map();
+  const projections = new Map();
   let shouldCrash = crashBeforeCommit;
   let eligibility = structuredClone(localEligibility);
   return {
     values,
+    srs,
+    projections,
     allowCommit() { shouldCrash = false; },
     setLocalEligibility(next) { eligibility = structuredClone(next); },
     async transaction(work) {
       const staged = new Map(values);
+      const stagedSrs = new Map(srs);
+      const stagedProjections = new Map(projections);
       const tx = {
         get: key => staged.get(key),
         set: (key, value) => staged.set(key, structuredClone(value)),
+        getSrs: cardId => structuredClone(stagedSrs.get(cardId) || null),
+        putSrs: row => {
+          if (stagedSrs.has(row.cardId)) throw new Error('fake SRS add constraint');
+          stagedSrs.set(row.cardId, structuredClone(row));
+        },
+        getProjection: name => structuredClone(stagedProjections.get(name) || null),
+        putProjection: row => {
+          if (stagedProjections.has(row.name)) throw new Error('fake projection add constraint');
+          stagedProjections.set(row.name, structuredClone(row));
+        },
         getClaimEligibility: workspaceId => (
           eligibility?.workspaceId === workspaceId ? structuredClone(eligibility) : null
         ),
@@ -224,6 +240,10 @@ function fakeTransactionalPort({
       if (shouldCrash) throw new Error('simulated crash before commit');
       values.clear();
       for (const [key, value] of staged) values.set(key, value);
+      srs.clear();
+      for (const [key, value] of stagedSrs) srs.set(key, value);
+      projections.clear();
+      for (const [key, value] of stagedProjections) projections.set(key, value);
       return result;
     },
   };
@@ -821,6 +841,175 @@ test('daily／achievements／favorites workspace facts 可直接保留，canonic
   assert.equal(plan.resolved.find(row => row.sourceStore === 'events').value.userWorkspace, undefined);
 });
 
+test('migration plan 只把可無損還原的 SRS 與版本化 workspace facts 排入權威 materialization', () => {
+  const legacy = snapshot([
+    fact('state', 'progress/one', 'L1:one', {
+      grade: 'good', reviewedAt: 10, nextReviewAt: 20,
+      interval: 3, easeFactor: 2.5, reps: 2, updatedAt: 10, deviceId: 'legacy-device',
+    }),
+    fact('history', 'cards/one', 'L1:one', [[2, 10]]),
+    fact('edits', 'edits/one', 'L1:one', { thai: 'แก้ไข' }),
+    { ...fact('daily', '2026-08-24', null, { reviewed: 1 }), identityKind: 'workspace' },
+    { ...fact('favorites', 'หนึ่ง', null, { thai: 'หนึ่ง', favorite: { v: 1, ts: 9 } }), identityKind: 'workspace' },
+    {
+      ...fact('events', 'event-1', null, { eventId: 'event-1', cardId: CARD_A }),
+      identityKind: 'canonical', cardId: CARD_A,
+    },
+    fact('state', 'progress/collision', 'L1:collision', { grade: 'hard' }),
+  ]);
+  const plan = planLegacyMigration({ legacySnapshot: legacy, ...completeLineage([
+    ['r1', { 'L1:one': [CARD_A], 'L1:collision': [CARD_B, CARD_C] }],
+    ['r2', { 'L1:one': [CARD_A], 'L1:collision': [CARD_B] }],
+  ]) });
+
+  assert.equal(plan.summary.original, 7);
+  assert.equal(plan.summary.resolved, 6);
+  assert.equal(plan.summary.quarantined, 1);
+  assert.equal(plan.summary.materialized, 3);
+  assert.equal(plan.summary.materializedSrs, 1);
+  assert.equal(plan.summary.materializedProjectionFacts, 2);
+  assert.equal(plan.summary.auditOnly, 3);
+  assert.deepEqual(plan.materializations.srs.map(row => row.cardId), [CARD_A]);
+  assert.deepEqual(
+    plan.materializations.projections.map(row => [row.name, row.facts.length]),
+    [['daily', 1], ['favorites', 1]],
+  );
+  assert.deepEqual(
+    plan.resolved.filter(row => !row.materialization).map(row => row.sourceStore).sort(),
+    ['edits', 'events', 'history'],
+  );
+});
+
+test('legacy string、壞數值與同 card 多筆 progress 都只留 audit，不猜權威 SRS', () => {
+  const legacy = snapshot([
+    fact('state', 'progress/string', 'L1:string', 'good'),
+    fact('state', 'progress/bad-number', 'L1:bad-number', { grade: 'good', interval: '3' }),
+    fact('state', 'progress/unknown-key', 'L1:unknown-key', { grade: 'good', workspaceId: 'user:A' }),
+    fact('state', 'progress/fractional-reps', 'L1:fractional-reps', { grade: 'good', reps: 1.5 }),
+    fact('state', 'progress/duplicate-a', 'L1:duplicate', { grade: 'good' }),
+    fact('state', 'progress/duplicate-b', 'L1:duplicate', { grade: 'easy' }),
+  ]);
+  const plan = planLegacyMigration({ legacySnapshot: legacy, ...completeLineage([
+    ['r1', {
+      'L1:string': [CARD_A], 'L1:bad-number': [CARD_B], 'L1:duplicate': [CARD_C],
+      'L1:unknown-key': [CARD_D], 'L1:fractional-reps': [CARD_E],
+    }],
+    ['r2', {
+      'L1:string': [CARD_A], 'L1:bad-number': [CARD_B], 'L1:duplicate': [CARD_C],
+      'L1:unknown-key': [CARD_D], 'L1:fractional-reps': [CARD_E],
+    }],
+  ]) });
+
+  assert.equal(plan.summary.resolved, 6);
+  assert.equal(plan.summary.materializedSrs, 0);
+  assert.equal(plan.summary.auditOnly, 6);
+  assert.deepEqual(plan.materializations.srs, []);
+});
+
+test('同 stable card 合法 progress 混到非法物件或字串時整組 audit only', () => {
+  const legacy = snapshot([
+    fact('state', 'progress/mixed-valid-a', 'L1:mixed-a', { grade: 'good', interval: 3 }),
+    fact('state', 'progress/mixed-invalid', 'L1:mixed-a', { grade: 'good', interval: '3' }),
+    fact('state', 'progress/mixed-valid-b', 'L1:mixed-b', { grade: 'easy', interval: 7 }),
+    fact('state', 'progress/mixed-string', 'L1:mixed-b', 'easy'),
+  ]);
+  const plan = planLegacyMigration({ legacySnapshot: legacy, ...completeLineage([
+    ['r1', { 'L1:mixed-a': [CARD_A], 'L1:mixed-b': [CARD_B] }],
+    ['r2', { 'L1:mixed-a': [CARD_A], 'L1:mixed-b': [CARD_B] }],
+  ]) });
+
+  assert.equal(plan.summary.resolved, 4);
+  assert.equal(plan.summary.materialized, 0);
+  assert.equal(plan.summary.materializedSrs, 0);
+  assert.equal(plan.summary.auditOnly, 4);
+  assert.ok(plan.summary.auditOnly >= 0);
+  assert.deepEqual(plan.materializations.srs, []);
+});
+
+test('transaction fake 使用 add semantics，duplicate authoritative key 整筆 rollback', async () => {
+  const store = fakeTransactionalPort();
+  await assert.rejects(store.transaction(async tx => {
+    await tx.putSrs({ cardId: CARD_A, state: { grade: 'good' } });
+    await tx.putProjection({ name: 'daily', facts: [] });
+    await tx.putSrs({ cardId: CARD_A, state: { grade: 'easy' } });
+  }), /fake SRS add constraint/);
+  assert.equal(store.srs.size, 0);
+  assert.equal(store.projections.size, 0);
+});
+
+test('claim transaction 同時 materialize、保留 audit，quarantine 永不進權威 projection', async () => {
+  const srsState = {
+    grade: 'good', reviewedAt: 10, nextReviewAt: 20,
+    interval: 3, easeFactor: 2.5, reps: 2, updatedAt: 10, deviceId: 'legacy-device',
+  };
+  const legacy = snapshot([
+    fact('state', 'progress/one', 'L1:one', srsState),
+    fact('history', 'cards/one', 'L1:one', [[2, 10]]),
+    { ...fact('daily', '2026-08-24', null, { reviewed: 1 }), identityKind: 'workspace' },
+    fact('state', 'progress/collision', 'L1:collision', { grade: 'hard' }),
+  ]);
+  const plan = planLegacyMigration({ legacySnapshot: legacy, ...completeLineage([
+    ['r1', { 'L1:one': [CARD_A], 'L1:collision': [CARD_B, CARD_C] }],
+    ['r2', { 'L1:one': [CARD_A], 'L1:collision': [CARD_B] }],
+  ]) });
+  const authorization = confirmClaim({ legacySnapshot: legacy, plan });
+  const store = fakeTransactionalPort();
+
+  const result = await commitLegacyMigration({
+    transactionalPort: store,
+    eligibilityGuard: eligibilityGuard(),
+    workspaceId: 'user:A',
+    plan,
+    authorization,
+  });
+
+  assert.equal(result.status, 'applied');
+  assert.deepEqual(store.srs.get(CARD_A), {
+    workspaceId: 'user:A', cardId: CARD_A, version: 0,
+    state: srsState, sourceEventId: null,
+    migration: {
+      kind: 'legacy-progress-v1', snapshotId: legacy.snapshotId,
+      sourceStore: 'state', sourceKey: 'progress/one',
+    },
+  });
+  assert.equal(store.srs.has(CARD_B), false);
+  assert.deepEqual(store.projections.get('daily'), {
+    workspaceId: 'user:A', name: 'daily', schemaVersion: 1,
+    projectorVersion: 'legacy-workspace-facts-v1', sourceSnapshotId: legacy.snapshotId,
+    facts: [{ sourceStore: 'daily', sourceKey: '2026-08-24', value: { reviewed: 1 } }],
+  });
+  assert.equal(store.projections.size, 1);
+  assert.equal([...store.values.keys()].filter(key => key.includes(':resolved:')).length, 3);
+  assert.equal([...store.values.keys()].filter(key => key.includes(':legacy_unresolved:')).length, 1);
+});
+
+test('legacy materialization 不覆蓋任何已存在的 authoritative SRS', async () => {
+  const legacy = snapshot([
+    fact('state', 'progress/one', 'L1:one', { grade: 'good', updatedAt: 10 }),
+  ]);
+  const plan = planLegacyMigration({ legacySnapshot: legacy, ...completeLineage([
+    ['r1', { 'L1:one': [CARD_A] }],
+    ['r2', { 'L1:one': [CARD_A] }],
+  ]) });
+  const authorization = confirmClaim({ legacySnapshot: legacy, plan });
+  const store = fakeTransactionalPort();
+  const newer = {
+    workspaceId: 'user:A', cardId: CARD_A, version: 4,
+    state: { grade: 'easy', updatedAt: 999 }, sourceEventId: 'newer-event',
+  };
+  store.srs.set(CARD_A, structuredClone(newer));
+
+  await assert.rejects(commitLegacyMigration({
+    transactionalPort: store,
+    eligibilityGuard: eligibilityGuard(),
+    workspaceId: 'user:A',
+    plan,
+    authorization,
+  }), error => error.code === 'MIGRATION_AUTHORITATIVE_CONFLICT');
+  assert.deepEqual(store.srs.get(CARD_A), newer);
+  assert.equal(store.values.size, 0);
+});
+
 test('claim confirmation 產生不可偽造且綁定 workspace/snapshot/plan 的 authorization', async () => {
   const legacy = snapshot([
     fact('state', 'progress/unique', 'L1:unique', { grade: 'good' }),
@@ -1088,6 +1277,8 @@ test('migration crash 後無半套寫入，重跑冪等且 resolved + quarantine
     /simulated crash/,
   );
   assert.equal(store.values.size, 0);
+  assert.equal(store.srs.size, 0);
+  assert.equal(store.projections.size, 0);
 
   store.allowCommit();
   const first = await commitLegacyMigration({
@@ -1098,6 +1289,7 @@ test('migration crash 後無半套寫入，重跑冪等且 resolved + quarantine
     authorization,
   });
   const afterFirst = structuredClone([...store.values.entries()]);
+  const srsAfterFirst = structuredClone([...store.srs.entries()]);
   store.setLocalEligibility({
     workspaceId: 'user:A',
     revision: 'local-now-nonempty',
@@ -1114,6 +1306,7 @@ test('migration crash 後無半套寫入，重跑冪等且 resolved + quarantine
   assert.equal(first.status, 'applied');
   assert.equal(second.status, 'already-applied');
   assert.deepEqual([...store.values.entries()], afterFirst);
+  assert.deepEqual([...store.srs.entries()], srsAfterFirst);
   assert.equal(first.summary.resolved + first.summary.quarantined, first.summary.original);
   assert.equal(first.summary.conservationValid, true);
   const records = [...store.values.entries()]

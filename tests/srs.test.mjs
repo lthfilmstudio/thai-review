@@ -12,7 +12,9 @@ Object.defineProperty(globalThis, 'navigator', {
   value: { platform: 'test' },
 });
 
-const { nextReview, cardStatus, normalizeGrade, getDueCards } = await import('../src/srs.js');
+const {
+  nextReview, cardStatus, normalizeGrade, getDueCards, isSrsStateSnapshot,
+} = await import('../src/srs.js');
 
 const DAY_MS = 86400000;
 
@@ -103,4 +105,18 @@ test('normalizeGrade maps legacy 3-grade values onto the new 4-grade scheme', ()
   assert.equal(normalizeGrade('again'), 'again');
   assert.equal(normalizeGrade('easy'), 'easy');
   assert.equal(normalizeGrade(undefined), undefined);
+});
+
+test('SRS snapshot validator 接受 exact legacy shape，拒絕 unknown keys 與非 safe integers', () => {
+  assert.equal(isSrsStateSnapshot({
+    grade: 'good', reviewedAt: 1, nextReviewAt: 2, interval: 3,
+    easeFactor: 2.5, reps: 2, updatedAt: 1, deviceId: 'legacy-device',
+  }), true);
+  assert.equal(isSrsStateSnapshot({ grade: 'ok' }), true);
+  assert.equal(isSrsStateSnapshot({ grade: 'good', workspaceId: 'user:A' }), false);
+  assert.equal(isSrsStateSnapshot({ grade: 'good', reps: 1.5 }), false);
+  assert.equal(isSrsStateSnapshot({ grade: 'good', interval: Number.MAX_SAFE_INTEGER + 1 }), false);
+  assert.equal(isSrsStateSnapshot({ grade: 'good', easeFactor: Infinity }), false);
+  assert.equal(isSrsStateSnapshot({ grade: 'unknown' }), false);
+  assert.equal(isSrsStateSnapshot('good'), false);
 });

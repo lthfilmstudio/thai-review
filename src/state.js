@@ -1,7 +1,10 @@
 /* 應用狀態與持久化。所有 runtime 狀態集中在 state 物件；
    settings 跟 progress 寫進 localStorage，重新開啟能還原。 */
 
-import { nextReview, countDue, getDueCards, normalizeGrade } from './srs.js';
+import {
+  nextReview, countDue, getDueCards, normalizeGrade, isSrsStateSnapshot,
+} from './srs.js';
+import { isStableCardId } from './card-identity.js';
 
 export const STORAGE_KEY = 'thai-review-v1';
 export const DEVICE_STATE_KEY = 'thai-review-device-state-v1';
@@ -11,6 +14,7 @@ export const MANIFEST_CACHE_KEY = 'thai-review-manifest-v2';    // tab 列表 ca
 export const LESSON_CACHE_PREFIX = 'thai-review-lesson-v2-';    // 單堂 cards cache
 export const SYNC_TIME_KEY = 'thai-review-last-sync-v1';        // 上次手動同步成功時間
 const SETTINGS_VERSION = 2;
+const UNSAFE_PROJECTION_NAMES = new Set(['__proto__', 'prototype', 'constructor']);
 
 /* 本地時區（台北）的 YYYY-MM-DD。不能用 toISOString()（UTC 會在早上 8 點前算成前一天）。
    today.js / stats.js 都要用同一份，放在共同的底層模組避免互相 import。 */
@@ -201,6 +205,44 @@ export const state = {
   dailyQueueKeys: null,       // string[] | null
   dailyQueueResweepKeys: null, // Set<string> | null，評分時判斷要不要推進 resweep 游標
 };
+
+export function projectHydratedWorkspaceState(snapshot) {
+  if (snapshot?.kind !== 'practice-workspace-hydration-v1'
+      || snapshot?.schemaVersion !== 1
+      || typeof snapshot?.workspaceId !== 'string'
+      || !Array.isArray(snapshot?.srs)
+      || !Array.isArray(snapshot?.projections)) {
+    throw new TypeError('invalid practice workspace hydration snapshot');
+  }
+  const progress = {};
+  for (const row of snapshot.srs) {
+    if (row?.workspaceId !== snapshot.workspaceId
+        || !isStableCardId(row?.cardId)
+        || !Number.isSafeInteger(row?.version)
+        || row.version < 0
+        || !isSrsStateSnapshot(row.state)
+        || Object.hasOwn(progress, row.cardId)) {
+      throw new TypeError('invalid hydrated SRS row');
+    }
+    progress[row.cardId] = structuredClone(row.state);
+  }
+  const projections = {};
+  for (const row of snapshot.projections) {
+    if (row?.workspaceId !== snapshot.workspaceId
+        || typeof row?.name !== 'string'
+        || !row.name
+        || UNSAFE_PROJECTION_NAMES.has(row.name)
+        || !Number.isInteger(row?.schemaVersion)
+        || row.schemaVersion < 1
+        || typeof row?.projectorVersion !== 'string'
+        || !row.projectorVersion
+        || Object.hasOwn(projections, row.name)) {
+      throw new TypeError('invalid hydrated projection row');
+    }
+    projections[row.name] = structuredClone(row);
+  }
+  return { progress, projections };
+}
 
 export function loadState(storage = localStorage) {
   return loadStateResult(storage).status === 'ok';

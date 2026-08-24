@@ -607,6 +607,29 @@ export function createLegacyMigrationTransactionPort(connection, {
             quarantineId: parts.recordId,
           }));
         },
+        async getSrs(cardId) {
+          active();
+          const row = await requestPromise(store('srsV2').get([workspace, cardId]));
+          return row ? structuredClone(row) : null;
+        },
+        async putSrs(row) {
+          active();
+          assertEnvelope(workspace, row);
+          await requestPromise(store('srsV2').add({
+            ...structuredClone(row),
+            nextReviewAt: row.state?.nextReviewAt ?? 0,
+          }));
+        },
+        async getProjection(name) {
+          active();
+          const row = await requestPromise(store('projections').get([workspace, name]));
+          return row ? structuredClone(row) : null;
+        },
+        async putProjection(row) {
+          active();
+          assertEnvelope(workspace, row);
+          await requestPromise(store('projections').add(structuredClone(row)));
+        },
       };
 
       try {
@@ -622,4 +645,54 @@ export function createLegacyMigrationTransactionPort(connection, {
       }
     },
   });
+}
+
+export async function hydrateWorkspaceSnapshot(connection, {
+  workspaceId,
+  assertActive,
+} = {}) {
+  if (!connection?.database || typeof connection.assertOpen !== 'function') {
+    throw codedError('STORAGE_UNAVAILABLE', 'practice database connection is unavailable');
+  }
+  const workspace = requiredWorkspace(workspaceId);
+  if (typeof assertActive !== 'function') {
+    throw codedError('PRACTICE_ADAPTER_INCOMPLETE', 'assertActive must be a function');
+  }
+  const active = () => {
+    connection.assertOpen();
+    assertActive(workspace);
+  };
+  active();
+  const transaction = connection.database.transaction(
+    [PRACTICE_DB_STORES.srsV2, PRACTICE_DB_STORES.projections],
+    'readonly',
+  );
+  const done = transactionPromise(transaction);
+  const srsStore = transaction.objectStore(PRACTICE_DB_STORES.srsV2);
+  const projectionStore = transaction.objectStore(PRACTICE_DB_STORES.projections);
+  try {
+    const [srs, projections] = await Promise.all([
+      requestPromise(srsStore.index('by_workspace').getAll(workspace)),
+      requestPromise(projectionStore.index('by_workspace').getAll(workspace)),
+    ]);
+    for (const row of [...srs, ...projections]) assertEnvelope(workspace, row);
+    active();
+    await done;
+    active();
+    return structuredClone({
+      kind: 'practice-workspace-hydration-v1',
+      schemaVersion: 1,
+      workspaceId: workspace,
+      srs: srs.sort((left, right) => (
+        left.cardId < right.cardId ? -1 : left.cardId > right.cardId ? 1 : 0
+      )),
+      projections: projections.sort((left, right) => (
+        left.name < right.name ? -1 : left.name > right.name ? 1 : 0
+      )),
+    });
+  } catch (error) {
+    try { transaction.abort(); } catch { /* already complete or aborted */ }
+    try { await done; } catch { /* preserve the domain error */ }
+    throw error;
+  }
 }
