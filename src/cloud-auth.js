@@ -14,6 +14,15 @@ export const SUPABASE_KEY = 'sb_publishable__WK4UaYwJ6vBrPsx6gmL0g_U6D3blA0';
 const STORAGE_KEY = 'thai-review-auth-v1';
 
 let clientPromise = null;
+const defaultSessionLoader = async () => (await getClient()).getSession();
+let sessionLoader = defaultSessionLoader;
+
+/* 測試只替換 session 讀取，不改 production auth client。 */
+export function __setAuthTestSessionLoader(loader) {
+  if (typeof loader !== 'function') throw new TypeError('session loader must be a function');
+  sessionLoader = loader;
+  return () => { sessionLoader = defaultSessionLoader; };
+}
 
 /* GoTrueClient 有 100KB，沒登入的人不該為它付解析成本，所以動態載入。
    （檔案本身還是進 sw.js 的 SHELL，離線時也拿得到。） */
@@ -35,12 +44,16 @@ async function getClient() {
 
 /* 這台裝置以前登入過嗎？用來決定要不要在開機時就把 100KB 的 auth 載進來——
    沒登入過的人完全不會碰到網路，行為跟同步功能上線前一模一樣。 */
-export function hasStoredSession() {
+function storedSessionPresence() {
   try {
-    return !!localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return false;
+    return { status: 'ok', present: !!localStorage.getItem(STORAGE_KEY) };
+  } catch (error) {
+    return { status: 'unavailable', present: null, error };
   }
+}
+
+export function hasStoredSession() {
+  return storedSessionPresence().present === true;
 }
 
 /* 同步版讀 session：關頁那一刻沒時間 await，只能直接讀 GoTrue 存在
@@ -59,15 +72,32 @@ export function readStoredSession() {
   }
 }
 
-/* 目前的 session；沒登入或出錯一律回 null，呼叫端不用 try/catch。 */
-export async function getSession() {
-  if (!hasStoredSession() && !location.search.includes('code=')) return null;
-  try {
-    const { data } = await (await getClient()).getSession();
-    return data?.session ?? null;
-  } catch {
-    return null;
+/* Boot 必須分清楚「真的沒登入」與「登入狀態暫時讀不到」；後者不能被當成
+   anonymous workspace，否則可能在錯的 namespace 開始寫學習資料。 */
+export async function getSessionResult() {
+  const presence = storedSessionPresence();
+  if (presence.status === 'unavailable') {
+    return { status: 'unavailable', session: null, error: presence.error };
   }
+  if (!presence.present && !location.search.includes('code=')) {
+    return { status: 'anonymous', session: null };
+  }
+  try {
+    const { data, error } = await sessionLoader();
+    if (error) throw error;
+    const session = data?.session ?? null;
+    return session
+      ? { status: 'authenticated', session }
+      : { status: 'anonymous', session: null };
+  } catch (error) {
+    return { status: 'unavailable', session: null, error };
+  }
+}
+
+/* 相容既有非 boot 呼叫端：沒登入或暫時出錯仍回 null。 */
+export async function getSession() {
+  const result = await getSessionResult();
+  return result.status === 'authenticated' ? result.session : null;
 }
 
 /* 登入導回來時網址上會帶 ?code=&state=，清掉才不會留在網址列，

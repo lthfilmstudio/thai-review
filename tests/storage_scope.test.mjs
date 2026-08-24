@@ -13,6 +13,7 @@ import {
   logoutToAnonymous,
   resolveWorkspaceId,
   runLegacyLearningBootGate,
+  runWorkspaceBoot,
 } from '../src/storage-scope.js';
 
 function memoryStorage() {
@@ -56,6 +57,170 @@ test('7 個 boot states 都有明確畫面、動作與完成後 focus', () => {
     assert.equal(typeof screen.focusTarget, 'string', state);
     assert.ok(screen.focusTarget.length > 0, state);
   }
+});
+
+test('workspace coordinator 依 session → catalog → storage → migration → ready 排序', async () => {
+  const events = [];
+  const backing = memoryStorage();
+  const result = await runWorkspaceBoot({
+    resolveSession: async () => {
+      events.push('resolve-session');
+      return { status: 'authenticated', session: { user: { id: 'A' } } };
+    },
+    resolveDeviceId: () => {
+      events.push('resolve-device');
+      return 'device-1';
+    },
+    loadCatalog: async ({ workspaceId }) => {
+      events.push(`catalog:${workspaceId}`);
+      return { revision: 'catalog-1' };
+    },
+    openStorage: ({ workspaceId, boot }) => {
+      events.push(`storage:${workspaceId}`);
+      return createWorkspaceStorage(backing, { workspaceId, boot });
+    },
+    inspectDurability: async ({ workspaceId }) => {
+      events.push(`durability:${workspaceId}`);
+      return { supported: true };
+    },
+    migrate: async ({ workspaceId, storage }) => {
+      events.push(`migration:${workspaceId}`);
+      assert.throws(() => storage.getItem(LEARNING_STORE_KEYS.state), {
+        code: 'WORKSPACE_NOT_READY',
+      });
+      return { summary: { original: 0, resolved: 0, quarantined: 0 } };
+    },
+    onState: snapshot => events.push(`state:${snapshot.state}`),
+  });
+
+  assert.equal(result.status, 'ready');
+  assert.equal(result.workspaceId, 'user:A');
+  assert.deepEqual(events, [
+    'state:checking-session',
+    'resolve-session',
+    'state:loading-catalog',
+    'catalog:user:A',
+    'state:opening-storage',
+    'storage:user:A',
+    'durability:user:A',
+    'state:migrating',
+    'migration:user:A',
+    'state:ready',
+  ]);
+  assert.equal(backing.values.size, 0, 'boot and migration adapters must not write learning facts');
+  result.storage.setItem(LEARNING_STORE_KEYS.state, '{}');
+  assert.equal(result.storage.getItem(LEARNING_STORE_KEYS.state), '{}');
+});
+
+test('authenticated boot 不建立或讀取裝置 ID', async () => {
+  let deviceReads = 0;
+  const result = await runWorkspaceBoot({
+    resolveSession: async () => ({
+      status: 'authenticated',
+      session: { user: { id: 'A' } },
+    }),
+    resolveDeviceId: () => { deviceReads += 1; return 'device-1'; },
+    loadCatalog: async () => ({ revision: 'catalog-1' }),
+    openStorage: ({ workspaceId, boot }) => createWorkspaceStorage(memoryStorage(), {
+      workspaceId,
+      boot,
+    }),
+  });
+
+  assert.equal(result.status, 'ready');
+  assert.equal(result.workspaceId, 'user:A');
+  assert.equal(deviceReads, 0);
+});
+
+test('auth unavailable 不得降級成 anonymous workspace，也不開 catalog 或 storage', async () => {
+  const events = [];
+  const result = await runWorkspaceBoot({
+    resolveSession: async () => ({ status: 'unavailable', session: null }),
+    resolveDeviceId: () => { events.push('device'); return 'device-1'; },
+    loadCatalog: async () => { events.push('catalog'); return {}; },
+    openStorage: () => { events.push('storage'); return memoryStorage(); },
+    onState: snapshot => events.push(`state:${snapshot.state}`),
+  });
+
+  assert.equal(result.status, 'recoverable-failure');
+  assert.equal(result.workspaceId, null);
+  assert.equal(result.error.code, 'SESSION_UNAVAILABLE');
+  assert.deepEqual(events, ['state:checking-session', 'state:recoverable-failure']);
+});
+
+test('storage opening failure 進 storage-unavailable，catalog failure 可安全重試', async () => {
+  const base = {
+    resolveSession: async () => ({ status: 'anonymous', session: null }),
+    resolveDeviceId: () => 'device-1',
+  };
+  const catalogFailure = await runWorkspaceBoot({
+    ...base,
+    loadCatalog: async () => { throw new Error('offline'); },
+    openStorage: () => { throw new Error('must not run'); },
+  });
+  assert.equal(catalogFailure.status, 'recoverable-failure');
+  assert.equal(catalogFailure.workspaceId, 'anon:device-1');
+
+  const storageFailure = await runWorkspaceBoot({
+    ...base,
+    loadCatalog: async () => ({ revision: 'catalog-1' }),
+    openStorage: () => { throw new Error('blocked'); },
+  });
+  assert.equal(storageFailure.status, 'storage-unavailable');
+  assert.equal(storageFailure.workspaceId, 'anon:device-1');
+
+  const unscopedStorage = await runWorkspaceBoot({
+    ...base,
+    loadCatalog: async () => ({ revision: 'catalog-1' }),
+    openStorage: () => memoryStorage(),
+  });
+  assert.equal(unscopedStorage.status, 'storage-unavailable');
+  assert.equal(unscopedStorage.error.code, 'STORAGE_UNAVAILABLE');
+});
+
+test('foreign ready boot 的同 workspace storage 不能繞過本次 boot gate', async () => {
+  const backing = memoryStorage();
+  const foreign = createWorkspaceStorage(backing, {
+    workspaceId: 'user:A',
+    boot: readyBoot('user:A'),
+  });
+  const result = await runWorkspaceBoot({
+    resolveSession: async () => ({
+      status: 'authenticated',
+      session: { user: { id: 'A' } },
+    }),
+    resolveDeviceId: () => 'device-1',
+    loadCatalog: async () => ({ revision: 'catalog-1' }),
+    openStorage: () => foreign,
+  });
+
+  assert.equal(result.status, 'storage-unavailable');
+  assert.equal(result.error.code, 'STORAGE_UNAVAILABLE');
+  assert.equal(backing.values.size, 0);
+});
+
+test('ready 畫面 callback 失敗時保留原錯誤並使 storage handle 失效', async () => {
+  const backing = memoryStorage();
+  const renderError = new Error('ready render failed');
+  const result = await runWorkspaceBoot({
+    resolveSession: async () => ({ status: 'anonymous', session: null }),
+    resolveDeviceId: () => 'device-1',
+    loadCatalog: async () => ({ revision: 'catalog-1' }),
+    openStorage: ({ workspaceId, boot }) => createWorkspaceStorage(backing, {
+      workspaceId,
+      boot,
+    }),
+    onState: snapshot => {
+      if (snapshot.state === 'ready') throw renderError;
+    },
+  });
+
+  assert.equal(result.status, 'recoverable-failure');
+  assert.equal(result.error, renderError);
+  assert.equal(result.boot.snapshot().state, 'recoverable-failure');
+  assert.throws(() => result.boot.assertReady('anon:device-1', 1), {
+    code: 'WORKSPACE_NOT_READY',
+  });
 });
 
 test('corrupt legacy learning outcome renders recoverable actions and skips ready side effects', async () => {

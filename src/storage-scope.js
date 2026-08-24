@@ -60,7 +60,7 @@ const BOOT_TRANSITIONS = Object.freeze({
   'loading-catalog': new Set(['opening-storage', 'recoverable-failure', 'storage-unavailable']),
   'opening-storage': new Set(['migrating', 'ready', 'recoverable-failure', 'storage-unavailable']),
   migrating: new Set(['ready', 'recoverable-failure', 'storage-unavailable']),
-  ready: new Set(['checking-session']),
+  ready: new Set(['checking-session', 'recoverable-failure']),
   'recoverable-failure': new Set(['checking-session']),
   'storage-unavailable': new Set(['checking-session']),
 });
@@ -78,6 +78,8 @@ export const LEARNING_STORE_KEYS = Object.freeze({
   resweep: 'thai-review-resweep-v1',
   installation: 'thai-review-installation-v1',
 });
+
+const workspaceStorageBindings = new WeakMap();
 
 function codedError(code, message) {
   const error = new Error(message);
@@ -172,6 +174,119 @@ export function createWorkspaceBoot() {
   };
 }
 
+function validateSessionResolution(result) {
+  if (result?.status === 'authenticated' && result?.session?.user?.id) return result;
+  if (result?.status === 'anonymous' && result?.session == null) return result;
+  if (result?.status === 'unavailable') {
+    throw codedError('SESSION_UNAVAILABLE', 'session could not be resolved safely');
+  }
+  throw codedError('SESSION_RESULT_INVALID', 'session resolver returned an invalid result');
+}
+
+function bootFailureState(error, phase) {
+  return error?.code === 'STORAGE_UNAVAILABLE' || phase === 'opening-storage'
+    ? 'storage-unavailable'
+    : 'recoverable-failure';
+}
+
+/* Pure boot coordinator. Adapters own auth, catalog, storage, migration, and DOM.
+   Learning state is intentionally absent from this function: callers may only
+   read or write it after the returned storage handle has reached ready. */
+export async function runWorkspaceBoot({
+  boot = createWorkspaceBoot(),
+  resolveSession,
+  resolveDeviceId,
+  loadCatalog,
+  openStorage,
+  inspectDurability = async () => null,
+  migrate = null,
+  onState = () => {},
+} = {}) {
+  if (typeof resolveSession !== 'function'
+      || typeof resolveDeviceId !== 'function'
+      || typeof loadCatalog !== 'function'
+      || typeof openStorage !== 'function'
+      || typeof inspectDurability !== 'function'
+      || typeof onState !== 'function'
+      || (migrate !== null && typeof migrate !== 'function')) {
+    throw codedError('WORKSPACE_BOOT_ADAPTER_INCOMPLETE', 'workspace boot adapters are incomplete');
+  }
+
+  let phase = 'checking-session';
+  let workspaceId = null;
+  const emit = () => onState(boot.snapshot());
+
+  try {
+    emit();
+    const sessionResult = validateSessionResolution(await resolveSession());
+    const deviceId = sessionResult.status === 'anonymous'
+      ? requiredIdentity(await resolveDeviceId())
+      : null;
+    workspaceId = resolveWorkspaceId({ session: sessionResult.session, deviceId });
+
+    phase = 'loading-catalog';
+    boot.moveTo(phase, { workspaceId });
+    emit();
+    const catalog = await loadCatalog({ workspaceId, session: sessionResult.session });
+    if (!catalog) throw codedError('CATALOG_UNAVAILABLE', 'catalog loader returned no catalog');
+
+    phase = 'opening-storage';
+    boot.moveTo(phase);
+    emit();
+    const storage = await openStorage({ workspaceId, boot });
+    const binding = storage && workspaceStorageBindings.get(storage);
+    if (!binding
+        || binding.boot !== boot
+        || binding.workspaceId !== workspaceId
+        || binding.epoch !== boot.snapshot().epoch) {
+      throw codedError('STORAGE_UNAVAILABLE', 'workspace storage was not opened safely');
+    }
+    const durability = await inspectDurability({ workspaceId, storage });
+
+    let migration = null;
+    if (migrate) {
+      phase = 'migrating';
+      boot.moveTo(phase);
+      emit();
+      migration = await migrate({
+        workspaceId,
+        session: sessionResult.session,
+        catalog,
+        storage,
+      });
+    }
+
+    phase = 'ready';
+    boot.moveTo(phase, migration ? { migration } : null);
+    emit();
+    return {
+      status: 'ready',
+      workspaceId,
+      session: sessionResult.session,
+      catalog,
+      storage,
+      durability,
+      migration,
+      boot,
+    };
+  } catch (error) {
+    const state = bootFailureState(error, phase);
+    if (boot.snapshot().state !== state) {
+      boot.moveTo(state, {
+        phase,
+        code: error?.code || 'WORKSPACE_BOOT_FAILED',
+      });
+    }
+    try { emit(); } catch { /* failure rendering must not replace the boot error */ }
+    return {
+      status: state,
+      workspaceId,
+      error,
+      boot,
+    };
+  }
+}
+
 function requiredIdentity(value) {
   const identity = typeof value === 'string' ? value.trim() : '';
   if (!identity || /[\u0000-\u001f\u007f]/.test(identity)) {
@@ -237,7 +352,7 @@ export function createWorkspaceStorage(storage, { workspaceId, boot } = {}) {
     return keys;
   };
 
-  return {
+  const workspaceStorage = {
     workspaceId: workspace,
     get length() { ready(); return ownKeys().length; },
     key(index) {
@@ -253,6 +368,12 @@ export function createWorkspaceStorage(storage, { workspaceId, boot } = {}) {
       for (const key of ownKeys()) storage.removeItem(key);
     },
   };
+  workspaceStorageBindings.set(workspaceStorage, {
+    boot,
+    workspaceId: workspace,
+    epoch: bootBinding?.epoch,
+  });
+  return workspaceStorage;
 }
 
 export async function inspectStorageDurability(storageManager) {
