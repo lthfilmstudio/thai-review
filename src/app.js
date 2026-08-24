@@ -2,17 +2,15 @@
 
 import {
   state, loadStateResult, saveState, localDateKey,
-  DEMO_LESSONS, DEFAULT_SHEET_URL,
+  DEFAULT_SHEET_URL,
   filteredCards, setGrade, shuffleCurrentLesson, isSrsActive, cardKey,
-  saveLessonsCache, loadLessonsCache, clearLessonsCache,
-  loadManifest, saveManifest, loadLessonCards, saveLessonCards,
+  saveLessonsCache, loadLessonsCache,
   setLastSync, getLastSync, formatLastSync,
   findCardByKey, saveCardEdit, clearCardEdit,
   allCardsWithLessonId, setDailyQueue, removeFromDailyQueue,
 } from './state.js';
 import {
-  loadLessons, loadTabsOnly, fetchLessonCards, loadBundledData,
-  fetchDialogues,
+  loadLessons, loadBundledData, loadPublishedCatalog,
 } from './data.js';
 import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds, settleStreakOnOpen, showToast, buildDailyQueue, loadDailyLog, setLogChangeHook } from './today.js';
 import { advanceResweepCursor } from './resweep.js';
@@ -31,196 +29,94 @@ import {
   openSearch, closeSearch, renderSearchResults,
 } from './ui.js';
 
-async function fetchFromNetwork(url, { force = false } = {}) {
-  try {
-    const lessons = await loadLessons(url, { force });
-    if (lessons && lessons.length) return lessons;
-    // 空回應時：force 路徑視為失敗讓上層 catch；非 force 才靜默
-    if (force) throw new Error('回應為空');
-  } catch (e) {
-    console.warn('資料載入失敗：', e.message);
-    if (force) throw e;
-    if (state.settings.sheetInput) alert('資料載入失敗：' + e.message);
-  }
-  return null;
-}
-
-/* 舊版 eager cache（給單一 CSV / 多 CSV 模式用，沒 tab 概念無法 lazy）。 */
-async function loadLessonsCacheFirstEager(onFreshData, { force = false } = {}) {
-  const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
-  const cached = force ? null : loadLessonsCache(url);
-
-  const revalidate = (async () => {
-    const fresh = await fetchFromNetwork(url, { force });
-    if (fresh) {
-      saveLessonsCache(url, fresh);
-      onFreshData?.(fresh);
-    }
-    return fresh;
-  })();
-
-  if (cached) return cached.lessons;
-  const fresh = await revalidate;
-  return fresh || DEMO_LESSONS;
-}
-
-/* ===== Lazy 載入（publish-to-web 模式） =====
-   先抓 manifest（tab 列表），每堂卡片按需抓並各自 cache。 */
-
-function buildLessonsFromManifest(manifest) {
-  state.baseUrl = manifest.baseUrl;
-  return manifest.tabs.map(t => {
-    const cards = loadLessonCards(t.gid) || [];
-    return {
-      id: 'gid-' + t.gid,
-      gid: t.gid,
-      title: t.name || t.title || ('gid-' + t.gid),  // parsePubTabs 回傳 name
-      cards,
-      _loaded: cards.length > 0,
-    };
-  });
-}
-
-async function loadManifestDialogues(manifest, { force = false } = {}) {
-  try {
-    if (!manifest.dialogueTab) throw new Error('找不到生活對話分頁');
-    const dialogues = await fetchDialogues(manifest.baseUrl, manifest.dialogueTab, { force });
-    if (!dialogues.length) throw new Error('生活對話沒有完整情境');
-    const changed = JSON.stringify(dialogues) !== JSON.stringify(state.dialogues);
-    state.dialogues = dialogues;
-    return changed;
-  } catch (e) {
-    console.warn('生活對話載入失敗：', e.message);
-    if (force) {
-      e.dialogueSyncFailed = true;
-      throw e;
-    }
-    return null;
+function assertCompleteCatalog() {
+  if (!state.lessons.length || state.lessons.some(lesson => !lesson._loaded)) {
+    throw new Error('課程資料尚未完整載入，已保留上一版資料');
   }
 }
 
-async function loadLessonsLazy(url, onFreshManifest, { force = false, onFreshDialogues } = {}) {
-  let manifest = force ? null : loadManifest(url);
-
-  if (!manifest) {
-    const m = await loadTabsOnly(url, { force });
-    if (!m) throw new Error('no-manifest');
-    manifest = { url, ts: Date.now(), ...m };
-    await loadManifestDialogues(manifest, { force });
-    saveManifest(url, m);
-  } else {
-    if (manifest.dialogueTab) await loadManifestDialogues(manifest);
-    // 背景 revalidate manifest（只抓小小的 pubhtml，便宜）
-    (async () => {
-      try {
-        const fresh = await loadTabsOnly(url);
-        if (!fresh) return;
-        const changed = JSON.stringify(fresh.tabs) !== JSON.stringify(manifest.tabs);
-        const dialogueTabChanged = JSON.stringify(fresh.dialogueTab) !== JSON.stringify(manifest.dialogueTab);
-        const dialoguesChanged = await loadManifestDialogues(fresh);
-        if (changed || (dialogueTabChanged && dialoguesChanged !== null)) {
-          saveManifest(url, fresh);
-        }
-        if (changed) onFreshManifest?.(fresh);
-        else if (dialoguesChanged) onFreshDialogues?.();
-      } catch {}
-    })();
-  }
-
-  return buildLessonsFromManifest(manifest);
+async function ensureLessonLoaded() {
+  assertCompleteCatalog();
 }
 
-function onFreshManifest(fresh) {
-  state.baseUrl = fresh.baseUrl;
-  const newLessons = buildLessonsFromManifest(fresh);
-  const sameStructure = newLessons.length === state.lessons.length
-    && newLessons.every((l, i) => l.id === state.lessons[i]?.id);
-  state.lessons = newLessons;
+/* 所有跨課程操作都先確認 catalog 已完整採用，絕不在半套資料上運作。 */
+export async function ensureAllLoaded() {
+  assertCompleteCatalog();
+}
+
+function replaceRuntimeCatalog(catalog) {
+  const lessons = catalog.lessons.map(lesson => ({ ...lesson, _loaded: true }));
+  const sameStructure = lessons.length === state.lessons.length
+    && lessons.every((lesson, index) => lesson.id === state.lessons[index]?.id);
+  state.lessons = lessons;
+  state.dialogues = catalog.dialogues || [];
+  state.baseUrl = catalog.baseUrl || '';
   if (!sameStructure) {
-    state.currentLessonId = newLessons[0]?.id || null;
+    state.currentLessonId = lessons[0]?.id || null;
     state.cardIndex = 0;
     state.flipped = false;
   }
   rerender();
 }
 
-/* 確保單堂課的 cards 已載入；未載入就抓並 cache。 */
-async function ensureLessonLoaded(lessonId, { silentUI = false, force = false } = {}) {
-  // 全部混合、收藏、搜尋都需要所有課都載入過才有完整結果
-  if (lessonId === '__ALL__' || lessonId === '__FAV__' || lessonId === '__SEARCH__') {
-    return ensureAllLoaded({ force });
-  }
-  const lesson = state.lessons.find(l => l.id === lessonId);
-  if (!lesson || (!force && lesson._loaded) || !lesson.gid || !state.baseUrl) return;
-
-  if (!silentUI) showLoading(`載入「${lesson.title}」…`);
-  try {
-    lesson.cards = await fetchLessonCards(state.baseUrl, lesson.gid, {
-      force,
-      id: lesson.id,
-      title: lesson.title,
-    });
-    lesson._loaded = true;
-    saveLessonCards(lesson.gid, lesson.cards);
-  } catch (e) {
-    console.warn('lesson load failed:', lesson.title, e.message);
-    alert('載入失敗：' + e.message);
-  }
-}
-
-/* 全部混合：把還沒抓過的課程全部補抓（並行）。
-   export 給 home.js 開連擊複習局前用（跨課程選卡需要所有課都載入過；bundled JSON
-   模式下每堂課早就 _loaded=true，這裡多半是即時 resolve，只有 lazy 模式才真的抓）。 */
-export async function ensureAllLoaded({ force = false } = {}) {
-  const todo = state.lessons.filter(l => (force || !l._loaded) && l.gid && state.baseUrl);
-  if (!todo.length) return;
-  showLoading(`正在補抓 ${todo.length} 堂未載入的課程…`);
-  await Promise.allSettled(todo.map(async l => {
-    try {
-      l.cards = await fetchLessonCards(state.baseUrl, l.gid, {
-        force,
-        id: l.id,
-        title: l.title,
-      });
-      l._loaded = true;
-      saveLessonCards(l.gid, l.cards);
-    } catch (e) {
-      console.warn('lesson load failed:', l.title, e.message);
-    }
-  }));
-}
-
 /* 主進入點：
    1. 預設 Sheet + 非 force → 直接讀同源 ./data.json（GitHub Action 預生成，< 50ms）
    2. 預設 Sheet + force（重新同步）→ 走 live publish-to-web（保留現有行為）
    3. 自訂 sheet URL → 永遠走 live（不影響使用者貼自己的 Sheet） */
-async function loadLessonsSmart(onFresh, { force = false } = {}) {
+async function loadLessonsSmart({ force = false } = {}) {
   const customInput = (state.settings.sheetInput || '').trim();
   const url = customInput || DEFAULT_SHEET_URL;
+  const cached = force ? null : loadLessonsCache(url);
+  const adopt = ({ lessons, dialogues = [], baseUrl = '' }) => {
+    state.dialogues = dialogues;
+    state.baseUrl = baseUrl;
+    return lessons.map(lesson => ({ ...lesson, _loaded: true }));
+  };
 
   // 預設 Sheet + 非 force → 試 bundled JSON
   if (!customInput && !force) {
     try {
       const { lessons, dialogues } = await loadBundledData();
-      state.dialogues = dialogues;
-      // 同 lazy 模式格式：補上 _loaded=true（cards 已內含）+ baseUrl 用來提供「重新同步」走 live
-      state.baseUrl = DEFAULT_SHEET_URL.replace(/\/pub(html)?$/, '');
-      return lessons.map((l) => ({ ...l, _loaded: true }));
+      return adopt({
+        lessons,
+        dialogues,
+        baseUrl: DEFAULT_SHEET_URL.replace(/\/pub(html)?$/, ''),
+      });
     } catch (e) {
       console.warn('bundled JSON 讀取失敗，退回 live fetch：', e.message);
     }
   }
 
   const isPublishedSheet = /\/d\/e\//.test(url) && !/output=csv/i.test(url);
-  if (!isPublishedSheet) state.dialogues = [];
+  const fetchCompleteCatalog = async () => {
+    if (isPublishedSheet) {
+      return loadPublishedCatalog(url, {
+        force,
+        requireDialogues: force || !customInput,
+      });
+    }
+    const lessons = await loadLessons(url, { force });
+    if (!lessons?.length) throw new Error('回應為空');
+    return { lessons, dialogues: [], baseUrl: '' };
+  };
 
-  try {
-    return await loadLessonsLazy(url, onFresh, { force, onFreshDialogues: rerender });
-  } catch (e) {
-    if (force && e.dialogueSyncFailed) throw e;
-    if (e.message !== 'no-manifest') console.warn('lazy failed:', e.message);
-    return await loadLessonsCacheFirstEager(onFresh, { force });
+  // 新版完整 cache 可先開畫面，但背景刷新仍必須把整份 manifest、所有課程與對話
+  // 都驗證完，才一起替換 runtime/cache；任何一處失敗都維持舊狀態。
+  if (cached) {
+    void fetchCompleteCatalog().then(catalog => {
+      const currentUrl = (state.settings.sheetInput || '').trim() || DEFAULT_SHEET_URL;
+      if (currentUrl !== url) return;
+      const ready = catalog.lessons.map(lesson => ({ ...lesson, _loaded: true }));
+      saveLessonsCache(url, ready, catalog);
+      replaceRuntimeCatalog({ ...catalog, lessons: ready });
+    }).catch(e => console.warn('背景 catalog 刷新失敗，沿用已驗證快取：', e.message));
+    return adopt(cached);
   }
+
+  const catalog = await fetchCompleteCatalog();
+  const ready = adopt(catalog);
+  saveLessonsCache(url, ready, catalog);
+  return ready;
 }
 
 function rerender() {
@@ -258,7 +154,7 @@ async function selectLesson(id) {
   saveState();
   closeDrawer();
   rerender();
-  // 抓不到已載入的 cards 就即時載入（lazy 模式）
+  // 跨課程操作前再次確認沒有半套 catalog。
   await ensureLessonLoaded(id);
   rerender();
 }
@@ -567,19 +463,6 @@ function clearDeepLinkParam() {
   history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : '') + location.hash);
 }
 
-function onFreshLessons(fresh) {
-  // 舊版 eager cache revalidation callback
-  const sameStructure = fresh.length === state.lessons.length
-    && fresh.every((l, i) => l.id === state.lessons[i]?.id);
-  state.lessons = fresh;
-  if (!sameStructure) {
-    state.currentLessonId = fresh[0]?.id || null;
-    state.cardIndex = 0;
-    state.flipped = false;
-  }
-  rerender();
-}
-
 async function init() {
   const learningReady = runLegacyLearningBootGate({
     loadStateResult,
@@ -597,11 +480,10 @@ async function init() {
   }
 
   const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
-  const hasManifest = !!loadManifest(url);
   const hasEager = !!loadLessonsCache(url);
-  if (!hasManifest && !hasEager) showLoading('正在從 Google Sheets 抓課程列表…');
+  if (!hasEager) showLoading('正在從 Google Sheets 抓課程列表…');
 
-  state.lessons = await loadLessonsSmart(onFreshManifest);
+  state.lessons = await loadLessonsSmart();
 
   const deepLink = parseDeepLinkParam();
   const today = localDateKey();
@@ -748,11 +630,9 @@ async function init() {
       try {
         showLoading('正在從 Google Sheets 抓課程列表…');
         // 先 fetch，成功才動 cache（避免抓壞時兩邊都沒了）
-        const fresh = await loadLessonsSmart(onFreshManifest, { force: true });
+        const fresh = await loadLessonsSmart({ force: true });
         if (!fresh || !fresh.length) throw new Error('沒抓到課程');
-        // URL 變了，舊 lesson cards 已不對應新 Sheet → 清掉
-        clearLessonsCache();
-        // saveManifest 已在 loadLessonsSmart 內部覆蓋，重新賦值 lessons
+        // 完整 catalog 驗證成功後，loadLessonsSmart 才會更新新版 cache。
         state.lessons = fresh;
         state.currentLessonId = state.lessons[0]?.id || null;
         state.cardIndex = 0;
@@ -877,14 +757,8 @@ async function init() {
 
     try {
       showLoading('重新抓課程列表…');
-      const fresh = await loadLessonsSmart(onFreshManifest, { force: true });
+      const fresh = await loadLessonsSmart({ force: true });
       if (!fresh || !fresh.length) throw new Error('沒抓到課程');
-
-      // 走到這裡代表新 manifest 已經 fetch + saveManifest 完成
-      // 現在才清掉舊的 lesson cards（其他 27 堂未來切過去會自動抓網路）
-      Object.keys(localStorage).forEach(k => {
-        if (k.startsWith('thai-review-lesson-')) localStorage.removeItem(k);
-      });
 
       state.lessons = fresh;
       if (!state.lessons.find(l => l.id === state.currentLessonId) &&

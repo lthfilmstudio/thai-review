@@ -5,9 +5,10 @@ import { nextReview, countDue, getDueCards, normalizeGrade } from './srs.js';
 
 export const STORAGE_KEY = 'thai-review-v1';
 export const DEVICE_STATE_KEY = 'thai-review-device-state-v1';
-export const LESSONS_CACHE_KEY = 'thai-review-lessons-v1';      // 舊版（full cache）
-export const MANIFEST_CACHE_KEY = 'thai-review-manifest-v1';    // 新版（只 tab 列表）
-export const LESSON_CACHE_PREFIX = 'thai-review-lesson-';       // 新版（單堂 cards）
+export const CATALOG_CACHE_SCHEMA = 2;                           // Gate B card_id 完整 catalog
+export const LESSONS_CACHE_KEY = 'thai-review-lessons-v2';      // 整份 lessons cache
+export const MANIFEST_CACHE_KEY = 'thai-review-manifest-v2';    // tab 列表 cache
+export const LESSON_CACHE_PREFIX = 'thai-review-lesson-v2-';    // 單堂 cards cache
 export const SYNC_TIME_KEY = 'thai-review-last-sync-v1';        // 上次手動同步成功時間
 const SETTINGS_VERSION = 2;
 
@@ -25,9 +26,11 @@ export function localDateKey(ts = Date.now()) {
 }
 
 /* ===== 舊版：整份 lessons cache（保留相容，其他非 publish-to-web 模式還在用） ===== */
-export function saveLessonsCache(url, lessons) {
+export function saveLessonsCache(url, lessons, { dialogues = [], baseUrl = '' } = {}) {
   try {
-    localStorage.setItem(LESSONS_CACHE_KEY, JSON.stringify({ url, ts: Date.now(), lessons }));
+    localStorage.setItem(LESSONS_CACHE_KEY, JSON.stringify({
+      schema: CATALOG_CACHE_SCHEMA, url, ts: Date.now(), lessons, dialogues, baseUrl,
+    }));
   } catch (e) {
     console.warn('lessons cache save failed:', e.message);
   }
@@ -38,8 +41,13 @@ export function loadLessonsCache(url) {
     const raw = localStorage.getItem(LESSONS_CACHE_KEY);
     if (!raw) return null;
     const c = JSON.parse(raw);
-    if (c.url !== url) return null;
-    return { lessons: c.lessons, ts: c.ts };
+    if (c.schema !== CATALOG_CACHE_SCHEMA || c.url !== url || !Array.isArray(c.lessons)) return null;
+    return {
+      lessons: c.lessons,
+      dialogues: Array.isArray(c.dialogues) ? c.dialogues : [],
+      baseUrl: typeof c.baseUrl === 'string' ? c.baseUrl : '',
+      ts: c.ts,
+    };
   } catch {
     return null;
   }
@@ -58,7 +66,9 @@ export function clearLessonsCache() {
 /* ===== 新版 lazy：manifest（tab 列表） + 單堂 cards ===== */
 export function saveManifest(url, manifest) {
   try {
-    localStorage.setItem(MANIFEST_CACHE_KEY, JSON.stringify({ url, ts: Date.now(), ...manifest }));
+    localStorage.setItem(MANIFEST_CACHE_KEY, JSON.stringify({
+      schema: CATALOG_CACHE_SCHEMA, url, ts: Date.now(), ...manifest,
+    }));
   } catch (e) {
     console.warn('manifest save failed:', e.message);
   }
@@ -69,7 +79,7 @@ export function loadManifest(url) {
     const raw = localStorage.getItem(MANIFEST_CACHE_KEY);
     if (!raw) return null;
     const m = JSON.parse(raw);
-    if (m.url !== url) return null;
+    if (m.schema !== CATALOG_CACHE_SCHEMA || m.url !== url) return null;
     return m;
   } catch {
     return null;
@@ -78,7 +88,9 @@ export function loadManifest(url) {
 
 export function saveLessonCards(gid, cards) {
   try {
-    localStorage.setItem(LESSON_CACHE_PREFIX + gid, JSON.stringify({ ts: Date.now(), cards }));
+    localStorage.setItem(LESSON_CACHE_PREFIX + gid, JSON.stringify({
+      schema: CATALOG_CACHE_SCHEMA, ts: Date.now(), cards,
+    }));
   } catch (e) {
     console.warn('lesson cards save failed:', gid, e.message);
   }
@@ -88,7 +100,9 @@ export function loadLessonCards(gid) {
   try {
     const raw = localStorage.getItem(LESSON_CACHE_PREFIX + gid);
     if (!raw) return null;
-    return JSON.parse(raw).cards;
+    const value = JSON.parse(raw);
+    if (value.schema !== CATALOG_CACHE_SCHEMA || !Array.isArray(value.cards)) return null;
+    return value.cards;
   } catch {
     return null;
   }
