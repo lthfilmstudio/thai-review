@@ -32,6 +32,9 @@ DEFAULT_PUB_URL = (
 )
 DIALOGUE_SHEET_TITLE = "生活對話"
 EXPECTED_DIALOGUE_IDS = {f"D{index:02d}" for index in range(1, 11)}
+CANONICAL_CARD_ID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
 
 # ── 欄位別名（跟 src/data.js COL_ALIASES 對齊） ────────────────────
 COL_ALIASES = {
@@ -117,7 +120,7 @@ def to_ms(value: str | None) -> int | None:
     return None
 
 
-def rows_to_cards(rows: list[list[str]]) -> list[dict]:
+def rows_to_cards(rows: list[list[str]], *, require_card_id: bool = False) -> list[dict]:
     if not rows:
         return []
     header = rows[0]
@@ -134,9 +137,12 @@ def rows_to_cards(rows: list[list[str]]) -> list[dict]:
 
     if iT < 0 or iK < 0 or iZ < 0:
         raise ValueError(f"CSV 缺少必要欄位（泰文/拼音/中文）：{' | '.join(header)}")
+    if require_card_id and iCardId < 0:
+        raise ValueError("CSV 缺少必要欄位 card_id")
 
     cards: list[dict] = []
-    for row in rows[1:]:
+    seen_card_ids: set[str] = set()
+    for row_number, row in enumerate(rows[1:], start=2):
         if not row or len(row) <= iT or not row[iT].strip():
             continue
         card = {
@@ -154,10 +160,32 @@ def rows_to_cards(rows: list[list[str]]) -> list[dict]:
             card["start_ms"] = s
         if e is not None:
             card["end_ms"] = e
-        if iCardId >= 0 and len(row) > iCardId and row[iCardId].strip():
-            card["card_id"] = row[iCardId].strip()
+        card_id = row[iCardId].strip() if iCardId >= 0 and len(row) > iCardId else ""
+        if require_card_id:
+            if not card_id:
+                raise ValueError(f"第 {row_number} 列缺少 card_id")
+            if not CANONICAL_CARD_ID_RE.fullmatch(card_id):
+                raise ValueError(f"第 {row_number} 列 card_id 不是 canonical lowercase UUID")
+            if card_id in seen_card_ids:
+                raise ValueError(f"第 {row_number} 列 card_id 重複：{card_id}")
+            seen_card_ids.add(card_id)
+        if card_id:
+            card["card_id"] = card_id
         cards.append(card)
     return cards
+
+
+def validate_global_card_ids(lessons: list[dict]) -> None:
+    seen: dict[str, str] = {}
+    for lesson in lessons:
+        title = str(lesson.get("title") or lesson.get("gid") or "unknown")
+        for index, card in enumerate(lesson.get("cards") or [], start=1):
+            card_id = card.get("card_id")
+            if not isinstance(card_id, str) or not CANONICAL_CARD_ID_RE.fullmatch(card_id):
+                raise ValueError(f"{title} 第 {index} 張缺少有效 canonical card_id")
+            if card_id in seen:
+                raise ValueError(f"跨分頁 card_id 重複：{card_id}（{seen[card_id]} / {title}）")
+            seen[card_id] = title
 
 
 def rows_to_dialogues(rows: list[list[str]]) -> list[dict]:
@@ -217,7 +245,7 @@ def fetch_lesson(base: str, tab: dict) -> dict:
     csv_url = f"{base}/pub?gid={tab['gid']}&single=true&output=csv"
     text = http_get(csv_url)
     rows = list(csv.reader(io.StringIO(text)))
-    cards = rows_to_cards(rows)
+    cards = rows_to_cards(rows, require_card_id=True)
     if not cards:
         raise ValueError("沒有可用字卡")
     return {
@@ -288,6 +316,16 @@ def main() -> int:
     if not lessons:
         print("[sync-sheet] ERROR: no lessons captured; aborting.", flush=True)
         return 2
+
+    try:
+        validate_global_card_ids(lessons)
+    except ValueError as exc:
+        print(
+            f"[sync-sheet] ERROR: card_id contract failed: {exc}; "
+            "keep the previous complete data.json",
+            flush=True,
+        )
+        return 5
 
     try:
         dialogues = fetch_dialogues(base, dialogue_tabs[0])

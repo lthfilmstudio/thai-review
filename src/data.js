@@ -6,8 +6,16 @@
 */
 
 import { applyTtsPromptsToLesson, applyTtsPromptsToLessons } from './tts-prompts.js';
+import { isStableCardId } from './card-identity.js';
 
 export const DIALOGUE_SHEET_TITLE = '生活對話';
+
+function isCanonicalCardId(value) {
+  return typeof value === 'string'
+    && value === value.trim()
+    && value === value.toLowerCase()
+    && isStableCardId(value);
+}
 
 export function parseCsv(text) {
   const rows = [];
@@ -60,7 +68,7 @@ function findCol(header, key) {
   return -1;
 }
 
-export function rowsToCards(rows) {
+export function rowsToCards(rows, { requireCardId = false } = {}) {
   if (!rows.length) return [];
   const header = rows[0].map(h => h.trim().toLowerCase());
   const iT = findCol(header, 'thai');
@@ -76,11 +84,13 @@ export function rowsToCards(rows) {
   if (iT < 0 || iK < 0 || iZ < 0) {
     throw new Error(`CSV 缺少必要欄位（泰文/拼音/中文）。目前 header：${rows[0].join(' | ')}`);
   }
+  if (requireCardId && iCardId < 0) throw new Error('CSV 缺少必要欄位 card_id');
   const toMs = v => {
     const n = Number((v || '').toString().trim());
     return Number.isFinite(n) && n >= 0 ? n : null;
   };
   const cards = [];
+  const seenCardIds = new Set();
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     if (!row || !row[iT]) continue;
@@ -95,12 +105,38 @@ export function rowsToCards(rows) {
       start_ms: iStart >= 0 ? toMs(row[iStart]) : null,
       end_ms: iEnd >= 0 ? toMs(row[iEnd]) : null,
     };
-    if (iCardId >= 0 && String(row[iCardId] || '').trim()) {
-      card.card_id = String(row[iCardId]).trim();
+    const cardId = iCardId >= 0 ? String(row[iCardId] || '').trim() : '';
+    if (requireCardId) {
+      if (!cardId) throw new Error(`第 ${r + 1} 列缺少 card_id`);
+      if (!isCanonicalCardId(cardId)) {
+        throw new Error(`第 ${r + 1} 列 card_id 不是 canonical lowercase UUID`);
+      }
+      if (seenCardIds.has(cardId)) throw new Error(`第 ${r + 1} 列 card_id 重複：${cardId}`);
+      seenCardIds.add(cardId);
+    }
+    if (cardId) {
+      card.card_id = cardId;
     }
     cards.push(card);
   }
   return cards;
+}
+
+function validateLessonCardIds(lessons) {
+  const seen = new Map();
+  for (const lesson of lessons || []) {
+    const title = String(lesson?.title || lesson?.gid || 'unknown');
+    for (let index = 0; index < (lesson?.cards || []).length; index++) {
+      const cardId = lesson.cards[index]?.card_id;
+      if (!isCanonicalCardId(cardId)) {
+        throw new Error(`${title} 第 ${index + 1} 張缺少有效 canonical card_id`);
+      }
+      if (seen.has(cardId)) {
+        throw new Error(`跨分頁 card_id 重複：${cardId}（${seen.get(cardId)} / ${title}）`);
+      }
+      seen.set(cardId, title);
+    }
+  }
 }
 
 export function parseDialogueRows(rows) {
@@ -163,7 +199,7 @@ async function fetchCsvRows(url, { force = false } = {}) {
 }
 
 async function fetchCsvCards(url, { force = false } = {}) {
-  return rowsToCards(await fetchCsvRows(url, { force }));
+  return rowsToCards(await fetchCsvRows(url, { force }), { requireCardId: true });
 }
 
 function extractSheetId(url) {
@@ -179,6 +215,7 @@ function extractGid(url) {
 /* 方案 1：多行 CSV URL，每行一堂課 */
 async function loadMultipleCsvs(urls, { force = false } = {}) {
   const lessons = [];
+  const failures = [];
   for (let i = 0; i < urls.length; i++) {
     try {
       const cards = await fetchCsvCards(urls[i], { force });
@@ -187,9 +224,12 @@ async function loadMultipleCsvs(urls, { force = false } = {}) {
       lessons.push({ id: 'csv-' + gid, gid, title: lessonName, cards });
     } catch (e) {
       console.warn('CSV load failed:', urls[i], e);
+      failures.push(`${urls[i]}：${e.message}`);
     }
   }
-  if (!lessons.length) throw new Error('所有 CSV 都讀取失敗');
+  if (failures.length) throw new Error(`CSV 批次載入失敗：${failures.join('；')}`);
+  if (!lessons.length) throw new Error('CSV 批次沒有可用課程');
+  validateLessonCardIds(lessons);
   return applyTtsPromptsToLessons(lessons);
 }
 
@@ -227,30 +267,53 @@ export async function fetchLessonCards(baseUrl, gid, { force = false, id = '', t
   return applyTtsPromptsToLesson({ id: id || ('gid-' + gid), gid, title, cards }).cards;
 }
 
-/* 方案 2：publish-to-web 整份 Sheet。抓 pubhtml 解析 tab 列表，
-   每個 tab 再抓成 CSV。需使用者在 Google Sheets 選「發佈整個文件」。 */
-async function loadFromPublishedSheet(pubUrl, { force = false } = {}) {
-  // 正規化：去掉 query / fragment / 結尾 /pub 或 /pubhtml
-  const base = pubUrl.replace(/[?#].*$/, '').replace(/\/pub(html)?$/, '');
-  const htmlUrl = base + '/pubhtml' + (force ? '?_=' + Date.now() : '');
-  const res = await fetch(htmlUrl, force ? { cache: 'no-store' } : {});
-  if (!res.ok) throw new Error('pubhtml HTTP ' + res.status);
-  const html = await res.text();
-  const tabs = parsePubTabs(html).filter(tab => tab.name !== DIALOGUE_SHEET_TITLE);
-  if (!tabs.length) throw new Error('找不到 tab，請確認 Sheet 已「發佈整個文件」');
-  // 並行抓所有 tab（28 個 × 300ms 依序 ≈ 10s，並行 <1s）
-  const results = await Promise.allSettled(tabs.map(async tab => {
-    const csvUrl = `${base}/pub?gid=${tab.gid}&single=true&output=csv`;
-    const cards = await fetchCsvCards(csvUrl, { force });
+/* 方案 2：publish-to-web 整份 Sheet。所有課程與生活對話先放在暫存結果，
+   全部通過後才交給 app 採用，避免半套 catalog 汙染 runtime 或 cache。 */
+export async function loadPublishedCatalog(pubUrl, {
+  force = false,
+  requireDialogues = false,
+} = {}) {
+  const manifest = await loadTabsOnly(pubUrl, { force });
+  if (!manifest) throw new Error('無法讀取整份已發佈 Sheet');
+
+  const results = await Promise.allSettled(manifest.tabs.map(async tab => {
+    const cards = await fetchLessonCards(manifest.baseUrl, tab.gid, {
+      force,
+      id: 'gid-' + tab.gid,
+      title: tab.name,
+    });
+    if (!cards.length) throw new Error('沒有可用字卡');
     return { id: 'gid-' + tab.gid, gid: tab.gid, title: tab.name, cards };
   }));
-  const lessons = [];
-  results.forEach((r, i) => {
-    if (r.status === 'fulfilled' && r.value.cards.length) lessons.push(r.value);
-    else if (r.status === 'rejected') console.warn('tab skipped:', tabs[i].name, r.reason);
-  });
-  if (!lessons.length) throw new Error('所有 tab 都讀取失敗');
-  return applyTtsPromptsToLessons(lessons);
+  const failures = results.flatMap((result, index) => result.status === 'rejected'
+    ? [{ tab: manifest.tabs[index].name, reason: result.reason }]
+    : []);
+  if (failures.length) {
+    const details = failures.map(({ tab, reason }) => `${tab}：${reason?.message || reason}`).join('；');
+    const identityFailure = failures.some(({ reason }) => /card_id|canonical/i.test(reason?.message || ''));
+    throw new Error(`${identityFailure ? '字卡識別驗證失敗' : '分頁抓取失敗'}：${details}`);
+  }
+
+  const lessons = results.map(result => result.value);
+  validateLessonCardIds(lessons);
+
+  let dialogues = [];
+  if (manifest.dialogueTab) {
+    try {
+      dialogues = await fetchDialogues(manifest.baseUrl, manifest.dialogueTab, { force });
+      if (!dialogues.length) throw new Error('沒有完整情境');
+    } catch (e) {
+      throw new Error(`生活對話載入失敗：${e.message}`);
+    }
+  } else if (requireDialogues) {
+    throw new Error('找不到生活對話分頁');
+  }
+
+  return {
+    ...manifest,
+    lessons: applyTtsPromptsToLessons(lessons),
+    dialogues,
+  };
 }
 
 function parsePubTabs(html) {
@@ -297,11 +360,13 @@ async function loadSingleCsv(url, { force = false } = {}) {
     if (!byLesson.has(name)) byLesson.set(name, []);
     byLesson.get(name).push(c);
   }
-  return applyTtsPromptsToLessons([...byLesson.entries()].map(([title, cards], idx) => ({
+  const lessons = [...byLesson.entries()].map(([title, cards], idx) => ({
     id: 'csv-' + idx + '-' + title.replace(/\s+/g, '_'),
     title,
     cards,
-  })));
+  }));
+  validateLessonCardIds(lessons);
+  return applyTtsPromptsToLessons(lessons);
 }
 
 /* 方案 0：bundled JSON（GitHub Action 預生成）。
@@ -316,6 +381,7 @@ export async function loadBundledData() {
   if (!data || !Array.isArray(data.lessons) || !data.lessons.length) {
     throw new Error('bundled JSON 格式異常');
   }
+  validateLessonCardIds(data.lessons);
   // 規範成跟 loadFromPublishedSheet 一樣的回傳格式：{ id, gid, title, cards }
   const lessons = applyTtsPromptsToLessons(data.lessons.map((l) => ({
     id: l.id || ('gid-' + (l.gid || '')),
@@ -340,8 +406,8 @@ export async function loadLessons(input, { force = false } = {}) {
 
   // publish-to-web 整份（含 /pub 或 /pubhtml 且不是 output=csv）
   if (/\/d\/e\//.test(one) && !/output=csv/i.test(one)) {
-    try { return await loadFromPublishedSheet(one, { force }); }
-    catch (e) { console.warn('publish-to-web 整份抓取失敗：', e.message); }
+    const { lessons } = await loadPublishedCatalog(one, { force });
+    return lessons;
   }
 
   // 單一 CSV URL
