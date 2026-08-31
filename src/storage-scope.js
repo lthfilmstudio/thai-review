@@ -389,9 +389,9 @@ function bootFailureState(error, phase) {
     : 'recoverable-failure';
 }
 
-/* Pure boot coordinator. Adapters own auth, catalog, storage, migration, and DOM.
-   Learning state is intentionally absent from this function: callers may only
-   read or write it after the returned storage handle has reached ready. */
+/* Pure boot coordinator. Adapters own auth, catalog, storage, migration, hydration,
+   and DOM. Learning state is intentionally absent from this function: callers may
+   only read or write it after the returned storage handle has reached ready. */
 export async function runWorkspaceBoot({
   boot = createWorkspaceBoot(),
   resolveSession,
@@ -400,6 +400,7 @@ export async function runWorkspaceBoot({
   openStorage,
   inspectDurability = async () => null,
   migrate = null,
+  hydrate = null,
   onState = () => {},
 } = {}) {
   if (typeof resolveSession !== 'function'
@@ -408,7 +409,8 @@ export async function runWorkspaceBoot({
       || typeof openStorage !== 'function'
       || typeof inspectDurability !== 'function'
       || typeof onState !== 'function'
-      || (migrate !== null && typeof migrate !== 'function')) {
+      || (migrate !== null && typeof migrate !== 'function')
+      || (hydrate !== null && typeof hydrate !== 'function')) {
     throw codedError('WORKSPACE_BOOT_ADAPTER_INCOMPLETE', 'workspace boot adapters are incomplete');
   }
 
@@ -456,8 +458,23 @@ export async function runWorkspaceBoot({
       });
     }
 
+    let hydration = null;
+    if (hydrate) {
+      phase = 'hydrating';
+      hydration = await hydrate({
+        workspaceId,
+        session: sessionResult.session,
+        catalog,
+        storage,
+        boot,
+        migration,
+        hydrationStorage: binding.hydrationStorage,
+        writeHydration: binding.writeHydration,
+      });
+    }
+
     phase = 'ready';
-    boot.moveTo(phase, migration ? { migration } : null);
+    boot.moveTo(phase, migration || hydration ? { migration, hydration } : null);
     emit();
     return {
       status: 'ready',
@@ -467,6 +484,7 @@ export async function runWorkspaceBoot({
       storage,
       durability,
       migration,
+      hydration,
       boot,
     };
   } catch (error) {
@@ -568,12 +586,48 @@ export function createWorkspaceStorage(storage, { workspaceId, boot } = {}) {
       for (const key of ownKeys()) storage.removeItem(key);
     },
   };
+  const assertHydrationActive = () => {
+    const snapshot = boot.snapshot();
+    if (snapshot.workspaceId !== workspace || snapshot.epoch !== bootBinding?.epoch
+        || !['opening-storage', 'migrating'].includes(snapshot.state)) {
+      throw codedError('WORKSPACE_NOT_READY', 'workspace hydration storage is not active');
+    }
+  };
+  const hydrationStorage = {
+    workspaceId: workspace,
+    getItem(key) {
+      assertHydrationActive();
+      return storage.getItem(physicalKey(key));
+    },
+    setItem(key, value) {
+      assertHydrationActive();
+      storage.setItem(physicalKey(key), value);
+    },
+  };
+  const writeHydration = (key, value) => hydrationStorage.setItem(key, value);
   workspaceStorageBindings.set(workspaceStorage, {
     boot,
     workspaceId: workspace,
     epoch: bootBinding?.epoch,
+    hydrationStorage,
+    writeHydration,
   });
   return workspaceStorage;
+}
+
+/* Production runtime entry gate.  App code must pass the capability-bound port
+   returned by runWorkspaceBoot; plain localStorage and stale boot handles are
+   rejected before any learning helper can fall back to a legacy key. */
+export function requireWorkspaceStorage(storage) {
+  if (!storage
+      || typeof storage.workspaceId !== 'string'
+      || typeof storage.getItem !== 'function'
+      || typeof storage.setItem !== 'function'
+      || typeof storage.removeItem !== 'function') {
+    throw codedError('WORKSPACE_NOT_READY', 'workspace storage is not ready');
+  }
+  storage.getItem('__runtime_readiness__');
+  return storage;
 }
 
 export async function inspectStorageDurability(storageManager) {

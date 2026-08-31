@@ -164,9 +164,9 @@ test('今日 is the landing tab: first in every mode picker and the mode init fa
 test('today.js owns the merged shell and delegates the action panel to home.js', async () => {
   const todaySource = await readFile(new URL('../src/today.js', import.meta.url), 'utf8');
   // 遊戲進行中要整頁接管；離開遊戲或從行動面板 rerender 時都必須保留同一 storage port。
-  assert.match(todaySource, /renderActiveGame\(el, \(\) => renderTodayMode\(el, storage\)\)/);
+  assert.match(todaySource, /renderActiveGame\(el, \(\) => renderTodayMode\(el, storage\), storage\)/);
   assert.match(todaySource, /homePanelHtml\(/);
-  assert.match(todaySource, /wireHomePanel\(el, todayLog, \(\) => renderTodayMode\(el, storage\)\)/);
+  assert.match(todaySource, /wireHomePanel\(el, todayLog, \(\) => renderTodayMode\(el, storage\), storage\)/);
   // home.js 不能再反過來 import today.js，否則循環相依會變成真的取值循環
   assert.doesNotMatch(homeSource, /from '\.\/today\.js'/);
 });

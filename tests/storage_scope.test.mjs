@@ -9,6 +9,7 @@ import {
   createWorkspaceBoot,
   getOrCreateWorkspaceInstallationId,
   createWorkspaceStorage,
+  requireWorkspaceStorage,
   inspectStorageDurability,
   logoutToAnonymous,
   resolveWorkspaceId,
@@ -132,6 +133,74 @@ test('authenticated boot 不建立或讀取裝置 ID', async () => {
   assert.equal(deviceReads, 0);
 });
 
+test('workspace hydration 在 migration 後、ready 前，失敗不會 emit ready', async () => {
+  const events = [];
+  const backing = memoryStorage();
+  let capturedHydrationStorage = null;
+  const bootArgs = {
+    resolveSession: async () => ({ status: 'anonymous', session: null }),
+    resolveDeviceId: () => 'device-1',
+    loadCatalog: async () => ({ revision: 'catalog-1' }),
+    openStorage: ({ workspaceId, boot }) => createWorkspaceStorage(backing, { workspaceId, boot }),
+    migrate: async () => { events.push('migrate'); return { migrated: true }; },
+    hydrate: async ({ migration, boot, hydrationStorage, writeHydration }) => {
+      capturedHydrationStorage = hydrationStorage;
+      events.push(`hydrate:${migration.migrated}:${boot.snapshot().state}`);
+      assert.equal(hydrationStorage.workspaceId, 'anon:device-1');
+      assert.equal(hydrationStorage.getItem(LEARNING_STORE_KEYS.daily), null);
+      writeHydration(LEARNING_STORE_KEYS.daily, '{"days":{}}');
+      assert.equal(hydrationStorage.getItem(LEARNING_STORE_KEYS.daily), '{"days":{}}');
+      return { snapshot: 'hydrated' };
+    },
+    onState: snapshot => events.push(`state:${snapshot.state}`),
+  };
+  const ready = await runWorkspaceBoot(bootArgs);
+  assert.equal(ready.status, 'ready');
+  assert.deepEqual(ready.hydration, { snapshot: 'hydrated' });
+  assert.deepEqual(events, [
+    'state:checking-session', 'state:loading-catalog', 'state:opening-storage',
+    'state:migrating', 'migrate', 'hydrate:true:migrating', 'state:ready',
+  ]);
+  assert.equal(ready.storage.getItem(LEARNING_STORE_KEYS.daily), '{"days":{}}');
+  assert.throws(() => capturedHydrationStorage.getItem(LEARNING_STORE_KEYS.daily), {
+    code: 'WORKSPACE_NOT_READY',
+  });
+
+  const failedEvents = [];
+  const failed = await runWorkspaceBoot({
+    ...bootArgs,
+    hydrate: async () => { failedEvents.push('hydrate'); throw Object.assign(new Error('bad hydration'), { code: 'HYDRATION_INVALID' }); },
+    onState: snapshot => failedEvents.push(`state:${snapshot.state}`),
+  });
+  assert.equal(failed.status, 'recoverable-failure');
+  assert.equal(failed.error.code, 'HYDRATION_INVALID');
+  assert.equal(failedEvents.includes('state:ready'), false);
+
+  const writeBacking = memoryStorage();
+  const rawSetItem = writeBacking.setItem.bind(writeBacking);
+  let rejectHydrationWrite = false;
+  writeBacking.setItem = (key, value) => {
+    if (rejectHydrationWrite && key.endsWith(LEARNING_STORE_KEYS.daily)) {
+      throw Object.assign(new Error('projection write blocked'), { code: 'HYDRATION_WRITE_FAILED' });
+    }
+    rawSetItem(key, value);
+  };
+  const writeFailureEvents = [];
+  const writeFailure = await runWorkspaceBoot({
+    ...bootArgs,
+    openStorage: ({ workspaceId, boot }) => createWorkspaceStorage(writeBacking, { workspaceId, boot }),
+    hydrate: async ({ writeHydration }) => {
+      writeFailureEvents.push('hydrate');
+      rejectHydrationWrite = true;
+      writeHydration(LEARNING_STORE_KEYS.daily, '{"days":{}}');
+    },
+    onState: snapshot => writeFailureEvents.push(`state:${snapshot.state}`),
+  });
+  assert.equal(writeFailure.status, 'recoverable-failure');
+  assert.equal(writeFailure.error.code, 'HYDRATION_WRITE_FAILED');
+  assert.equal(writeFailureEvents.includes('state:ready'), false);
+});
+
 test('auth unavailable 不得降級成 anonymous workspace，也不開 catalog 或 storage', async () => {
   const events = [];
   const result = await runWorkspaceBoot({
@@ -253,28 +322,30 @@ test('corrupt legacy learning outcome renders recoverable actions and skips read
   }), true);
   assert.deepEqual(successEvents, ['learning-side-effects']);
 
+});
+
+test('App 只以 workspace boot 開機，ready 前不做 daily/streak/save/render', async () => {
   const appSource = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
   const initStart = appSource.indexOf('async function init()');
-  const gate = appSource.indexOf('runLegacyLearningBootGate', initStart);
-  const firstDailyRead = appSource.indexOf('initDailyLog(', initStart);
-  const firstSettle = appSource.indexOf('settleStreakOnOpen(', initStart);
-  const firstLessonLoad = appSource.indexOf('loadLessonsSmart(', initStart);
-  const firstRender = appSource.indexOf('rerender();', initStart);
-  const firstSync = appSource.indexOf('syncNow();', initStart);
-  const firstListener = appSource.indexOf('addEventListener(', initStart);
-  const firstTimer = appSource.indexOf('setInterval(', initStart);
-  assert.ok(initStart >= 0 && gate > initStart);
-  const gatedInit = appSource.slice(initStart, firstDailyRead);
-  assert.match(gatedInit, /runLegacyLearningBootGate\(\{[^]*loadStateResult/);
-  assert.match(gatedInit, /if \(!learningReady\) return;/);
-  for (const [name, sideEffect] of [
-    ['daily', firstDailyRead], ['settle', firstSettle], ['lesson', firstLessonLoad],
-    ['render', firstRender], ['sync', firstSync], ['listener', firstListener], ['timer', firstTimer],
-  ]) {
-    assert.ok(sideEffect > gate, `${name} side effect must remain after the learning gate`);
-  }
-  assert.match(appSource, /boot-retry[^]*location\.reload\(\)/);
-  assert.match(appSource, /boot-diagnostics[^]*details\.hidden = false/);
+  const boot = appSource.indexOf('await runWorkspaceBoot({', initStart);
+  const ready = appSource.indexOf("if (bootResult.status !== 'ready')", boot);
+  const assignStorage = appSource.indexOf('workspaceStorage = bootResult.storage;', ready);
+  const requireStorage = appSource.indexOf('const storage = requireWorkspaceStorage();', assignStorage);
+  const firstDaily = appSource.indexOf('initDailyLog(state.progress, storage)', requireStorage);
+  const firstSettle = appSource.indexOf('settleStreakOnOpen(undefined, storage)', requireStorage);
+  const firstSave = appSource.indexOf('saveState(storage);', ready);
+  const firstRender = appSource.indexOf('rerender(storage);', ready);
+  assert.ok(initStart >= 0 && boot > initStart && ready > boot);
+  assert.equal(appSource.includes('runLegacyLearningBootGate'), false);
+  assert.ok(assignStorage > ready && requireStorage > assignStorage);
+  assert.ok(firstDaily > requireStorage && firstSettle > firstDaily);
+  assert.ok(firstSave > firstSettle && firstRender > firstSave);
+  assert.match(appSource, /resolveSession: cloudAuth\.getSessionResult/);
+  assert.match(appSource, /resolveDeviceId: getDeviceId/);
+  assert.match(appSource, /hydrateWorkspaceSnapshot\(practiceConnection/);
+  assert.match(appSource, /projectHydratedWorkspaceState\(hydration\)/);
+  assert.match(appSource, /projectWorkspaceAuxiliaryState\(/);
+  assert.match(appSource, /hydrationStorage\.getItem\(STORAGE_KEY\)/);
 });
 
 test('unavailable legacy learning outcome uses storage-unavailable without raw-preserved claim', () => {
@@ -310,6 +381,23 @@ test('workspace ready 前與 storage unavailable 都 fail closed，沒有假完�
   });
   assert.equal(boot.snapshot().state, 'storage-unavailable');
   assert.equal(boot.snapshot().ready, false);
+});
+
+test('runtime learning entry requires a ready explicit workspace port and rejects stale handles', () => {
+  const backing = memoryStorage();
+  const boot = readyBoot('user:A');
+  const port = createWorkspaceStorage(backing, { workspaceId: 'user:A', boot });
+
+  assert.throws(() => requireWorkspaceStorage(), {
+    code: 'WORKSPACE_NOT_READY',
+  });
+  assert.equal(requireWorkspaceStorage(port), port);
+
+  boot.moveTo('checking-session');
+  assert.throws(() => requireWorkspaceStorage(port), {
+    code: 'WORKSPACE_NOT_READY',
+  });
+  assert.equal(backing.values.size, 0, 'readiness probes must not create legacy or scoped data');
 });
 
 test('storage construction 以 scoped canary 驗證可寫可讀，成功或失敗都不殘留', () => {

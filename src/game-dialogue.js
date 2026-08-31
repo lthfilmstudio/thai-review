@@ -65,7 +65,7 @@ function playCurrentTurn() {
   speakCard(turn);
 }
 
-function renderTurn(el, { onExit }) {
+function renderTurn(el, { onExit }, storage) {
   const { dialogue, idx } = session;
   const visibleTurns = dialogue.turns.slice(0, idx + 1);
 
@@ -100,7 +100,7 @@ function renderTurn(el, { onExit }) {
   el.querySelector('[data-gdg-replay]')?.addEventListener('click', playCurrentTurn);
   el.querySelector('[data-gdg-next]')?.addEventListener('click', () => {
     session.idx++;
-    render(el, { onExit });
+    render(el, { onExit }, storage);
   });
 
   if (session.playedIdx !== idx) {
@@ -109,10 +109,10 @@ function renderTurn(el, { onExit }) {
   }
 }
 
-function renderSummary(el, { onExit }) {
+function renderSummary(el, { onExit }, storage) {
   if (!session.logged) {
     session.logged = true;
-    logGame('dialog');
+    logGame('dialog', Date.now(), storage);
   }
   const { dialogue } = session;
 
@@ -145,7 +145,7 @@ function renderSummary(el, { onExit }) {
     const previousId = dialogue.id;
     const dialogues = session.dialogues || [dialogue];
     startDialogueGame(dialogues, { excludeId: previousId });
-    render(el, { onExit });
+    render(el, { onExit }, storage);
   });
   el.querySelector('[data-gdg-home]')?.addEventListener('click', () => {
     exitDialogueGame();
@@ -153,8 +153,8 @@ function renderSummary(el, { onExit }) {
   });
 }
 
-export function render(el, { onExit } = {}) {
+export function render(el, { onExit } = {}, storage) {
   if (!session) { el.innerHTML = ''; return; }
-  if (session.idx >= session.dialogue.turns.length) renderSummary(el, { onExit });
-  else renderTurn(el, { onExit });
+  if (session.idx >= session.dialogue.turns.length) renderSummary(el, { onExit }, storage);
+  else renderTurn(el, { onExit }, storage);
 }

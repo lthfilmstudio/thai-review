@@ -76,7 +76,7 @@ function playCurrentCard() {
   speakCard(q.card);
 }
 
-function renderQuestion(el, { onExit }) {
+function renderQuestion(el, { onExit }, storage) {
   const q = session.questions[session.idx];
   const total = session.questions.length;
   const answered = session.answered !== null;
@@ -117,7 +117,7 @@ function renderQuestion(el, { onExit }) {
         session.streak = i === q.answerIndex ? (session.streak || 0) + 1 : 0;
         if (i === q.answerIndex) session.correct++;
         else session.wrongCards = [...(session.wrongCards || []), q.card];
-        renderQuestion(el, { onExit });
+        renderQuestion(el, { onExit }, storage);
       });
     });
   } else {
@@ -128,7 +128,7 @@ function renderQuestion(el, { onExit }) {
     el.querySelector('[data-glg-next]')?.addEventListener('click', () => {
       session.idx++;
       session.answered = null;
-      render(el, { onExit });
+      render(el, { onExit }, storage);
     });
   }
 }
@@ -150,10 +150,10 @@ function renderFeedback(q, gotIt) {
   `;
 }
 
-function renderSummary(el, { onExit }) {
+function renderSummary(el, { onExit }, storage) {
   if (!session.logged) {
     session.logged = true;
-    logGame('listen');
+    logGame('listen', Date.now(), storage);
   }
   const total = session.questions.length;
   const wrong = session.wrongCards || [];
@@ -186,11 +186,11 @@ function renderSummary(el, { onExit }) {
   el.querySelector('[data-glg-back-home]')?.addEventListener('click', () => { exitListenGame(); onExit?.(); });
 }
 
-export function render(el, { onExit } = {}) {
+export function render(el, { onExit } = {}, storage) {
   if (!session) { el.innerHTML = ''; return; }
   if (session.idx >= session.questions.length) {
-    renderSummary(el, { onExit });
+    renderSummary(el, { onExit }, storage);
   } else {
-    renderQuestion(el, { onExit });
+    renderQuestion(el, { onExit }, storage);
   }
 }

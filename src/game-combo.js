@@ -117,7 +117,7 @@ function playCurrentCard() {
   speakCard(q.card);
 }
 
-function renderQuestion(el, { onExit }) {
+function renderQuestion(el, { onExit }, storage) {
   const q = session.questions[session.idx];
   const total = session.questions.length;
   const flipped = session.flipped;
@@ -155,7 +155,7 @@ function renderQuestion(el, { onExit }) {
     playCurrentCard();
     el.querySelector('[data-gcr-flip]')?.addEventListener('click', () => {
       session.flipped = true;
-      renderQuestion(el, { onExit });
+      renderQuestion(el, { onExit }, storage);
     });
   } else {
     el.querySelectorAll('[data-gcr-report]').forEach(btn => {
@@ -171,16 +171,16 @@ function renderQuestion(el, { onExit }) {
         }
         session.idx++;
         session.flipped = false;
-        render(el, { onExit });
+        render(el, { onExit }, storage);
       });
     });
   }
 }
 
-function renderSummary(el, { onExit }) {
+function renderSummary(el, { onExit }, storage) {
   if (!session.logged) {
     session.logged = true;
-    logGame('combo');
+    logGame('combo', Date.now(), storage);
   }
   const total = session.questions.length;
   const wrong = session.wrongCards;
@@ -218,11 +218,11 @@ function renderSummary(el, { onExit }) {
   el.querySelector('[data-gcr-back-home]')?.addEventListener('click', () => { exitComboReview(); onExit?.(); });
 }
 
-export function render(el, { onExit } = {}) {
+export function render(el, { onExit } = {}, storage) {
   if (!session) { el.innerHTML = ''; return; }
   if (session.idx >= session.questions.length) {
-    renderSummary(el, { onExit });
+    renderSummary(el, { onExit }, storage);
   } else {
-    renderQuestion(el, { onExit });
+    renderQuestion(el, { onExit }, storage);
   }
 }

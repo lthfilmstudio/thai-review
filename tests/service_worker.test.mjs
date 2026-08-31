@@ -36,8 +36,10 @@ test('service worker refreshes mutable Thai audio indexes before using cache', (
   }
 });
 
-test('service worker cache version invalidates the stale v74 home bundle', () => {
-  assert.ok(sw.includes("const CACHE = 'thai-review-v90';"));
+test('service worker cache version invalidates the stale v90 home bundle', () => {
+  assert.ok(sw.includes("const CACHE = 'thai-review-v91';"));
   assert.ok(sw.includes("'./src/storage-scope.js'"),
     'app boot dependency must be available in the offline shell');
+  assert.ok(sw.includes("'./src/practice-db.js'"),
+    'workspace hydration dependency must be available in the offline shell');
 });

@@ -5,9 +5,12 @@ function memoryStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
   return {
     values,
+    get length() { return values.size; },
+    key(index) { return [...values.keys()][index] ?? null; },
     getItem(key) { return values.get(key) ?? null; },
     setItem(key, value) { values.set(key, String(value)); },
     removeItem(key) { values.delete(key); },
+    clear() { values.clear(); },
   };
 }
 
@@ -15,13 +18,20 @@ const fallback = memoryStorage();
 globalThis.localStorage = fallback;
 
 const {
-  state, loadState, loadStateResult, saveState, STORAGE_KEY, DEVICE_STATE_KEY,
-  projectHydratedWorkspaceState,
+  state, loadDeviceStateResult, loadState, loadStateResult, saveState, STORAGE_KEY, DEVICE_STATE_KEY,
+  setGrade, toggleFavorite, saveCardEdit,
+  projectHydratedWorkspaceState, projectWorkspaceAuxiliaryState,
 } = await import('../src/state.js');
-const { DAILY_KEY, loadDailyLog, logReview } = await import('../src/today.js');
+const {
+  DAILY_KEY, loadDailyLog, logReview, logGame, addActiveSeconds, buildDailyQueue,
+} = await import('../src/today.js');
 const { loadGradeHistory, recordGrade } = await import('../src/grade-history.js');
 const { loadUnlocked, checkAndUnlock } = await import('../src/achievements.js');
 const { loadResweepState, advanceResweepCursor } = await import('../src/resweep.js');
+const {
+  LEARNING_STORE_KEYS, createWorkspaceBoot, createWorkspaceStorage, runWorkspaceBoot,
+} = await import('../src/storage-scope.js');
+const { clearSyncState, lastSyncedAt } = await import('../src/cloud-sync.js');
 
 const HISTORY_KEY = 'thai-review-grade-history-v1';
 const ACHIEVEMENTS_KEY = 'thai-review-achievements-v1';
@@ -56,6 +66,14 @@ function achievementCtx(streak) {
     hasFullyMatureLesson: false,
     weeklyAccuracy: null,
   };
+}
+
+function readyWorkspacePort(backing, workspaceId) {
+  const boot = createWorkspaceBoot();
+  boot.moveTo('loading-catalog', { workspaceId });
+  boot.moveTo('opening-storage');
+  boot.moveTo('ready');
+  return { boot, port: createWorkspaceStorage(backing, { workspaceId, boot }) };
 }
 
 test('state keeps device UI global while explicit learning ports stay isolated', () => {
@@ -224,6 +242,26 @@ test('missing default legacy state is a valid first-run load', () => {
   assert.equal(state.currentLessonId, 'unchanged-default');
   assert.equal(fallback.getItem(STORAGE_KEY), null);
   assert.equal(fallback.getItem(DEVICE_STATE_KEY), null);
+});
+
+test('device-only boot loader 不讀 legacy learning blob，只採用獨立 UI settings', () => {
+  fallback.values.clear();
+  fallback.setItem(STORAGE_KEY, JSON.stringify({
+    progress: { leaked: { grade: 'easy' } }, settings: { theme: 'light' },
+  }));
+  fallback.setItem(DEVICE_STATE_KEY, JSON.stringify({
+    settingsVersion: 2, settings: { theme: 'light', rate: 0.8 }, mode: 'lists',
+  }));
+  resetRuntimeState();
+
+  assert.deepEqual(loadDeviceStateResult(), { status: 'ok', source: 'stored' });
+  assert.deepEqual(state.progress, {});
+  assert.equal(state.settings.theme, 'light');
+  assert.equal(state.settings.rate, 0.8);
+  assert.equal(state.mode, 'lists');
+
+  fallback.setItem(DEVICE_STATE_KEY, '{bad json');
+  assert.deepEqual(loadDeviceStateResult(), { status: 'corrupt', reason: 'json' });
 });
 
 test('corrupt or unavailable state reads fail closed without mutating runtime or raw bytes', () => {
@@ -406,6 +444,186 @@ test('learning owners isolate explicit anonymous, A, and B storage ports', () =>
     assert.equal(!!loadUnlocked(port).streak7, index === 2);
     assert.equal(loadResweepState(port).position, index + 1);
   });
+});
+
+test('production learning paths keep actual A, anonymous, and B workspace ports isolated on one backing store', () => {
+  fallback.values.clear();
+  const legacyBefore = new Map();
+  for (const [name, key] of Object.entries(LEARNING_STORE_KEYS)) {
+    const raw = JSON.stringify({ legacy: name });
+    fallback.setItem(key, raw);
+    legacyBefore.set(key, raw);
+  }
+
+  const workspaces = ['user:A', 'anon:device-1', 'user:B'];
+  const handles = workspaces.map(id => readyWorkspacePort(fallback, id));
+  const ts = Date.UTC(2026, 7, 20, 4, 0);
+
+  handles.forEach(({ port }, index) => {
+    const lessonId = `L${index}`;
+    const card = {
+      _lessonId: lessonId,
+      _cardKey: `${lessonId}:thai-${index}`,
+      thai: `thai-${index}`,
+      karaoke: `karaoke-${index}`,
+      zh: `zh-${index}`,
+    };
+    resetRuntimeState();
+    state.lessons = [{ id: lessonId, title: lessonId, _loaded: true, cards: [card] }];
+    state.currentLessonId = lessonId;
+    state.settings.theme = ['light', 'dark', 'auto'][index];
+
+    setGrade(card, 'good', port);
+    toggleFavorite(card, port);
+    saveCardEdit(card, { thai: `edited-${index}`, zh: card.zh }, port);
+    recordGrade(card._cardKey, 'good', ts + index, port);
+    logReview('good', ts + index, port);
+    logGame(['listen', 'combo', 'dialog'][index], ts + index, port);
+    addActiveSeconds(15 + index, ts + index, port);
+    assert.equal(buildDailyQueue([card], state.progress, state.lessons, 0, port).cards.length, 1);
+    checkAndUnlock(achievementCtx(index === 2 ? 7 : 0), port);
+    advanceResweepCursor(index + 1, 10, port);
+
+    port.setItem(LEARNING_STORE_KEYS.cursors, JSON.stringify({ at: 100 + index }));
+    assert.equal(lastSyncedAt(port), 100 + index);
+    clearSyncState(port);
+    assert.equal(lastSyncedAt(port), 0);
+  });
+
+  handles.forEach(({ port }, index) => {
+    const lessonId = `L${index}`;
+    const key = `${lessonId}:thai-${index}`;
+    const savedState = JSON.parse(port.getItem(STORAGE_KEY));
+    const daily = loadDailyLog(port).days['2026-08-20'];
+    assert.deepEqual(Object.keys(savedState.progress), [key]);
+    assert.deepEqual(Object.keys(savedState.favorites), [`thai-${index}`]);
+    assert.deepEqual(Object.keys(savedState.edits), [key]);
+    assert.equal(daily.reviewed, 1);
+    assert.equal(daily.games, 1);
+    assert.equal(daily.seconds, 15 + index);
+    assert.deepEqual(Object.keys(loadGradeHistory(port).cards), [key]);
+    assert.equal(!!loadUnlocked(port).streak7, index === 2);
+    assert.equal(loadResweepState(port).position, index + 1);
+    assert.deepEqual(JSON.parse(port.getItem(LEARNING_STORE_KEYS.remoteDays)), {});
+  });
+
+  for (const [key, raw] of legacyBefore) {
+    assert.equal(fallback.getItem(key), raw, `${key} legacy bytes must remain unchanged`);
+  }
+  const deviceState = JSON.parse(fallback.getItem(DEVICE_STATE_KEY));
+  assert.equal(deviceState.settings.theme, 'auto', 'device settings remain one shared device store');
+});
+
+test('fresh reload hydrates scoped favorites and edits while IndexedDB remains progress authority', async () => {
+  fallback.values.clear();
+  const legacyRaw = JSON.stringify({
+    progress: { legacy: { grade: 'again' } },
+    favorites: { legacy: { v: 1, ts: 1 } },
+    edits: { legacy: { thai: 'legacy' } },
+  });
+  fallback.setItem(STORAGE_KEY, legacyRaw);
+
+  const workspaces = ['user:A', 'anon:device-1', 'user:B'];
+  const cards = [
+    '550e8400-e29b-41d4-a716-446655440000',
+    '550e8400-e29b-41d4-a716-446655440001',
+    '550e8400-e29b-41d4-a716-446655440002',
+  ];
+  workspaces.forEach((workspaceId, index) => {
+    const { port } = readyWorkspacePort(fallback, workspaceId);
+    port.setItem(STORAGE_KEY, JSON.stringify({
+      progress: { [`local-${index}`]: { grade: 'again' } },
+      favorites: { [`thai-${index}`]: index === 1 ? 1 : { v: 1, ts: index + 1 } },
+      edits: { [`L${index}:thai-${index}`]: { thai: `edited-${index}`, updatedAt: index + 1 } },
+    }));
+  });
+
+  for (let index = 0; index < workspaces.length; index += 1) {
+    const workspaceId = workspaces[index];
+    const session = workspaceId.startsWith('user:')
+      ? { user: { id: workspaceId.slice(5) } }
+      : null;
+    resetRuntimeState();
+    const result = await runWorkspaceBoot({
+      resolveSession: async () => session
+        ? { status: 'authenticated', session }
+        : { status: 'anonymous', session: null },
+      resolveDeviceId: () => 'device-1',
+      loadCatalog: async () => ({ revision: 'catalog-1' }),
+      openStorage: ({ workspaceId: id, boot }) => createWorkspaceStorage(fallback, {
+        workspaceId: id, boot,
+      }),
+      hydrate: async ({ workspaceId: id, hydrationStorage }) => {
+        const auxiliary = projectWorkspaceAuxiliaryState(
+          hydrationStorage.getItem(STORAGE_KEY),
+        );
+        const projected = projectHydratedWorkspaceState({
+          kind: 'practice-workspace-hydration-v1', schemaVersion: 1, workspaceId: id,
+          srs: [{
+            workspaceId: id, cardId: cards[index], version: index,
+            state: { grade: ['again', 'good', 'easy'][index] }, sourceEventId: null,
+          }],
+          projections: [],
+        });
+        Object.assign(state, { progress: projected.progress, ...auxiliary });
+        return { projected, auxiliary };
+      },
+    });
+
+    assert.equal(result.status, 'ready');
+    assert.deepEqual(Object.keys(state.progress), [cards[index]]);
+    assert.deepEqual(Object.keys(state.favorites), [`thai-${index}`]);
+    assert.deepEqual(Object.keys(state.edits), [`L${index}:thai-${index}`]);
+    assert.deepEqual(state.favorites[`thai-${index}`], { v: 1, ts: index === 1 ? 0 : index + 1 });
+    saveState(result.storage);
+    const saved = JSON.parse(result.storage.getItem(STORAGE_KEY));
+    assert.deepEqual(saved.favorites, state.favorites, 'first ready save must retain favorites');
+    assert.deepEqual(saved.edits, state.edits, 'first ready save must retain edits');
+    assert.deepEqual(Object.keys(saved.progress), [cards[index]], 'scoped local progress is ignored');
+  }
+
+  assert.equal(fallback.getItem(STORAGE_KEY), legacyRaw, 'global legacy bytes remain untouched');
+});
+
+test('invalid scoped auxiliary state fails boot closed without partially applying hydration', async () => {
+  fallback.values.clear();
+  const seed = readyWorkspacePort(fallback, 'user:A').port;
+  seed.setItem(STORAGE_KEY, JSON.stringify({
+    progress: { ignored: { grade: 'good' } },
+    favorites: { bad: { v: 2, ts: 1 } },
+    edits: {},
+  }));
+  resetRuntimeState();
+  state.progress = { sentinel: { grade: 'easy' } };
+  state.favorites = { sentinel: { v: 1, ts: 9 } };
+  state.edits = { sentinel: { thai: 'เดิม' } };
+
+  const events = [];
+  const result = await runWorkspaceBoot({
+    resolveSession: async () => ({
+      status: 'authenticated', session: { user: { id: 'A' } },
+    }),
+    resolveDeviceId: () => 'device-1',
+    loadCatalog: async () => ({ revision: 'catalog-1' }),
+    openStorage: ({ workspaceId, boot }) => createWorkspaceStorage(fallback, {
+      workspaceId, boot,
+    }),
+    hydrate: async ({ workspaceId, hydrationStorage }) => {
+      const auxiliary = projectWorkspaceAuxiliaryState(hydrationStorage.getItem(STORAGE_KEY));
+      const projected = projectHydratedWorkspaceState({
+        kind: 'practice-workspace-hydration-v1', schemaVersion: 1, workspaceId,
+        srs: [], projections: [],
+      });
+      Object.assign(state, { progress: projected.progress, ...auxiliary });
+    },
+    onState: snapshot => events.push(snapshot.state),
+  });
+
+  assert.equal(result.status, 'recoverable-failure');
+  assert.equal(events.includes('ready'), false);
+  assert.deepEqual(state.progress, { sentinel: { grade: 'easy' } });
+  assert.deepEqual(state.favorites, { sentinel: { v: 1, ts: 9 } });
+  assert.deepEqual(state.edits, { sentinel: { thai: 'เดิม' } });
 });
 
 test('undefined storage preserves fallback behavior and corrupt injected payloads fail safe', () => {
