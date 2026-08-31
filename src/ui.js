@@ -1,7 +1,7 @@
 /* UI render 總管：sidebar、drawer、topbar、stats、content dispatcher、modal、主題。 */
 
 import {
-  state, currentLesson, filteredCards, favoriteCount, saveState, isSrsActive,
+  state, currentLesson, filteredCards, favoriteCount, saveDeviceState, isSrsActive,
   allCardsWithLessonId, applyCardEdit, isFavorite, gradeOf,
 } from './state.js';
 import { renderCardMode, invalidateCardAudioRender } from './card.js';
@@ -80,7 +80,7 @@ export function updateSrsTabBadges() {
   });
 }
 
-export function renderSidebar(selectLesson) {
+export function renderSidebar(selectLesson, storage) {
   const list = document.getElementById('sideList');
   const dlist = document.getElementById('drawerList');
   list.innerHTML = '';
@@ -158,8 +158,8 @@ export function renderSidebar(selectLesson) {
         const label = `${GROUP_LABEL[topKey]} ${ch}`;
         const toggle = () => {
           state.collapsed[collapseKey] = !state.collapsed[collapseKey];
-          saveState();
-          renderSidebar(selectLesson);
+          saveDeviceState();
+          renderSidebar(selectLesson, storage);
         };
         list.appendChild(makeChapterHeader(label, items.length, collapsed, toggle));
         dlist.appendChild(makeChapterHeader(label, items.length, collapsed, toggle));
@@ -350,7 +350,7 @@ function renderListsMode(el) {
   `;
 }
 
-export function renderContent(onGrade) {
+export function renderContent(onGrade, storage) {
   const el = document.getElementById('content');
 
   if (!['card', 'reverse', 'srs'].includes(state.mode)) invalidateCardAudioRender();
@@ -363,7 +363,7 @@ export function renderContent(onGrade) {
   }
 
   if (state.mode === 'today') {
-    renderTodayMode(el);
+    renderTodayMode(el, storage);
     renderStats();
     updateSrsTabBadges();
     return;
@@ -371,7 +371,7 @@ export function renderContent(onGrade) {
 
   // 對話模式不依賴單張卡片，獨立 render（吃 state.lessons）
   if (state.mode === 'dialog') {
-    renderDialogMode(el);
+    renderDialogMode(el, null, storage);
     renderStats();
     updateSrsTabBadges();
     return;
@@ -427,14 +427,15 @@ export function renderContent(onGrade) {
 
   if (state.mode === 'listen') {
     renderListenMode(el, cards, () => {
-      renderContent(onGrade);
+      renderContent(onGrade, storage);
       renderStats();
-    });
+    }, storage);
   } else {
     // card / reverse / srs 都共用 renderCardMode；reverse 把中文擺正面
     renderCardMode(el, cards, onGrade, {
       reverse: state.mode === 'reverse',
       dueCount: currentViewDueCount(),
+      storage,
     });
     renderStats();
   }

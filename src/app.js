@@ -1,7 +1,8 @@
 /* 入口：init → 載入狀態 → 抓資料 → 綁事件。 */
 
 import {
-  state, loadStateResult, saveState, localDateKey,
+  state, loadDeviceStateResult, saveState as persistState, localDateKey,
+  STORAGE_KEY, projectHydratedWorkspaceState, projectWorkspaceAuxiliaryState,
   DEFAULT_SHEET_URL,
   filteredCards, setGrade, shuffleCurrentLesson, isSrsActive, cardKey,
   saveLessonsCache, loadLessonsCache,
@@ -12,7 +13,7 @@ import {
 import {
   loadLessons, loadBundledData, loadPublishedCatalog,
 } from './data.js';
-import { initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds, settleStreakOnOpen, showToast, buildDailyQueue, loadDailyLog, setLogChangeHook } from './today.js';
+import { DAILY_KEY, initDailyLog, logReview, buildAchievementCtx, notifyAchievements, addActiveSeconds, settleStreakOnOpen, showToast, buildDailyQueue, loadDailyLog, setLogChangeHook } from './today.js';
 import { advanceResweepCursor } from './resweep.js';
 import { syncProgressThrottled, syncProgressOnHide } from './progress-sync.js';
 import * as cloudAuth from './cloud-auth.js';
@@ -22,12 +23,27 @@ import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices, preloadRealAudioAvailability } from './tts.js';
 import { stopListen } from './listen.js';
 import { exitDialogueGame } from './game-dialogue.js';
-import { runLegacyLearningBootGate } from './storage-scope.js';
+import {
+  createWorkspaceStorage, requireWorkspaceStorage as assertWorkspaceStorage,
+  bootScreenFor, runWorkspaceBoot,
+} from './storage-scope.js';
+import { getDeviceId } from './srs.js';
+import { hydrateWorkspaceSnapshot, openPracticeDatabase } from './practice-db.js';
 import {
   renderSidebar, renderTopbarTitle, renderStats, renderContent,
   openDrawer, closeDrawer, openModal, closeModal, applyTheme,
   openSearch, closeSearch, renderSearchResults,
 } from './ui.js';
+
+let workspaceStorage = null;
+
+function requireWorkspaceStorage(storage = workspaceStorage) {
+  return assertWorkspaceStorage(storage);
+}
+
+function saveState(storage) {
+  return persistState(requireWorkspaceStorage(storage));
+}
 
 function assertCompleteCatalog() {
   if (!state.lessons.length || state.lessons.some(lesson => !lesson._loaded)) {
@@ -44,7 +60,8 @@ export async function ensureAllLoaded() {
   assertCompleteCatalog();
 }
 
-function replaceRuntimeCatalog(catalog) {
+function replaceRuntimeCatalog(catalog, storage) {
+  const runtimeStorage = requireWorkspaceStorage(storage);
   const lessons = catalog.lessons.map(lesson => ({ ...lesson, _loaded: true }));
   const sameStructure = lessons.length === state.lessons.length
     && lessons.every((lesson, index) => lesson.id === state.lessons[index]?.id);
@@ -56,14 +73,14 @@ function replaceRuntimeCatalog(catalog) {
     state.cardIndex = 0;
     state.flipped = false;
   }
-  rerender();
+  rerender(runtimeStorage);
 }
 
 /* 主進入點：
    1. 預設 Sheet + 非 force → 直接讀同源 ./data.json（GitHub Action 預生成，< 50ms）
    2. 預設 Sheet + force（重新同步）→ 走 live publish-to-web（保留現有行為）
    3. 自訂 sheet URL → 永遠走 live（不影響使用者貼自己的 Sheet） */
-async function loadLessonsSmart({ force = false } = {}) {
+async function loadLessonsSmart({ force = false, runtimeStorage = null } = {}) {
   const customInput = (state.settings.sheetInput || '').trim();
   const url = customInput || DEFAULT_SHEET_URL;
   const cached = force ? null : loadLessonsCache(url);
@@ -108,7 +125,7 @@ async function loadLessonsSmart({ force = false } = {}) {
       if (currentUrl !== url) return;
       const ready = catalog.lessons.map(lesson => ({ ...lesson, _loaded: true }));
       saveLessonsCache(url, ready, catalog);
-      replaceRuntimeCatalog({ ...catalog, lessons: ready });
+      if (runtimeStorage) replaceRuntimeCatalog({ ...catalog, lessons: ready }, runtimeStorage);
     }).catch(e => console.warn('背景 catalog 刷新失敗，沿用已驗證快取：', e.message));
     return adopt(cached);
   }
@@ -119,25 +136,27 @@ async function loadLessonsSmart({ force = false } = {}) {
   return ready;
 }
 
-function rerender() {
-  preloadRealAudioAvailability(state.currentLessonId, rerender);
-  renderSidebar(selectLesson);
+function rerender(storage) {
+  const runtimeStorage = requireWorkspaceStorage(storage);
+  const renderAgain = () => rerender(runtimeStorage);
+  preloadRealAudioAvailability(state.currentLessonId, renderAgain);
+  renderSidebar(id => selectLesson(id, runtimeStorage), runtimeStorage);
   renderTopbarTitle();
-  renderContent(rerender);
+  renderContent(renderAgain, runtimeStorage);
   renderStats();
 }
 
-function onSearchPick(match) {
+function onSearchPick(match, storage) {
   // 跳到該卡：切到對應課程、cardIndex、並切回字卡模式
   state.currentLessonId = match.lessonId;
   state.cardIndex = match.index;
   state.flipped = false;
   if (state.mode === 'listen' || state.mode === 'dialog' || state.mode === 'lists') state.mode = 'card';
   stopListen();
-  saveState();
+  saveState(storage);
   syncModeButtons();
   closeSearch();
-  rerender();
+  rerender(storage);
 }
 
 function syncModeButtons(m = state.mode) {
@@ -146,71 +165,74 @@ function syncModeButtons(m = state.mode) {
   document.querySelectorAll('[data-drawer-mode]').forEach(t => t.classList.toggle('active', t.dataset.drawerMode === m));
 }
 
-async function selectLesson(id) {
+async function selectLesson(id, storage) {
   state.currentLessonId = id;
   state.cardIndex = 0;
   state.flipped = false;
   stopListen();
-  saveState();
+  saveState(storage);
   closeDrawer();
-  rerender();
+  rerender(storage);
   // 跨課程操作前再次確認沒有半套 catalog。
   await ensureLessonLoaded(id);
-  rerender();
+  rerender(storage);
 }
 
-async function selectMode(m) {
+async function selectMode(m, storage) {
   state.mode = m;
   state.flipped = false;
   stopListen();
   exitDialogueGame();
   syncModeButtons(m);
-  saveState();
-  renderContent(rerender);
+  saveState(storage);
+  renderContent(() => rerender(storage), storage);
   renderStats();
   if (m === 'lists' || m === 'dialog' || m === 'today') {
     await ensureAllLoaded();
-    rerender();
+    rerender(storage);
   }
 }
 
-async function selectListMode(order) {
+async function selectListMode(order, storage) {
   const enteringLists = state.mode !== 'lists';
   state.listOrder = order === 'zh' ? 'zh' : 'thai';
   if (enteringLists) state.listFilter = 'all';
-  await selectMode('lists');
+  await selectMode('lists', storage);
   closeDrawer();
 }
 
-function nextCard() {
+function nextCard(storage) {
   const cards = filteredCards();
   if (!cards.length) return;
   state.cardIndex = (state.cardIndex + 1) % cards.length;
   state.flipped = false;
-  saveState();
-  renderContent(rerender);
+  saveState(storage);
+  renderContent(() => rerender(storage), storage);
 }
 
 /* 評分後的行為：
    - SRS active：剛評的那張 nextReviewAt > now → 從 due 列表消失，cardIndex 不變但 list 變短，
      直接 rerender 自然指到下一張；clamp 防越界
    - 一般 mode：cards 不變，往下一張前進 */
-function gradeAndAdvance(g) {
+function gradeAndAdvance(g, storage) {
+  const runtimeStorage = requireWorkspaceStorage(storage);
   const gradedCard = filteredCards()[state.cardIndex];
   const gradedCardKey = gradedCard ? (gradedCard._cardKey || cardKey(gradedCard)) : '';
-  setGrade(state.cardIndex, g);
-  const improvementMoment = gradedCard ? recordGrade(gradedCardKey, g) : false;
-  logReview(g);
+  setGrade(state.cardIndex, g, runtimeStorage);
+  const improvementMoment = gradedCard
+    ? recordGrade(gradedCardKey, g, Date.now(), runtimeStorage)
+    : false;
+  logReview(g, Date.now(), runtimeStorage);
   // 評分是唯一會產生要同步的資料的動作，所以在這裡就排同步（去抖動 4 秒）。
   // 只靠「切背景」不夠：評完就關 App 的話那批評分會留在本機上不去。
-  if (cloudAuth.hasStoredSession()) syncSoon();
+  if (cloudAuth.hasStoredSession()) syncSoon(runtimeStorage);
   if (state.currentLessonId === '__TODAY__' && gradedCardKey) {
     const wasResweep = removeFromDailyQueue(gradedCardKey);
-    if (wasResweep) advanceResweepCursor(1, allCardsWithLessonId().length);
+    if (wasResweep) advanceResweepCursor(1, allCardsWithLessonId().length, runtimeStorage);
   }
-  const achvCtx = buildAchievementCtx();
+  const achvCtx = buildAchievementCtx(undefined, Date.now(), runtimeStorage);
   notifyAchievements(
-    checkAndUnlock(achvCtx),
+    checkAndUnlock(achvCtx, runtimeStorage),
     achvCtx,
     improvementMoment ? '這句你上次不會，現在會了。' : '',
   );
@@ -218,23 +240,23 @@ function gradeAndAdvance(g) {
   if (isSrsActive()) {
     const cards = filteredCards();
     if (state.cardIndex >= cards.length) state.cardIndex = Math.max(0, cards.length - 1);
-    saveState();
-    rerender();
+    saveState(runtimeStorage);
+    rerender(runtimeStorage);
   } else {
-    nextCard();
+    nextCard(runtimeStorage);
     // 評分會影響側邊欄徽章，補一次 sidebar render
-    renderSidebar(selectLesson);
+    renderSidebar(id => selectLesson(id, runtimeStorage), runtimeStorage);
     renderTopbarTitle();
   }
 }
 
-function prevCard() {
+function prevCard(storage) {
   const cards = filteredCards();
   if (!cards.length) return;
   state.cardIndex = (state.cardIndex - 1 + cards.length) % cards.length;
   state.flipped = false;
-  saveState();
-  renderContent(rerender);
+  saveState(storage);
+  renderContent(() => rerender(storage), storage);
 }
 
 function closeEditModal() {
@@ -257,7 +279,7 @@ function openEditModal(cardKey) {
   setTimeout(() => document.getElementById('editThai').focus(), 50);
 }
 
-function saveEditModal() {
+function saveEditModal(storage) {
   const key = document.getElementById('editCardKey').value;
   const found = findCardByKey(key);
   if (!found) return closeEditModal();
@@ -266,21 +288,21 @@ function saveEditModal() {
     karaoke: document.getElementById('editKaraoke').value,
     zh: document.getElementById('editZh').value,
     note: document.getElementById('editNote').value,
-  });
+  }, storage);
   closeEditModal();
-  rerender();
+  rerender(storage);
 }
 
-function clearEditModal() {
+function clearEditModal(storage) {
   const key = document.getElementById('editCardKey').value;
   const found = findCardByKey(key);
   if (!found) return closeEditModal();
-  clearCardEdit(found.card);
+  clearCardEdit(found.card, storage);
   closeEditModal();
-  rerender();
+  rerender(storage);
 }
 
-function jumpToCard(cardKey) {
+function jumpToCard(cardKey, storage) {
   const found = findCardByKey(cardKey);
   if (!found) {
     alert('找不到這張卡片，請重新同步後再試一次。');
@@ -291,9 +313,9 @@ function jumpToCard(cardKey) {
   state.mode = 'card';
   state.flipped = false;
   stopListen();
-  saveState();
+  saveState(storage);
   syncModeButtons('card');
-  rerender();
+  rerender(storage);
 }
 
 function wireSegClick(sel, onPick) {
@@ -324,25 +346,77 @@ function showLoading(msg) {
   }
 }
 
-function renderLegacyLearningBootFailure({ state: bootState, screen, diagnostics }) {
+function renderWorkspaceBoot(snapshot, diagnostics = '') {
+  if (snapshot.state === 'ready') return;
   const el = document.getElementById('content');
   if (!el) return;
-  const actions = screen.actions.map(action => `
-    <button class="btn ${action.id === 'retry' ? 'primary' : 'ghost'}"
-      id="boot-${action.id}" type="button">${action.label}</button>`).join('');
-  el.innerHTML = `<div class="empty" data-boot-state="${bootState}">
-    <div class="empty-icon">!</div>
-    <div class="empty-title">${screen.title}</div>
-    <div class="empty-sub">${screen.message}</div>
-    <div class="btn-row">${actions}</div>
-    <div class="empty-sub" id="boot-diagnostic-details" hidden>${diagnostics}</div>
-  </div>`;
+  const screen = snapshot.screen || bootScreenFor(snapshot.state);
+  const root = document.createElement('div');
+  root.className = 'empty';
+  root.dataset.bootState = snapshot.state;
+  const add = (className, text) => {
+    const child = document.createElement('div');
+    child.className = className;
+    child.textContent = text;
+    root.append(child);
+  };
+  add('empty-icon', snapshot.state === 'recoverable-failure' || snapshot.state === 'storage-unavailable' ? '!' : '⋯');
+  add('empty-title', screen.title);
+  add('empty-sub', screen.message);
+  const actions = document.createElement('div');
+  actions.className = 'btn-row';
+  for (const action of screen.actions) {
+    const button = document.createElement('button');
+    button.className = `btn ${action.id === 'retry' ? 'primary' : 'ghost'}`;
+    button.id = `boot-${action.id}`;
+    button.type = 'button';
+    button.textContent = action.label;
+    actions.append(button);
+  }
+  root.append(actions);
+  const details = document.createElement('div');
+  details.className = 'empty-sub';
+  details.id = 'boot-diagnostic-details';
+  details.hidden = true;
+  details.textContent = diagnostics;
+  root.append(details);
+  el.replaceChildren(root);
   document.getElementById('boot-retry')?.addEventListener('click', () => location.reload());
   document.getElementById('boot-diagnostics')?.addEventListener('click', () => {
     const details = document.getElementById('boot-diagnostic-details');
     if (details) details.hidden = false;
   });
   document.getElementById(screen.focusTarget)?.focus();
+}
+
+function bootDiagnostics({ details = null, error = null } = {}) {
+  const phase = details?.phase || 'unknown';
+  const code = details?.code || error?.code || 'WORKSPACE_BOOT_FAILED';
+  return `診斷：${phase} / ${code}`;
+}
+
+function applyHydratedWorkspace(hydration, auxiliary, writeHydration) {
+  const projected = projectHydratedWorkspaceState(hydration);
+  const daily = projected.projections.daily;
+  if (daily?.schemaVersion === 1
+      && daily.projectorVersion === 'legacy-workspace-facts-v1'
+      && Array.isArray(daily.facts)) {
+    const log = { v: 1, backfilled: false, days: {} };
+    for (const fact of daily.facts) {
+      if (fact?.sourceKey === 'meta' && fact.value && typeof fact.value === 'object') {
+        Object.assign(log, structuredClone(fact.value));
+      } else if (typeof fact?.sourceKey === 'string' && fact.value && typeof fact.value === 'object') {
+        log.days[fact.sourceKey] = structuredClone(fact.value);
+      }
+    }
+    writeHydration(DAILY_KEY, JSON.stringify(log));
+  }
+  Object.assign(state, {
+    progress: projected.progress,
+    favorites: auxiliary.favorites,
+    edits: auxiliary.edits,
+  });
+  return { projected, auxiliary };
 }
 
 function updateSyncHint() {
@@ -353,7 +427,7 @@ function updateSyncHint() {
 }
 
 /* 跨裝置同步的狀態列。沒登入時完全不碰網路，畫面就停在「未登入」。 */
-async function updateCloudHint() {
+async function updateCloudHint(storage) {
   const statusEl = document.getElementById('cloudStatus');
   const btn = document.getElementById('btnCloudAuth');
   const hint = document.getElementById('cloudHint');
@@ -372,7 +446,7 @@ async function updateCloudHint() {
   btn.textContent = '登出';
   btn.dataset.cloudAction = 'logout';
   if (hint) {
-    const at = lastSyncedAt();
+    const at = lastSyncedAt(requireWorkspaceStorage(storage));
     hint.textContent = at
       ? `上次同步：${formatLastSync(at)}`
       : '尚未同步過，開啟 App 或切到背景時會自動同步。';
@@ -464,26 +538,72 @@ function clearDeepLinkParam() {
 }
 
 async function init() {
-  const learningReady = runLegacyLearningBootGate({
-    loadStateResult,
-    onFailure: renderLegacyLearningBootFailure,
-  });
-  if (!learningReady) return;
-  initDailyLog(state.progress);
+  const deviceState = loadDeviceStateResult();
+  if (deviceState.status !== 'ok') {
+    const state = deviceState.status === 'unavailable' ? 'storage-unavailable' : 'recoverable-failure';
+    renderWorkspaceBoot({ state, screen: bootScreenFor(state) }, bootDiagnostics({
+      details: { phase: deviceState.phase || 'device-settings', code: deviceState.reason },
+    }));
+    return;
+  }
   applyTheme();
+  let practiceConnection = null;
+  const bootResult = await runWorkspaceBoot({
+    resolveSession: cloudAuth.getSessionResult,
+    resolveDeviceId: getDeviceId,
+    loadCatalog: async () => ({ lessons: await loadLessonsSmart() }),
+    openStorage: async ({ workspaceId, boot }) => {
+      const storage = createWorkspaceStorage(localStorage, { workspaceId, boot });
+      practiceConnection = await openPracticeDatabase({
+        onVersionChange: () => {
+          const current = boot.snapshot();
+          if (current.state !== 'recoverable-failure' && current.state !== 'storage-unavailable') {
+            boot.moveTo('recoverable-failure', {
+              phase: 'indexeddb-versionchange', code: 'PRACTICE_DB_VERSION_CHANGED',
+            });
+          }
+          renderWorkspaceBoot(boot.snapshot(), bootDiagnostics({ details: boot.snapshot().details }));
+        },
+      });
+      return storage;
+    },
+    hydrate: async ({ workspaceId, boot, hydrationStorage, writeHydration }) => {
+      const auxiliary = projectWorkspaceAuxiliaryState(
+        hydrationStorage.getItem(STORAGE_KEY),
+      );
+      const hydration = await hydrateWorkspaceSnapshot(practiceConnection, {
+        workspaceId,
+        assertActive: id => {
+          const current = boot.snapshot();
+          if (current.workspaceId !== id || !['opening-storage', 'migrating'].includes(current.state)) {
+            throw new Error('workspace hydration was invalidated');
+          }
+        },
+      });
+      return {
+        snapshot: hydration,
+        ...applyHydratedWorkspace(hydration, auxiliary, writeHydration),
+      };
+    },
+    onState: snapshot => renderWorkspaceBoot(snapshot, bootDiagnostics({ details: snapshot.details })),
+  });
+  if (bootResult.status !== 'ready') {
+    practiceConnection?.close();
+    renderWorkspaceBoot(bootResult.boot.snapshot(), bootDiagnostics({
+      details: bootResult.boot.snapshot().details, error: bootResult.error,
+    }));
+    return;
+  }
+  workspaceStorage = bootResult.storage;
+  const storage = requireWorkspaceStorage();
+  initDailyLog(state.progress, storage);
 
-  // streak 結算（安神保護消耗／補救判定／回補，設計書 6.1 節）：每次開 App 跑一次，
-  // 要在任何畫面 render 之前跑完，首頁的連續天數／安神保護數字才會是結算後的數字。
-  const settleEvent = settleStreakOnOpen();
+  // streak 結算必須在 hydration 後、任何主畫面 render 前完成。
+  const settleEvent = settleStreakOnOpen(undefined, storage);
   if (settleEvent.type === 'protected') {
     showToast(`昨天沒開，用掉 ${settleEvent.spent} 個安神保護幫你保住連續天數`);
   }
-
-  const url = state.settings.sheetInput || DEFAULT_SHEET_URL;
-  const hasEager = !!loadLessonsCache(url);
-  if (!hasEager) showLoading('正在從 Google Sheets 抓課程列表…');
-
-  state.lessons = await loadLessonsSmart();
+  state.lessons = bootResult.catalog.lessons;
 
   const deepLink = parseDeepLinkParam();
   const today = localDateKey();
@@ -504,7 +624,7 @@ async function init() {
     // 同一天內記住上次 mode」，練功併進今日後這個分頁就是每天的起點。
     state.mode = 'today';
   }
-  saveState();
+  saveState(storage);
 
   // lazy 模式：確保當前課程的卡片已載入
   await ensureLessonLoaded(state.currentLessonId, { silentUI: false });
@@ -525,44 +645,44 @@ async function init() {
   const _initCards = filteredCards();
   if (_initCards.length && state.cardIndex >= _initCards.length) state.cardIndex = 0;
 
-  rerender();
+  rerender(storage);
 
   if (state.mode === 'lists' || state.mode === 'dialog' || state.mode === 'today') {
     await ensureAllLoaded();
-    rerender();
+    rerender(storage);
   }
 
   // 跨裝置同步：登入導回來要先把 ?code= 換成 session，再拉一次雲端進度。
   // 整段不 await 進主流程——同步慢或失敗都不能拖住 App 開機。
   void (async () => {
     await cloudAuth.consumeRedirect();
-    void updateCloudHint();
+    void updateCloudHint(storage);
     if (!cloudAuth.hasStoredSession()) return;
-    const r = await syncNow();
-    if (r?.pulled) { rerender(); void updateCloudHint(); }
+    const r = await syncNow(storage);
+    if (r?.pulled) { rerender(storage); void updateCloudHint(storage); }
   })();
 
   // 模式切換
   syncModeButtons();
 
   document.querySelectorAll('.mode-tab,.mp-btn').forEach(b =>
-    b.addEventListener('click', () => selectMode(b.dataset.mode))
+    b.addEventListener('click', () => selectMode(b.dataset.mode, storage))
   );
   document.querySelectorAll('[data-drawer-mode]').forEach(b =>
-    b.addEventListener('click', () => selectMode(b.dataset.drawerMode))
+    b.addEventListener('click', () => selectMode(b.dataset.drawerMode, storage))
   );
   document.querySelectorAll('[data-drawer-list-order]').forEach(b =>
-    b.addEventListener('click', () => selectListMode(b.dataset.drawerListOrder))
+    b.addEventListener('click', () => selectListMode(b.dataset.drawerListOrder, storage))
   );
   document.querySelectorAll('[data-mobile-mode]').forEach(b =>
-    b.addEventListener('click', () => selectMode(b.dataset.mobileMode))
+    b.addEventListener('click', () => selectMode(b.dataset.mobileMode, storage))
   );
 
   // Topbar 按鈕
-  document.getElementById('btnFavPanel')?.addEventListener('click', () => selectLesson('__FAV__'));
-  document.querySelector('[data-mobile-fav-button]')?.addEventListener('click', () => selectLesson('__FAV__'));
+  document.getElementById('btnFavPanel')?.addEventListener('click', () => selectLesson('__FAV__', storage));
+  document.querySelector('[data-mobile-fav-button]')?.addEventListener('click', () => selectLesson('__FAV__', storage));
   document.querySelectorAll('[data-list-order-button]').forEach(b =>
-    b.addEventListener('click', () => selectListMode(b.dataset.listOrderButton))
+    b.addEventListener('click', () => selectListMode(b.dataset.listOrderButton, storage))
   );
   document.getElementById('btnMenu').addEventListener('click', openDrawer);
   document.getElementById('drawerMask').addEventListener('click', closeDrawer);
@@ -576,7 +696,7 @@ async function init() {
     // 搜尋要跨全部課程，先補抓
     await ensureAllLoaded();
     // 重畫側邊看有沒有載入新的
-    renderSidebar(selectLesson);
+    renderSidebar(id => selectLesson(id, storage), storage);
   });
   document.getElementById('btnCloseSearch').addEventListener('click', closeSearch);
   document.getElementById('searchMask').addEventListener('click', e => {
@@ -584,18 +704,18 @@ async function init() {
   });
   document.getElementById('btnCloseEdit').addEventListener('click', closeEditModal);
   document.getElementById('btnCancelEdit').addEventListener('click', closeEditModal);
-  document.getElementById('btnSaveEdit').addEventListener('click', saveEditModal);
-  document.getElementById('btnClearEdit').addEventListener('click', clearEditModal);
+  document.getElementById('btnSaveEdit').addEventListener('click', () => saveEditModal(storage));
+  document.getElementById('btnClearEdit').addEventListener('click', () => clearEditModal(storage));
   document.getElementById('editMask').addEventListener('click', e => {
     if (e.target.id === 'editMask') closeEditModal();
   });
   document.getElementById('inpSearch').addEventListener('input', e => {
-    renderSearchResults(e.target.value, onSearchPick);
+    renderSearchResults(e.target.value, match => onSearchPick(match, storage));
   });
   document.getElementById('btnShuffle').addEventListener('click', () => {
     stopListen();
     shuffleCurrentLesson();
-    rerender();
+    rerender(storage);
     flashShuffle();
   });
   document.getElementById('btnCloseModal').addEventListener('click', closeModal);
@@ -621,7 +741,7 @@ async function init() {
     const inputChanged = newInput !== state.settings.sheetInput;
     const oldInput = state.settings.sheetInput;
     state.settings.sheetInput = newInput;
-    saveState();
+    saveState(storage);
     if (inputChanged) {
       const btn = document.getElementById('btnSaveSettings');
       const originalText = btn.textContent;
@@ -630,7 +750,7 @@ async function init() {
       try {
         showLoading('正在從 Google Sheets 抓課程列表…');
         // 先 fetch，成功才動 cache（避免抓壞時兩邊都沒了）
-        const fresh = await loadLessonsSmart({ force: true });
+        const fresh = await loadLessonsSmart({ force: true, runtimeStorage: storage });
         if (!fresh || !fresh.length) throw new Error('沒抓到課程');
         // 完整 catalog 驗證成功後，loadLessonsSmart 才會更新新版 cache。
         state.lessons = fresh;
@@ -644,7 +764,7 @@ async function init() {
         alert('抓不到 Sheet：' + e.message + '\n\nURL 已存，但資料還是舊的。');
         // 把 settings 回滾，避免下次又走 inputChanged 分支
         state.settings.sheetInput = oldInput;
-        saveState();
+        saveState(storage);
         document.getElementById('inpSheet').value = oldInput;
       } finally {
         btn.disabled = false;
@@ -652,7 +772,7 @@ async function init() {
       }
     }
     closeModal();
-    rerender();
+    rerender(storage);
   });
 
   // 重置進度
@@ -692,7 +812,7 @@ async function init() {
     // 雲端沒清」，下次同步又把資料拉回來，使用者會以為重置沒生效。
     if (cloudAuth.hasStoredSession()) {
       try {
-        await resetProgressEverywhere();
+        await resetProgressEverywhere(storage);
       } catch (err) {
         btn.textContent = '確定重置';
         btn.disabled = false;
@@ -702,11 +822,11 @@ async function init() {
     }
 
     state.progress = {};
-    saveState();
+    saveState(storage);
     closeResetModal();
     renderStats();
-    renderContent(rerender);
-    void updateCloudHint();
+    renderContent(() => rerender(storage), storage);
+    void updateCloudHint(storage);
   });
 
   // 跨裝置同步：登入 / 登出，以及登入狀態下手動觸發一次同步
@@ -721,10 +841,10 @@ async function init() {
       await cloudAuth.logout();
       // 連同步 watermark 與別台的日誌視圖一起清掉，否則登出後統計還混著別台
       // 的數字，換帳號登入也會沿用舊 watermark 漏拉資料。
-      clearSyncState();
+      clearSyncState(storage);
       btn.disabled = false;
-      void updateCloudHint();
-      rerender();   // 別台的數字剛被清掉，統計與月曆要跟著回到只有這台的值
+      void updateCloudHint(storage);
+      rerender(storage);   // 別台的數字剛被清掉，統計與月曆要跟著回到只有這台的值
       return;
     }
     await cloudAuth.login();   // 會整頁跳轉去 Google
@@ -735,13 +855,13 @@ async function init() {
     const hint = document.getElementById('cloudHint');
     if (!await cloudAuth.getSession()) return;
     if (hint) hint.textContent = '同步中…';
-    const r = await syncNow();
+    const r = await syncNow(storage);
     if (hint) {
       hint.textContent = r
         ? `同步完成：收到 ${r.pulled} 筆、送出 ${r.pushed} 筆`
         : '同步失敗，稍後會自動重試。';
     }
-    if (r?.pulled) rerender();
+    if (r?.pulled) rerender(storage);
   });
 
   // 重新同步 Sheet：先抓再覆蓋；失敗保留舊資料；連點防呆
@@ -757,7 +877,7 @@ async function init() {
 
     try {
       showLoading('重新抓課程列表…');
-      const fresh = await loadLessonsSmart({ force: true });
+      const fresh = await loadLessonsSmart({ force: true, runtimeStorage: storage });
       if (!fresh || !fresh.length) throw new Error('沒抓到課程');
 
       state.lessons = fresh;
@@ -774,11 +894,11 @@ async function init() {
       setLastSync(url);
       updateSyncHint();
       closeModal();
-      rerender();
+      rerender(storage);
     } catch (e) {
       console.warn('重新同步失敗：', e);
       alert('抓不到 Sheet：' + e.message + '\n\n先用舊資料繼續。');
-      rerender();   // 把 showLoading 蓋掉的內容還原成舊資料
+      rerender(storage);   // 把 showLoading 蓋掉的內容還原成舊資料
     } finally {
       btn.disabled = false;
       btn.textContent = originalText;
@@ -810,8 +930,8 @@ async function init() {
     }
 
     if (state.mode === 'listen') {
-      if (e.key === 'ArrowLeft') { stopListen(); prevCard(); }
-      else if (e.key === 'ArrowRight') { stopListen(); nextCard(); }
+      if (e.key === 'ArrowLeft') { stopListen(); prevCard(storage); }
+      else if (e.key === 'ArrowRight') { stopListen(); nextCard(storage); }
       else if (e.code === 'Space') {
         e.preventDefault();
         import('./listen.js').then(m => m.toggleListen());
@@ -822,23 +942,23 @@ async function init() {
     // 今日 / 練功 mode 沒有當前卡片，卡片快捷鍵（翻面 / 評分 / 換卡）不適用
     if (state.mode === 'today') return;
 
-    if (e.key === 'ArrowLeft') prevCard();
-    else if (e.key === 'ArrowRight') nextCard();
+    if (e.key === 'ArrowLeft') prevCard(storage);
+    else if (e.key === 'ArrowRight') nextCard(storage);
     else if (e.code === 'Space') {
       e.preventDefault();
       state.flipped = !state.flipped;
       document.getElementById('cardStage')?.classList.toggle('flipped', state.flipped);
-    } else if (e.key === '1') { gradeAndAdvance('again'); }
-    else if (e.key === '2') { gradeAndAdvance('hard'); }
-    else if (e.key === '3') { gradeAndAdvance('good'); }
-    else if (e.key === '4') { gradeAndAdvance('easy'); }
+    } else if (e.key === '1') { gradeAndAdvance('again', storage); }
+    else if (e.key === '2') { gradeAndAdvance('hard', storage); }
+    else if (e.key === '3') { gradeAndAdvance('good', storage); }
+    else if (e.key === '4') { gradeAndAdvance('easy', storage); }
     else if (e.key === 'p' || e.key === 'P') {
       const cards = filteredCards();
       if (cards[state.cardIndex]) speakCard(cards[state.cardIndex]);
     }
     else if (e.key === 's' || e.key === 'S') {
       shuffleCurrentLesson();
-      rerender();
+      rerender(storage);
       flashShuffle();
     }
   });
@@ -850,15 +970,15 @@ async function init() {
       const lessonId = e.target.closest('[data-lesson-map-jump]').dataset.lessonMapJump;
       state.mode = 'card';
       syncModeButtons('card');
-      selectLesson(lessonId);
+      selectLesson(lessonId, storage);
       return;
     }
     if (e.target.closest('[data-start-review-all]')) {
       e.stopPropagation();
-      const log = loadDailyLog();
+      const log = loadDailyLog(storage);
       const todaySeconds = log.days[localDateKey()]?.seconds || 0;
       const { cards, resweepKeys } = buildDailyQueue(
-        allCardsWithLessonId(), state.progress, state.lessons, todaySeconds,
+        allCardsWithLessonId(), state.progress, state.lessons, todaySeconds, storage,
       );
       setDailyQueue(cards, resweepKeys);
       state.currentLessonId = '__TODAY__';
@@ -866,9 +986,9 @@ async function init() {
       state.cardIndex = 0;
       state.flipped = false;
       stopListen();
-      saveState();
+      saveState(storage);
       syncModeButtons('srs');
-      rerender();
+      rerender(storage);
       return;
     }
     if (e.target.closest('[data-start-review]')) {
@@ -877,9 +997,9 @@ async function init() {
       state.cardIndex = 0;
       state.flipped = false;
       stopListen();
-      saveState();
+      saveState(storage);
       syncModeButtons('srs');
-      rerender();
+      rerender(storage);
       return;
     }
     if (e.target.closest('[data-mode-back-to-card]')) {
@@ -887,9 +1007,9 @@ async function init() {
       state.mode = 'card';
       state.cardIndex = 0;
       state.flipped = false;
-      saveState();
+      saveState(storage);
       syncModeButtons('card');
-      rerender();
+      rerender(storage);
       return;
     }
     const editBtn = e.target.closest('[data-edit-card-key]');
@@ -901,31 +1021,31 @@ async function init() {
     const jumpBtn = e.target.closest('[data-jump-card]');
     if (jumpBtn) {
       e.stopPropagation();
-      jumpToCard(jumpBtn.dataset.jumpCard);
+      jumpToCard(jumpBtn.dataset.jumpCard, storage);
       return;
     }
     const listFilter = e.target.closest('[data-list-filter]');
     if (listFilter) {
       e.stopPropagation();
       state.listFilter = listFilter.dataset.listFilter;
-      saveState();
-      renderContent(rerender);
+      saveState(storage);
+      renderContent(() => rerender(storage), storage);
       return;
     }
     const listLesson = e.target.closest('[data-list-lesson]');
     if (listLesson) {
       e.stopPropagation();
       state.listLessonId = listLesson.dataset.listLesson;
-      saveState();
-      renderContent(rerender);
+      saveState(storage);
+      renderContent(() => rerender(storage), storage);
       return;
     }
-    if (e.target.closest('#cardPrev')) { e.stopPropagation(); prevCard(); return; }
-    if (e.target.closest('#cardNext')) { e.stopPropagation(); nextCard(); return; }
+    if (e.target.closest('#cardPrev')) { e.stopPropagation(); prevCard(storage); return; }
+    if (e.target.closest('#cardNext')) { e.stopPropagation(); nextCard(storage); return; }
     const grade = e.target.closest('.pill[data-grade]');
     if (grade) {
       e.stopPropagation();
-      gradeAndAdvance(grade.dataset.grade);
+      gradeAndAdvance(grade.dataset.grade, storage);
     }
   });
 
@@ -935,7 +1055,7 @@ async function init() {
       state.srsToggle = e.target.checked;
       state.cardIndex = 0;
       state.flipped = false;
-      rerender();
+      rerender(storage);
     }
   });
 
@@ -953,7 +1073,7 @@ async function init() {
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       if (state.mode === 'today') return;   // 今日 mode 沒有卡片可滑
       if (state.mode === 'listen') stopListen();
-      if (dx > 0) prevCard(); else nextCard();
+      if (dx > 0) prevCard(storage); else nextCard(storage);
     }
   }, { passive: true });
 
@@ -966,24 +1086,26 @@ async function init() {
   // 「即時進度推播」），同步失敗不影響複習，syncProgressThrottled 內部靜默吞錯。
   setInterval(() => {
     if (document.hidden) return;
-    addActiveSeconds(15);
-    syncProgressThrottled(loadDailyLog().days[localDateKey()]?.seconds || 0);
+    addActiveSeconds(15, Date.now(), storage);
+    syncProgressThrottled(loadDailyLog(storage).days[localDateKey()]?.seconds || 0);
     // 跨裝置同步（登入才會真的動作，內部節流 2 分鐘一次）
-    if (cloudAuth.hasStoredSession()) syncThrottled();
+    if (cloudAuth.hasStoredSession()) syncThrottled(storage);
   }, 15000);
 
   // 背景化/關頁時補送最後一筆進度（sendBeacon，比一般 fetch 更能在背景存活）。
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) return;
-    syncProgressOnHide(loadDailyLog().days[localDateKey()]?.seconds || 0);
+    syncProgressOnHide(loadDailyLog(storage).days[localDateKey()]?.seconds || 0);
     // 切走前把還沒推上去的評分補送（keepalive，分頁關掉也送得完）。
     // 不用 syncNow()：那是一般 fetch，分頁一關就被瀏覽器砍掉。
-    if (cloudAuth.hasStoredSession()) flushOnHide();
+    if (cloudAuth.hasStoredSession()) flushOnHide(storage);
   });
 
   // 完成一局遊戲也會產生要同步的資料（games / gameIds / 補救蓋章），
   // 用 hook 通知，避免 today.js 反向 import cloud-sync 造成循環相依。
-  setLogChangeHook(storage => { if (cloudAuth.hasStoredSession()) syncSoon(storage); });
+  setLogChangeHook(changedStorage => {
+    if (cloudAuth.hasStoredSession()) syncSoon(changedStorage);
+  });
 
   // Service worker
   if ('serviceWorker' in navigator) {

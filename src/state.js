@@ -244,8 +244,102 @@ export function projectHydratedWorkspaceState(snapshot) {
   return { progress, projections };
 }
 
+/* Fresh boot 只從 scoped learning blob 採用仍留在 localStorage 的輔助資料。
+   progress 由 IndexedDB hydration 唯一決定；這裡即使看到同名欄位也刻意忽略。 */
+export function projectWorkspaceAuxiliaryState(raw) {
+  if (raw == null) return { favorites: {}, edits: {} };
+
+  let value;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new TypeError('invalid workspace auxiliary state JSON');
+  }
+  if (!isPlainRecord(value)
+      || (Object.hasOwn(value, 'favorites') && !isPlainRecord(value.favorites))
+      || (Object.hasOwn(value, 'edits') && !isPlainRecord(value.edits))) {
+    throw new TypeError('invalid workspace auxiliary state schema');
+  }
+
+  const favorites = {};
+  for (const [key, entry] of Object.entries(value.favorites || {})) {
+    if (!isSafeAuxiliaryKey(key)) {
+      throw new TypeError('invalid workspace favorite entry');
+    }
+    if (entry === 0 || entry === 1 || entry === false || entry === true) {
+      favorites[key] = { v: entry ? 1 : 0, ts: 0 };
+      continue;
+    }
+    if (!isPlainRecord(entry)
+        || Object.keys(entry).some(field => !['v', 'ts'].includes(field))
+        || (entry.v !== 0 && entry.v !== 1)
+        || !isNonnegativeFiniteNumber(entry.ts)) {
+      throw new TypeError('invalid workspace favorite entry');
+    }
+    favorites[key] = { v: entry.v, ts: entry.ts };
+  }
+
+  const edits = {};
+  for (const [key, entry] of Object.entries(value.edits || {})) {
+    if (!isSafeAuxiliaryKey(key)
+        || !isPlainRecord(entry)
+        || Object.keys(entry).some(field => !['thai', 'karaoke', 'zh', 'note', 'updatedAt'].includes(field))
+        || ['thai', 'karaoke', 'zh', 'note'].some(field => (
+          Object.hasOwn(entry, field) && typeof entry[field] !== 'string'
+        ))
+        || (Object.hasOwn(entry, 'updatedAt') && !isNonnegativeFiniteNumber(entry.updatedAt))) {
+      throw new TypeError('invalid workspace edit entry');
+    }
+    edits[key] = structuredClone(entry);
+  }
+
+  return { favorites, edits };
+}
+
+function isPlainRecord(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isSafeAuxiliaryKey(key) {
+  return !!key && !UNSAFE_PROJECTION_NAMES.has(key);
+}
+
+function isNonnegativeFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
 export function loadState(storage = localStorage) {
   return loadStateResult(storage).status === 'ok';
+}
+
+/* 開機最早期只允許採用這台裝置的 UI 設定。不能回讀舊的合併 state，
+   因為那份資料可能含另一個 workspace 的學習進度。 */
+export function loadDeviceStateResult(storage = localStorage) {
+  const deviceRead = readStoredState(storage, DEVICE_STATE_KEY);
+  if (deviceRead.status === 'missing') return { status: 'ok', source: 'missing' };
+  if (deviceRead.status === 'unavailable') return { status: 'unavailable', phase: 'read' };
+  if (deviceRead.status === 'corrupt'
+      || hasInvalidRecord(deviceRead.value, ['settings', 'collapsed'])) {
+    return { status: 'corrupt', reason: deviceRead.reason || 'schema' };
+  }
+  try {
+    const value = deviceRead.value;
+    Object.assign(state, {
+      settings: { ...state.settings, ...(value.settings || {}) },
+      collapsed: value.collapsed || {},
+      currentLessonId: value.currentLessonId || null,
+      mode: value.mode || 'card',
+      lastOpenDate: value.lastOpenDate || null,
+      cardIndex: typeof value.cardIndex === 'number' ? value.cardIndex : 0,
+      listFilter: value.listFilter || 'all',
+      listLessonId: value.listLessonId || null,
+      listOrder: value.listOrder || 'thai',
+    });
+    if ((value.settingsVersion || 1) < SETTINGS_VERSION) state.settings.gap = 'auto';
+    return { status: 'ok', source: 'stored' };
+  } catch {
+    return { status: 'corrupt', reason: 'schema' };
+  }
 }
 
 export function loadStateResult(storage = localStorage) {
@@ -410,6 +504,16 @@ export function saveState(storage = localStorage) {
   };
 
   return persistState(storage, learningState, deviceState);
+}
+
+export function saveDeviceState(storage = localStorage) {
+  const deviceState = {
+    settingsVersion: SETTINGS_VERSION, settings: state.settings, collapsed: state.collapsed,
+    currentLessonId: state.currentLessonId, mode: state.mode, lastOpenDate: state.lastOpenDate,
+    cardIndex: state.cardIndex, listFilter: state.listFilter,
+    listLessonId: state.listLessonId, listOrder: state.listOrder,
+  };
+  storage.setItem(DEVICE_STATE_KEY, JSON.stringify(deviceState));
 }
 
 function persistState(storage, learningState, deviceState) {

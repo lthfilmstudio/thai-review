@@ -3,7 +3,7 @@
    Cache：Worker 端 KV 7 天；client 不另外 cache（reuse worker cache）
    每行對話可點 ▶ 或泰文整段唸。 */
 
-import { state, isFavorite, saveState } from './state.js';
+import { state, isFavorite, saveDeviceState } from './state.js';
 import { speakCard } from './tts.js';
 import { escapeHtml } from './ui.js';
 import { normalizeGrade } from './srs.js';
@@ -78,7 +78,7 @@ async function fetchDialog(words) {
 }
 
 /* 主 render：從零畫整個對話面板（替代原本的卡片區）。 */
-export function renderDialogMode(el, _ignoredCards) {
+export function renderDialogMode(el, _ignoredCards, storage) {
   const source = ['lesson', 'fav', 'again', 'hard'].includes(state.settings.dialogSource)
     ? state.settings.dialogSource
     : 'lesson';
@@ -127,7 +127,7 @@ export function renderDialogMode(el, _ignoredCards) {
     btn.addEventListener('click', () => {
       const src = btn.dataset.src;
       state.settings.dialogSource = src;
-      saveState();
+      saveDeviceState();
       el.querySelectorAll('.dlg-src-btn').forEach((x) => x.classList.toggle('on', x.dataset.src === src));
     });
   });

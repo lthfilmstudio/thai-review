@@ -219,7 +219,7 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
   const favBtn = document.getElementById('favBtn');
   favBtn?.addEventListener('click', e => {
     e.stopPropagation();
-    toggleFavorite(card);
+    toggleFavorite(card, opts.storage);
     favBtn.classList.toggle('on');
     favBtn.innerHTML = isFavorite(card) ? SVG_STAR_FILLED : SVG_STAR_OUTLINE;
   });

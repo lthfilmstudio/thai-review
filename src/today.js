@@ -702,7 +702,7 @@ function renderCalendarHtml(log, storage = localStorage) {
 
 export function renderTodayMode(el, storage = localStorage) {
   // 遊戲進行中整頁交給遊戲，不畫分頁殼（原「練功」mode 的行為，合併後保留）
-  if (renderActiveGame(el, () => renderTodayMode(el, storage))) return;
+  if (renderActiveGame(el, () => renderTodayMode(el, storage), storage)) return;
 
   const log = loadDailyLog(storage);
   const dueCount = getDueCount();
@@ -712,8 +712,8 @@ export function renderTodayMode(el, storage = localStorage) {
   const todaySeconds = todayLog.seconds || 0;
   const streak = streakDays(days);
   const week = weekSummary(days);
-  const protection = getProtectionCount(log);
-  const makeup = getMakeupPending(log);
+  const protection = getProtectionCount(log, storage);
+  const makeup = getMakeupPending(log, storage);
 
   const checkin = reviewedToday > 0
     ? `<span class="today-checkin done">${SVG_CHECK}今天已複習 ${reviewedToday} 張</span>`
@@ -777,7 +777,7 @@ export function renderTodayMode(el, storage = localStorage) {
       ${bodyHtml}
     </div>`;
 
-  if (statsTab === 'plan') wireHomePanel(el, todayLog, () => renderTodayMode(el, storage));
+  if (statsTab === 'plan') wireHomePanel(el, todayLog, () => renderTodayMode(el, storage), storage);
 
   el.querySelectorAll('[data-today-tab]').forEach(btn => {
     btn.addEventListener('click', () => {

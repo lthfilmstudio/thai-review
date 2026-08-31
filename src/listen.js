@@ -2,7 +2,7 @@
    手機背景 / 鎖屏播放：全程用 tts.js 的共用 <audio> 串聲音鏈，
    跟讀空白也是播真靜音音檔（不是 setTimeout），audio session 不會斷。 */
 
-import { state, filteredCards, saveState } from './state.js';
+import { state, filteredCards, saveDeviceState } from './state.js';
 import { prepareLockListenSession } from './listen-lock.js';
 import { findLockPosition } from './listen-static.js';
 import {
@@ -98,7 +98,7 @@ async function warmUpcomingCycles(cards, version) {
   }
 }
 
-export function renderListenMode(el, cards, advanceCb) {
+export function renderListenMode(el, cards, advanceCb, storage) {
   onAdvance = advanceCb;
 
   const i = state.cardIndex;
@@ -194,7 +194,7 @@ export function renderListenMode(el, cards, advanceCb) {
     state.settings.rate = Number(btn.dataset.rate);
     if (isLockPlaying()) stopListen(); // rate 已烘進長音檔，播放中改要停下重拼
     clearLockSession();
-    saveState();
+    saveDeviceState();
     document.querySelectorAll('#listenRateSeg .listen-rate-btn').forEach(rateBtn => {
       rateBtn.classList.toggle('active', rateBtn === btn);
     });
@@ -205,7 +205,7 @@ export function renderListenMode(el, cards, advanceCb) {
     state.settings.gap = btn.dataset.gap === 'auto' ? 'auto' : Number(btn.dataset.gap);
     if (isLockPlaying()) stopListen(); // gap 已烘進長音檔，播放中改要停下重拼
     clearLockSession();
-    saveState();
+    saveDeviceState();
     document.querySelectorAll('#listenGapSeg .listen-rate-btn').forEach(gapBtn => {
       gapBtn.classList.toggle('active', gapBtn === btn);
     });

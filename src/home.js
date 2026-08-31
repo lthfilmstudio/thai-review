@@ -111,17 +111,17 @@ export function renderWeekChip(week) {
 }
 
 /* 遊戲進行中：整頁交給遊戲接管，呼叫端（today.js）看到 true 就不要再畫分頁殼。 */
-export function renderActiveGame(el, onExit) {
+export function renderActiveGame(el, onExit, storage) {
   if (listenGame.isListenGameActive()) {
-    listenGame.render(el, { onExit });
+    listenGame.render(el, { onExit }, storage);
     return true;
   }
   if (comboGame.isComboReviewActive()) {
-    comboGame.render(el, { onExit });
+    comboGame.render(el, { onExit }, storage);
     return true;
   }
   if (dialogueGame.isDialogueGameActive()) {
-    dialogueGame.render(el, { onExit });
+    dialogueGame.render(el, { onExit }, storage);
     return true;
   }
   return false;
@@ -204,7 +204,7 @@ export function homePanelHtml({ todayLog, makeup }) {
 }
 
 /* 綁行動面板的事件；rerender 由呼叫端（today.js）給，開完一局回到今日分頁。 */
-export function wireHomePanel(el, todayLog, rerender) {
+export function wireHomePanel(el, todayLog, rerender, storage) {
   const lesson = newestLesson();
   const { task1Done, task2Done, task3Done } = gameTaskState(todayLog);
 
