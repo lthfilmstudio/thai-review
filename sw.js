@@ -1,7 +1,7 @@
 /* Service Worker：app shell cache + runtime CSV cache。
    改檔後升 CACHE 版本號強制更新。 */
 
-const CACHE = 'thai-review-v91';
+const CACHE = 'thai-review-v92';
 
 const SHELL = [
   './',
@@ -14,6 +14,9 @@ const SHELL = [
   './src/state.js',
   './src/storage-scope.js',
   './src/practice-db.js',
+  './src/legacy-claim-flow.js',
+  './src/remote-workspace-probe.js',
+  './src/production-lineage-trust.js',
   './src/data.js',
   './src/tts-prompts.js',
   './src/tts.js',
@@ -94,6 +97,7 @@ self.addEventListener('fetch', e => {
   //   MP3 / sprite 本體檔名帶 hash，繼續走 cache-first）
   if (url.origin === location.origin &&
       (url.pathname.endsWith('/data.json') ||
+       url.pathname.endsWith('/data/card-id-lineage.json') ||
        url.pathname.endsWith('/src/tts-prompts.js') ||
        url.pathname.endsWith('/audio-manifest.json') ||
        url.pathname.endsWith('/zh-manifest.json') ||

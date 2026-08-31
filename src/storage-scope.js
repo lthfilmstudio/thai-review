@@ -455,6 +455,7 @@ export async function runWorkspaceBoot({
         session: sessionResult.session,
         catalog,
         storage,
+        migrationStorage: binding.hydrationStorage,
       });
     }
 
