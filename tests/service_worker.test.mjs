@@ -36,10 +36,24 @@ test('service worker refreshes mutable Thai audio indexes before using cache', (
   }
 });
 
-test('service worker cache version invalidates the stale v90 home bundle', () => {
-  assert.ok(sw.includes("const CACHE = 'thai-review-v91';"));
+test('service worker cache version invalidates the stale v91 home bundle', () => {
+  assert.ok(sw.includes("const CACHE = 'thai-review-v92';"));
   assert.ok(sw.includes("'./src/storage-scope.js'"),
     'app boot dependency must be available in the offline shell');
   assert.ok(sw.includes("'./src/practice-db.js'"),
     'workspace hydration dependency must be available in the offline shell');
+  assert.ok(sw.includes("'./src/legacy-claim-flow.js'"),
+    'legacy claim controller must be available in the offline shell');
+  assert.ok(sw.includes("'./src/remote-workspace-probe.js'"),
+    'legacy claim remote probe must be available in the offline shell');
+  assert.ok(sw.includes("'./src/production-lineage-trust.js'"),
+    'legacy claim trust manifest must be available in the offline shell');
+});
+
+test('service worker refreshes production lineage evidence before using cache', () => {
+  const lineageRule = sw.indexOf("url.pathname.endsWith('/data/card-id-lineage.json')");
+  const cacheFirstRule = sw.indexOf('// 同源：cache-first');
+  assert.ok(lineageRule > 0, 'production lineage evidence needs an explicit rule');
+  assert.ok(cacheFirstRule > lineageRule,
+    'production lineage evidence must be handled before same-origin cache-first');
 });

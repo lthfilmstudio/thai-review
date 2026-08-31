@@ -25,10 +25,11 @@ import { stopListen } from './listen.js';
 import { exitDialogueGame } from './game-dialogue.js';
 import {
   createWorkspaceStorage, requireWorkspaceStorage as assertWorkspaceStorage,
-  bootScreenFor, runWorkspaceBoot,
+  bootScreenFor, createWorkspaceBoot, runWorkspaceBoot,
 } from './storage-scope.js';
 import { getDeviceId } from './srs.js';
 import { hydrateWorkspaceSnapshot, openPracticeDatabase } from './practice-db.js';
+import { createLegacyClaimFlow } from './legacy-claim-flow.js';
 import {
   renderSidebar, renderTopbarTitle, renderStats, renderContent,
   openDrawer, closeDrawer, openModal, closeModal, applyTheme,
@@ -395,6 +396,101 @@ function bootDiagnostics({ details = null, error = null } = {}) {
   return `診斷：${phase} / ${code}`;
 }
 
+function renderLegacyClaimOffer({
+  offer, accountLabel, legacyFactCount, summary, signal,
+}) {
+  return new Promise((resolve, reject) => {
+    const content = document.getElementById('content');
+    if (!content) {
+      const error = new Error('legacy claim UI is unavailable');
+      error.code = 'LEGACY_CLAIM_UI_UNAVAILABLE';
+      reject(error);
+      return;
+    }
+    const root = document.createElement('div');
+    root.className = 'empty';
+    root.dataset.legacyClaim = 'offer';
+    const add = (className, text) => {
+      const child = document.createElement('div');
+      child.className = className;
+      child.textContent = text;
+      root.append(child);
+    };
+    add('empty-icon', '↗');
+    add('empty-title', '找到這台裝置的舊進度');
+    add('empty-sub', `帳號：${accountLabel}`);
+    add('empty-sub', `共 ${legacyFactCount} 筆；可解析 ${summary.resolved} 筆，${summary.quarantined} 筆會先隔離。保守不亂猜。`);
+
+    const actions = document.createElement('div');
+    actions.className = 'btn-row';
+    const claimButton = document.createElement('button');
+    claimButton.className = 'btn primary';
+    claimButton.type = 'button';
+    claimButton.textContent = '將這台裝置的進度加入此帳號';
+    const cancelButton = document.createElement('button');
+    cancelButton.className = 'btn ghost';
+    cancelButton.type = 'button';
+    cancelButton.textContent = '先不要';
+    actions.append(claimButton, cancelButton);
+    root.append(actions);
+    content.replaceChildren(root);
+
+    let settled = false;
+    const finish = decision => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener('abort', onAbort);
+      for (const button of [claimButton, cancelButton]) button.disabled = true;
+      if (decision === 'claim') claimButton.textContent = '儲存中…';
+      resolve(decision);
+    };
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      const error = new Error('legacy claim was invalidated');
+      error.code = 'WORKSPACE_INVALIDATED';
+      reject(error);
+    };
+    claimButton.addEventListener('click', () => finish('claim'), { once: true });
+    cancelButton.addEventListener('click', () => finish('cancel'), { once: true });
+    signal?.addEventListener('abort', onAbort, { once: true });
+    claimButton.focus();
+  });
+}
+
+function showLegacyMigrationSummary(summary) {
+  if (!summary) return Promise.resolve();
+  return new Promise(resolve => {
+    const content = document.getElementById('content');
+    if (!content) {
+      resolve();
+      return;
+    }
+    const root = document.createElement('div');
+    root.className = 'empty';
+    root.dataset.migrationSummary = 'complete';
+    const add = (className, text) => {
+      const child = document.createElement('div');
+      child.className = className;
+      child.textContent = text;
+      root.append(child);
+    };
+    add('empty-icon', '✓');
+    add('empty-title', '舊進度已安全整理');
+    add('empty-sub', `原始紀錄：${summary.original} 筆（完整保留）`);
+    add('empty-sub', `已解析：${summary.resolved} 筆；已加入可用進度：${summary.materialized} 筆`);
+    add('empty-sub', `待重新掃描：${summary.quarantined} 筆。無法唯一對應的內容已先隔離，保守不亂猜。`);
+    const button = document.createElement('button');
+    button.className = 'btn primary';
+    button.type = 'button';
+    button.textContent = '進入今日';
+    button.addEventListener('click', () => resolve(), { once: true });
+    root.append(button);
+    content.replaceChildren(root);
+    button.focus();
+  });
+}
+
 function applyHydratedWorkspace(hydration, auxiliary, writeHydration) {
   const projected = projectHydratedWorkspaceState(hydration);
   const daily = projected.projections.daily;
@@ -548,7 +644,10 @@ async function init() {
   }
   applyTheme();
   let practiceConnection = null;
+  let legacyClaimFlow = null;
+  const workspaceBoot = createWorkspaceBoot();
   const bootResult = await runWorkspaceBoot({
+    boot: workspaceBoot,
     resolveSession: cloudAuth.getSessionResult,
     resolveDeviceId: getDeviceId,
     loadCatalog: async () => ({ lessons: await loadLessonsSmart() }),
@@ -556,6 +655,7 @@ async function init() {
       const storage = createWorkspaceStorage(localStorage, { workspaceId, boot });
       practiceConnection = await openPracticeDatabase({
         onVersionChange: () => {
+          legacyClaimFlow?.invalidate();
           const current = boot.snapshot();
           if (current.state !== 'recoverable-failure' && current.state !== 'storage-unavailable') {
             boot.moveTo('recoverable-failure', {
@@ -566,6 +666,24 @@ async function init() {
         },
       });
       return storage;
+    },
+    migrate: async ({ workspaceId, session, migrationStorage }) => {
+      legacyClaimFlow?.invalidate();
+      legacyClaimFlow = createLegacyClaimFlow({
+        rootStorage: localStorage,
+        eligibilityStorage: migrationStorage,
+        practiceConnection,
+        assertBootActive: id => {
+          const current = workspaceBoot.snapshot();
+          if (current.state !== 'migrating' || current.workspaceId !== id) {
+            throw Object.assign(new Error('legacy claim boot was invalidated'), {
+              code: 'WORKSPACE_INVALIDATED',
+            });
+          }
+        },
+        requestDecision: renderLegacyClaimOffer,
+      });
+      return legacyClaimFlow.migrate({ workspaceId, session });
     },
     hydrate: async ({ workspaceId, boot, hydrationStorage, writeHydration }) => {
       const auxiliary = projectWorkspaceAuxiliaryState(
@@ -588,6 +706,7 @@ async function init() {
     onState: snapshot => renderWorkspaceBoot(snapshot, bootDiagnostics({ details: snapshot.details })),
   });
   if (bootResult.status !== 'ready') {
+    legacyClaimFlow?.invalidate();
     practiceConnection?.close();
     renderWorkspaceBoot(bootResult.boot.snapshot(), bootDiagnostics({
       details: bootResult.boot.snapshot().details, error: bootResult.error,
@@ -596,6 +715,7 @@ async function init() {
   }
   workspaceStorage = bootResult.storage;
   const storage = requireWorkspaceStorage();
+  await showLegacyMigrationSummary(bootResult.migration?.summary);
   initDailyLog(state.progress, storage);
 
   // streak 結算必須在 hydration 後、任何主畫面 render 前完成。
@@ -837,6 +957,7 @@ async function init() {
       if (!confirm('登出後這台裝置就不再同步（本機已有的紀錄不會被刪）。確定登出？')) return;
       btn.disabled = true;
       // 先切斷舊 operation；Supabase signOut 不保證已送出的 token 立刻失效。
+      legacyClaimFlow?.invalidate();
       invalidateSync();
       await cloudAuth.logout();
       // 連同步 watermark 與別台的日誌視圖一起清掉，否則登出後統計還混著別台

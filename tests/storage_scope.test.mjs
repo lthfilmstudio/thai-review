@@ -9,6 +9,7 @@ import {
   createWorkspaceBoot,
   getOrCreateWorkspaceInstallationId,
   createWorkspaceStorage,
+  inspectNamespacedLocalCounts,
   requireWorkspaceStorage,
   inspectStorageDurability,
   logoutToAnonymous,
@@ -111,6 +112,38 @@ test('workspace coordinator 依 session → catalog → storage → migration �
   assert.equal(backing.values.size, 0, 'boot and migration adapters must not write learning facts');
   result.storage.setItem(LEARNING_STORE_KEYS.state, '{}');
   assert.equal(result.storage.getItem(LEARNING_STORE_KEYS.state), '{}');
+});
+
+test('migrate 只用 boot-bound capability 盤點 local eligibility，runtime storage 仍鎖到 ready', async () => {
+  const backing = memoryStorage();
+  let capturedMigrationStorage = null;
+  const result = await runWorkspaceBoot({
+    resolveSession: async () => ({
+      status: 'authenticated', session: { user: { id: 'A' } },
+    }),
+    resolveDeviceId: () => 'must-not-run',
+    loadCatalog: async () => ({ revision: 'catalog-1' }),
+    openStorage: ({ workspaceId, boot }) => createWorkspaceStorage(backing, {
+      workspaceId, boot,
+    }),
+    migrate: async ({ workspaceId, storage, migrationStorage }) => {
+      capturedMigrationStorage = migrationStorage;
+      assert.notEqual(migrationStorage, storage);
+      assert.throws(() => inspectNamespacedLocalCounts(storage, workspaceId), {
+        code: 'STORAGE_UNAVAILABLE',
+      });
+      const inspected = inspectNamespacedLocalCounts(migrationStorage, workspaceId);
+      assert.equal(inspected.workspaceId, workspaceId);
+      assert.ok(Object.values(inspected.counts).every(value => value === 0));
+      return { status: 'offer-path-reached' };
+    },
+  });
+
+  assert.equal(result.status, 'ready', result.error?.stack);
+  assert.equal(result.migration.status, 'offer-path-reached');
+  assert.throws(() => capturedMigrationStorage.getItem(LEARNING_STORE_KEYS.state), {
+    code: 'WORKSPACE_NOT_READY',
+  });
 });
 
 test('authenticated boot 不建立或讀取裝置 ID', async () => {
