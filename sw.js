@@ -1,7 +1,7 @@
 /* Service Worker：app shell cache + runtime CSV cache。
    改檔後升 CACHE 版本號強制更新。 */
 
-const CACHE = 'thai-review-v94';
+const CACHE = 'thai-review-v95';
 
 const SHELL = [
   './',
@@ -57,10 +57,21 @@ const SHELL = [
   './data/card-id-lineage.json',
 ];
 
+/* cache.add() 只看狀態碼，200 text/html 也照收，install 當下就會把 SPA fallback
+   或 Access 登入頁寫進 JSON 的 cache key。改成自己 fetch 再過型別檢查：型別不對
+   就不寫（離線時該路徑拿不到東西，呼叫端會走各自的 fail-closed 分支），但不讓整個
+   install 失敗——那會連 offline shell 都沒有，比缺一個檔更糟。 */
+async function precache(cache, url) {
+  const request = new Request(url, { cache: 'reload' });
+  const response = await fetch(request);
+  if (!response.ok) throw new Error(`precache failed ${url} (${response.status})`);
+  if (cacheableJsonResponse(request, response)) await cache.put(request, response);
+}
+
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
-      .then(c => Promise.all(SHELL.map(url => c.add(new Request(url, { cache: 'reload' })))))
+      .then(c => Promise.all(SHELL.map(url => precache(c, url))))
       .then(() => self.skipWaiting())
   );
 });

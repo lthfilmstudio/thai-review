@@ -572,6 +572,8 @@ test('compact production lineage evidence 仍須完整 manifest、partition 與�
   ]);
   const evidence = {
     kind: 'production-lineage-evidence-v2',
+    schemaVersion: 2,
+    generatedAt: '2026-08-24T17:54:31+0800',
     completeness: 'complete',
     expectedRevisions: ['deploy:r1', 'deploy:r2'],
     resolvedAliases: { 'L1:stable': CARD_A },
@@ -1478,6 +1480,8 @@ test('v2 lineage 夾帶未知 top-level 欄位整份不收', () => {
   const legacySnapshot = snapshot([fact('state', 'progress/stable', 'L1:stable', { interval: 3 })]);
   const evidence = {
     kind: 'production-lineage-evidence-v2',
+    schemaVersion: 2,
+    generatedAt: '2026-08-24T17:54:31+0800',
     completeness: 'complete',
     expectedRevisions: ['deploy:r1'],
     source: {
@@ -1515,4 +1519,90 @@ test('v2 lineage 夾帶未知 top-level 欄位整份不收', () => {
 
   assert.equal(plan.summary.resolved, 0, '自洽但夾帶未知欄位的證據不可以被採信');
   assert.equal(plan.summary.quarantined, 1);
+});
+
+/* 只擋未知 top-level key 不夠：白名單內的自由字串與可延伸子物件一樣是填充空間，
+   FNV32 有得湊就有碰撞可能。這幾條把形狀釘死。 */
+function paddableEvidence(overrides) {
+  const evidence = {
+    kind: 'production-lineage-evidence-v2',
+    schemaVersion: 2,
+    generatedAt: '2026-08-24T17:54:31+0800',
+    completeness: 'complete',
+    expectedRevisions: ['deploy:r1'],
+    source: {
+      projectName: 'thai-review',
+      environment: 'production',
+      deploymentManifestSha256: 'deployment-sha',
+    },
+    resolvedAliases: { 'L1:stable': CARD_A },
+    unresolvedReasons: {},
+    collisionAliases: [],
+    canonicalCardIds: [CARD_A],
+    summary: {
+      currentAliasCount: 1,
+      resolvedAliasCount: 1,
+      unresolvedAliasCount: 0,
+      historicalCollisionAliasCount: 0,
+    },
+    ...overrides,
+  };
+  const { evidenceId: _drop, ...core } = evidence;
+  evidence.evidenceId = `production-lineage-evidence-v2:fnv1a32:${fixtureStableHash(fixtureStableSerialize(core))}`;
+  return evidence;
+}
+
+function planWith(evidence) {
+  return planLegacyMigration({
+    legacySnapshot: snapshot([fact('state', 'progress/stable', 'L1:stable', { interval: 3 })]),
+    lineageEvidence: evidence,
+    trustedRevisionManifest: {
+      kind: 'trusted-lineage-revision-manifest-v1',
+      projectName: 'thai-review',
+      environment: 'production',
+      sourceManifestSha256: 'deployment-sha',
+      evidenceId: evidence.evidenceId,
+      revisions: ['deploy:r1'],
+    },
+  });
+}
+
+test('自洽的 v2 證據在乾淨形狀下仍然可用（確認下面幾條不是把功能關掉）', () => {
+  assert.equal(planWith(paddableEvidence({})).summary.resolved, 1);
+});
+
+test('generatedAt 不是固定時間戳格式就不收（不留自由字串當填充空間）', () => {
+  for (const generatedAt of ['x'.repeat(10240), '2026-08-24', '', 12345, null]) {
+    const plan = planWith(paddableEvidence({ generatedAt }));
+    assert.equal(plan.summary.resolved, 0, `generatedAt=${JSON.stringify(generatedAt)} 不該被採信`);
+  }
+});
+
+test('schemaVersion 必須正好是 2', () => {
+  for (const schemaVersion of [1, 3, '2', undefined]) {
+    assert.equal(planWith(paddableEvidence({ schemaVersion })).summary.resolved, 0);
+  }
+});
+
+test('source／summary 夾帶未知子欄位整份不收', () => {
+  const withSourcePadding = paddableEvidence({
+    source: {
+      projectName: 'thai-review',
+      environment: 'production',
+      deploymentManifestSha256: 'deployment-sha',
+      padding: 'y'.repeat(4096),
+    },
+  });
+  assert.equal(planWith(withSourcePadding).summary.resolved, 0);
+
+  const withSummaryPadding = paddableEvidence({
+    summary: {
+      currentAliasCount: 1,
+      resolvedAliasCount: 1,
+      unresolvedAliasCount: 0,
+      historicalCollisionAliasCount: 0,
+      padding: 'z'.repeat(4096),
+    },
+  });
+  assert.equal(planWith(withSummaryPadding).summary.resolved, 0);
 });

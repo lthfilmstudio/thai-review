@@ -23,15 +23,16 @@ function loadServiceWorker({ fetchImpl, cacheEntries = new Map() }) {
     fetch: fetchImpl,
     location: { origin: 'https://thai-review.test' },
     URL,
+    Request,
     Response,
     Promise,
     console,
   };
   const exported = runInNewContext(
-    `${sw}\n;({ networkFirst, cacheableJsonResponse })`,
+    `${sw}\n;({ networkFirst, cacheableJsonResponse, precache })`,
     context,
   );
-  return { ...exported, puts };
+  return { ...exported, puts, cache };
 }
 
 function jsonRequest(path = '/data/card-id-lineage.json') {
@@ -101,8 +102,8 @@ test('service worker refreshes mutable Thai audio indexes before using cache', (
   }
 });
 
-test('service worker cache version invalidates the stale v93 bundle', () => {
-  assert.ok(sw.includes("const CACHE = 'thai-review-v94';"));
+test('service worker cache version invalidates the stale v94 bundle', () => {
+  assert.ok(sw.includes("const CACHE = 'thai-review-v95';"));
   assert.ok(sw.includes("'./src/storage-scope.js'"),
     'app boot dependency must be available in the offline shell');
   assert.ok(sw.includes("'./src/practice-db.js'"),
@@ -194,3 +195,47 @@ test('every offline shell entry is staged by the deploy script', async () => {
     );
   }
 });
+
+/* install 的 cache.add() 只看狀態碼，200 text/html 也照收——檔案哪天又漏部署，
+   開機當下就把 SPA fallback 寫進 JSON 的 cache key。 */
+test('precache 不把 200 text/html 寫進 JSON 的 cache key，但也不讓整個 install 掛掉', async () => {
+  const sw1 = loadServiceWorker({
+    fetchImpl: async () => stubResponse('<!DOCTYPE html>', 'text/html; charset=utf-8'),
+  });
+
+  await sw1.precache(await sw1Cache(sw1), 'https://thai-review.test/data/card-id-lineage.json');
+
+  assert.equal(sw1.puts.length, 0, '型別不對不可以進 cache');
+});
+
+test('precache 照常快取正常 JSON 與一般靜態資源', async () => {
+  const jsonSw = loadServiceWorker({
+    fetchImpl: async () => stubResponse('{"kind":"x"}', 'application/json'),
+  });
+  await jsonSw.precache(await sw1Cache(jsonSw), 'https://thai-review.test/data/card-id-lineage.json');
+  assert.equal(jsonSw.puts.length, 1);
+
+  const htmlSw = loadServiceWorker({
+    fetchImpl: async () => stubResponse('<!DOCTYPE html>', 'text/html'),
+  });
+  await htmlSw.precache(await sw1Cache(htmlSw), 'https://thai-review.test/index.html');
+  assert.equal(htmlSw.puts.length, 1, 'HTML 資源本來就該是 HTML，照收');
+});
+
+test('install 真的走 precache，而不是繞回 cache.add', () => {
+  const install = sw.slice(sw.indexOf("addEventListener('install'"), sw.indexOf("addEventListener('activate'"));
+  assert.match(install, /precache\(/, 'install 必須經過型別檢查那條路徑');
+  assert.doesNotMatch(install, /\.add\(/, 'cache.add() 會把 200 text/html 照收');
+});
+
+test('precache 對非 2xx 仍然丟錯（維持原本 cache.add 的失敗語意）', async () => {
+  const sw1 = loadServiceWorker({
+    fetchImpl: async () => stubResponse('', 'text/plain', 404),
+  });
+  await assert.rejects(sw1.precache(await sw1Cache(sw1), 'https://thai-review.test/index.html'), /precache failed/);
+});
+
+async function sw1Cache(sw1) {
+  // loadServiceWorker 的 caches.open() 一律回同一個 cache 物件
+  return sw1.cache;
+}

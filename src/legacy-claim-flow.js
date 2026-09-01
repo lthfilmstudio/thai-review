@@ -77,6 +77,14 @@ export async function fetchProductionLineageEvidence({
   timeoutMs = 10000,
   expectedEvidenceSha256 = TRUSTED_PRODUCTION_LINEAGE.evidenceSha256,
 } = {}) {
+  // 常數漏掉時 digest 永遠不會相等，等於把所有人一起鎖住。與其靜默比對 undefined，
+  // 不如當成「這個 build 沒有可比對的基準」。
+  if (typeof expectedEvidenceSha256 !== 'string' || !/^[0-9a-f]{64}$/.test(expectedEvidenceSha256)) {
+    throw codedError(
+      'LEGACY_LINEAGE_UNAVAILABLE',
+      'trust manifest 沒有可用的 evidenceSha256，無法驗證 lineage evidence',
+    );
+  }
   const controller = new AbortController();
   const onParentAbort = () => controller.abort();
   if (parentSignal) {
@@ -112,7 +120,14 @@ export async function fetchProductionLineageEvidence({
       // 只有跟編進 bundle 的 SHA-256 對得起來才往下走。
       const digest = await abortable(sha256Hex(raw), controller.signal);
       if (digest !== expectedEvidenceSha256) {
-        throw new Error(`lineage evidence digest mismatch (${digest})`);
+        // 「bytes 不是我們認得的那份」不等於「有人在攻擊」：重跑產生器換掉 artifact
+        // 之後，離線裝置的 SW cache 還留著舊那份就會走到這裡。歸類成 UNAVAILABLE 讓
+        // claim 延後重試，不要把已登入的人鎖在開機畫面外——沒驗過就不會有任何
+        // migration 寫入，安全性跟丟 INVALID 完全一樣。
+        throw codedError(
+          'LEGACY_LINEAGE_UNAVAILABLE',
+          `lineage evidence digest mismatch (${digest})`,
+        );
       }
       const evidence = JSON.parse(raw);
       if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {

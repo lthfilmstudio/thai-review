@@ -1003,16 +1003,39 @@ function normalizeLineageEvidence(evidence, trustedRevisionManifest) {
   };
 }
 
-/* evidenceId 是 32-bit FNV，塞得進額外欄位就有空間湊碰撞。只收已知欄位，
-   多一個就整份不收。 */
+/* evidenceId 是 32-bit FNV，塞得進額外 bytes 就有空間湊碰撞。只擋未知的 top-level
+   key 不夠——白名單內的自由字串（generatedAt）與可延伸的子物件（source）一樣是填充
+   空間，所以形狀也要一起釘死。 */
 const COMPACT_LINEAGE_FIELDS = Object.freeze(new Set([
   'kind', 'schemaVersion', 'completeness', 'generatedAt', 'expectedRevisions',
   'source', 'resolvedAliases', 'unresolvedReasons', 'collisionAliases',
   'canonicalCardIds', 'summary', 'evidenceId',
 ]));
+const COMPACT_LINEAGE_SOURCE_FIELDS = Object.freeze(new Set([
+  'deploymentManifestSha256', 'gateManifestSha256', 'projectName', 'environment',
+]));
+const COMPACT_LINEAGE_SUMMARY_FIELDS = Object.freeze(new Set([
+  'deploymentCount', 'currentCardCount', 'currentAliasCount',
+  'resolvedAliasCount', 'unresolvedAliasCount', 'historicalCollisionAliasCount',
+]));
+const ISO_OFFSET_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4}$/;
+
+function boundedShape(value, allowed) {
+  return !!value
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && Object.keys(value).every(field => allowed.has(field));
+}
 
 function normalizeCompactLineageEvidence(evidence, trustedRevisionManifest) {
-  if (Object.keys(evidence).some(field => !COMPACT_LINEAGE_FIELDS.has(field))) {
+  if (Object.keys(evidence).some(field => !COMPACT_LINEAGE_FIELDS.has(field))
+      || evidence.schemaVersion !== 2
+      || typeof evidence.generatedAt !== 'string'
+      || !ISO_OFFSET_TIMESTAMP.test(evidence.generatedAt)
+      || !boundedShape(evidence.source, COMPACT_LINEAGE_SOURCE_FIELDS)
+      || !boundedShape(evidence.summary, COMPACT_LINEAGE_SUMMARY_FIELDS)
+      || Object.values(evidence.summary).some(count => !Number.isSafeInteger(count) || count < 0)
+      || Object.values(evidence.source).some(field => typeof field !== 'string' || !field.trim())) {
     return { complete: false, snapshots: [] };
   }
   const resolvedAliases = evidence?.resolvedAliases;

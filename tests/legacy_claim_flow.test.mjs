@@ -174,7 +174,9 @@ test('production lineage evidence 固定讀絕對路徑並使用 no-store', asyn
 });
 
 /* payload 自報的 kind／evidenceId 都是攻擊者可控的，唯一不可控的是編進 bundle 的
-   SHA-256。少了這道，偽造的 v1 payload 或 FNV 碰撞版本都能一路走到 migration。 */
+   SHA-256。少了這道，偽造的 v1 payload 或 FNV 碰撞版本都能一路走到 migration。
+   分類成 UNAVAILABLE 而不是 INVALID：bytes 不符也可能只是 SW 還快取著上一版
+   artifact，讓 claim 延後重試就好，不要把已登入的人鎖在開機畫面外。 */
 test('lineage evidence bytes 對不上 trust manifest 的 SHA-256 就 fail closed', async () => {
   const genuine = JSON.stringify({ kind: 'production-lineage-evidence-v2' });
   const expected = await sha256Hex(genuine);
@@ -184,19 +186,39 @@ test('lineage evidence bytes 對不上 trust manifest 的 SHA-256 就 fail close
       expectedEvidenceSha256: expected,
       fetchImpl: async () => servedBytes(`${genuine} `),   // 只多一個空白
     }),
-    error => error.code === 'LEGACY_LINEAGE_INVALID'
-      && /digest mismatch/.test(error.cause?.message || ''),
+    error => error.code === 'LEGACY_LINEAGE_UNAVAILABLE'
+      && /digest mismatch/.test(error.message || ''),
   );
 });
 
-test('Pages SPA fallback 的 200 text/html 不會被當成 evidence', async () => {
+/* 沒有 digest 綁定的話這份 HTML 會落到 JSON.parse 才炸成 INVALID（鎖死開機）。
+   斷言 UNAVAILABLE 等於斷言「是 digest 這關先擋下來的」。 */
+test('Pages SPA fallback 的 200 text/html 在 digest 這關就被擋下', async () => {
   await assert.rejects(
     fetchProductionLineageEvidence({
       expectedEvidenceSha256: await sha256Hex('{}'),
       fetchImpl: async () => servedBytes('<!DOCTYPE html>\n<html lang="zh-Hant">'),
     }),
-    { code: 'LEGACY_LINEAGE_INVALID' },
+    { code: 'LEGACY_LINEAGE_UNAVAILABLE' },
   );
+});
+
+/* 顯式傳 undefined 會觸發預設參數，測不到這條；用 null／壞格式代表「trust manifest
+   裡那個欄位不見了或被改壞」。少了這道守衛，digest 會永遠不等於 undefined，
+   等於把所有人一起鎖在開機畫面外。 */
+test('trust manifest 沒有可用的 evidenceSha256 時不發請求、也不鎖死開機', async () => {
+  for (const broken of [null, '', 'not-a-sha', 'A'.repeat(64)]) {
+    let fetched = false;
+    await assert.rejects(
+      fetchProductionLineageEvidence({
+        expectedEvidenceSha256: broken,
+        fetchImpl: async () => { fetched = true; return servedBytes('{}'); },
+      }),
+      { code: 'LEGACY_LINEAGE_UNAVAILABLE' },
+      `expectedEvidenceSha256=${JSON.stringify(broken)} 應該 fail closed`,
+    );
+    assert.equal(fetched, false, '沒有可比對的基準就不該發出請求');
+  }
 });
 
 test('編進 bundle 的 evidenceSha256 跟實際 artifact 一致', async () => {
