@@ -560,6 +560,22 @@ test('登出先同步 invalidate，再等 auth ownership 清除後才切 anonymo
   ]);
 });
 
+test('登出 auth 清除失敗時不清理同步狀態、不切 anonymous、也不 reload', async () => {
+  const events = [];
+  await assert.rejects(
+    logoutToAnonymous({
+      deviceId: 'device-1',
+      invalidate: () => events.push('invalidate'),
+      cleanup: () => events.push('cleanup'),
+      clearAuth: async () => { events.push('clear-auth'); throw new Error('auth unavailable'); },
+      activate: id => events.push(`activate:${id}`),
+      reload: () => events.push('reload'),
+    }),
+    /auth unavailable/,
+  );
+  assert.deepEqual(events, ['invalidate', 'clear-auth']);
+});
+
 test('opening storage 會呼叫 persist／estimate 並保留診斷，不虛構結果', async () => {
   const calls = [];
   const diagnostics = await inspectStorageDurability({

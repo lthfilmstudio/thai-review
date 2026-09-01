@@ -20,7 +20,7 @@ globalThis.localStorage = fallback;
 const {
   state, loadDeviceStateResult, loadState, loadStateResult, saveState, STORAGE_KEY, DEVICE_STATE_KEY,
   setGrade, toggleFavorite, saveCardEdit,
-  projectHydratedWorkspaceState, projectWorkspaceAuxiliaryState,
+  projectHydratedWorkspaceState, projectWorkspaceAuxiliaryState, mergeWorkspaceHydration,
 } = await import('../src/state.js');
 const {
   DAILY_KEY, loadDailyLog, logReview, logGame, addActiveSeconds, buildDailyQueue,
@@ -75,6 +75,29 @@ function readyWorkspacePort(backing, workspaceId) {
   boot.moveTo('ready');
   return { boot, port: createWorkspaceStorage(backing, { workspaceId, boot }) };
 }
+
+test('workspace hydration 保留 local-only 評分，IndexedDB 同卡資料優先', () => {
+  const localOnly = '550e8400-e29b-41d4-a716-446655440010';
+  const shared = '550e8400-e29b-41d4-a716-446655440011';
+  const result = mergeWorkspaceHydration(
+    { progress: { [shared]: { grade: 'easy' } }, projections: {} },
+    {
+      progress: {
+        [localOnly]: { grade: 'good' },
+        [shared]: { grade: 'again' },
+      },
+      favorites: { favorite: { v: 1, ts: 9 } },
+      edits: { edit: { thai: 'เดิม', updatedAt: 9 } },
+    },
+  );
+
+  assert.deepEqual(result.progress, {
+    [localOnly]: { grade: 'good' },
+    [shared]: { grade: 'easy' },
+  });
+  assert.deepEqual(result.favorites, { favorite: { v: 1, ts: 9 } });
+  assert.deepEqual(result.edits, { edit: { thai: 'เดิม', updatedAt: 9 } });
+});
 
 test('state keeps device UI global while explicit learning ports stay isolated', () => {
   fallback.values.clear();
@@ -565,13 +588,13 @@ test('fresh reload hydrates scoped favorites and edits while IndexedDB remains p
           }],
           projections: [],
         });
-        Object.assign(state, { progress: projected.progress, ...auxiliary });
+        Object.assign(state, mergeWorkspaceHydration(projected, auxiliary));
         return { projected, auxiliary };
       },
     });
 
     assert.equal(result.status, 'ready');
-    assert.deepEqual(Object.keys(state.progress), [cards[index]]);
+    assert.deepEqual(Object.keys(state.progress).sort(), [`local-${index}`, cards[index]].sort());
     assert.deepEqual(Object.keys(state.favorites), [`thai-${index}`]);
     assert.deepEqual(Object.keys(state.edits), [`L${index}:thai-${index}`]);
     assert.deepEqual(state.favorites[`thai-${index}`], { v: 1, ts: index === 1 ? 0 : index + 1 });
@@ -579,7 +602,11 @@ test('fresh reload hydrates scoped favorites and edits while IndexedDB remains p
     const saved = JSON.parse(result.storage.getItem(STORAGE_KEY));
     assert.deepEqual(saved.favorites, state.favorites, 'first ready save must retain favorites');
     assert.deepEqual(saved.edits, state.edits, 'first ready save must retain edits');
-    assert.deepEqual(Object.keys(saved.progress), [cards[index]], 'scoped local progress is ignored');
+    assert.deepEqual(
+      Object.keys(saved.progress).sort(),
+      [`local-${index}`, cards[index]].sort(),
+      'scoped local progress survives until the IndexedDB write path owns every grade',
+    );
   }
 
   assert.equal(fallback.getItem(STORAGE_KEY), legacyRaw, 'global legacy bytes remain untouched');

@@ -10,6 +10,8 @@
 
 export const HISTORY_MAX = 5;   // 對齊 src/grade-history.js 的 MAX_PER_CARD
 
+import { isStableCardId } from './card-identity.js';
+
 /* progress entry 的有效時間戳。舊資料可能沒有 updatedAt（migrate 進來的
    只有 nextReviewAt），退回 reviewedAt，再退回 0 當「最舊」。 */
 export function progressStamp(entry) {
@@ -263,6 +265,9 @@ export function normalizeCardRows(rows) {
 export function collectLocalChanges(localProgress, localHistory, since, resetAt = 0, localEdits = null) {
   const byKey = new Map();
   for (const key in localProgress) {
+    // IndexedDB hydration 使用 card_id；runtime／雲端同步仍使用 lessonId:thai。
+    // 在兩者接線前，絕不能把未翻譯的 UUID 當成 card_key 推上雲端。
+    if (isStableCardId(key)) continue;
     const entry = localProgress[key];
     if (!entry || typeof entry !== 'object') continue;
     const stamp = progressStamp(entry);

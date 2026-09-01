@@ -3,6 +3,7 @@
 import {
   state, loadDeviceStateResult, saveState as persistState, localDateKey,
   STORAGE_KEY, projectHydratedWorkspaceState, projectWorkspaceAuxiliaryState,
+  mergeWorkspaceHydration,
   DEFAULT_SHEET_URL,
   filteredCards, setGrade, shuffleCurrentLesson, isSrsActive, cardKey,
   saveLessonsCache, loadLessonsCache,
@@ -25,7 +26,7 @@ import { stopListen } from './listen.js';
 import { exitDialogueGame } from './game-dialogue.js';
 import {
   createWorkspaceStorage, requireWorkspaceStorage as assertWorkspaceStorage,
-  bootScreenFor, createWorkspaceBoot, runWorkspaceBoot,
+  bootScreenFor, createWorkspaceBoot, logoutToAnonymous, runWorkspaceBoot,
 } from './storage-scope.js';
 import { getDeviceId } from './srs.js';
 import { hydrateWorkspaceSnapshot, openPracticeDatabase } from './practice-db.js';
@@ -52,7 +53,7 @@ function assertCompleteCatalog() {
   }
 }
 
-async function ensureLessonLoaded() {
+async function ensureCatalogReady() {
   assertCompleteCatalog();
 }
 
@@ -175,7 +176,7 @@ async function selectLesson(id, storage) {
   closeDrawer();
   rerender(storage);
   // 跨課程操作前再次確認沒有半套 catalog。
-  await ensureLessonLoaded(id);
+  await ensureCatalogReady();
   rerender(storage);
 }
 
@@ -491,10 +492,39 @@ function showLegacyMigrationSummary(summary) {
   });
 }
 
-function applyHydratedWorkspace(hydration, auxiliary, writeHydration) {
+function runtimeProgressFromHydration(progress, catalog) {
+  const keyByCardId = new Map();
+  for (const lesson of catalog?.lessons || []) {
+    for (const card of lesson.cards || []) {
+      if (card?.card_id) {
+        keyByCardId.set(card.card_id, cardKey({ ...card, _lessonId: lesson.id }, lesson.id));
+      }
+    }
+  }
+  const translated = {};
+  for (const [cardId, entry] of Object.entries(progress || {})) {
+    const key = keyByCardId.get(cardId);
+    if (key) translated[key] = structuredClone(entry);
+  }
+  return translated;
+}
+
+function mergeProjectionRecord(storage, writeHydration, key, projection) {
+  const facts = Object.fromEntries((projection?.facts || []).map(fact => [fact.sourceKey, fact.value]));
+  let existing = {};
+  try {
+    const parsed = JSON.parse(storage.getItem(key) || '{}');
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) existing = parsed;
+  } catch { /* invalid auxiliary bytes are replaced by the verified projection */ }
+  writeHydration(key, JSON.stringify({ ...facts, ...existing }));
+  return { ...facts, ...existing };
+}
+
+function applyHydratedWorkspace(hydration, auxiliary, dailyStateExists, writeHydration, catalog, hydrationStorage) {
   const projected = projectHydratedWorkspaceState(hydration);
   const daily = projected.projections.daily;
-  if (daily?.schemaVersion === 1
+  if (!dailyStateExists
+      && daily?.schemaVersion === 1
       && daily.projectorVersion === 'legacy-workspace-facts-v1'
       && Array.isArray(daily.facts)) {
     const log = { v: 1, backfilled: false, days: {} };
@@ -507,11 +537,38 @@ function applyHydratedWorkspace(hydration, auxiliary, writeHydration) {
     }
     writeHydration(DAILY_KEY, JSON.stringify(log));
   }
-  Object.assign(state, {
-    progress: projected.progress,
-    favorites: auxiliary.favorites,
-    edits: auxiliary.edits,
-  });
+  const favoritesProjection = projected.projections.favorites;
+  const projectionFavorites = Object.fromEntries((favoritesProjection?.facts || []).map(fact => [
+    fact.sourceKey,
+    fact.value?.favorite ?? fact.value,
+  ]));
+  const mergedFavorites = {
+    ...projectionFavorites,
+    ...auxiliary.favorites,
+  };
+  if (favoritesProjection) {
+    writeHydration(STORAGE_KEY, JSON.stringify({
+      progress: auxiliary.progress,
+      favorites: mergedFavorites,
+      edits: auxiliary.edits,
+    }));
+  }
+  if (projected.projections.achievements) {
+    mergeProjectionRecord(
+      hydrationStorage, writeHydration, 'thai-review-achievements-v1',
+      projected.projections.achievements,
+    );
+  }
+  if (projected.projections.remoteDays) {
+    mergeProjectionRecord(
+      hydrationStorage, writeHydration, 'thai-review-remote-days-v1',
+      projected.projections.remoteDays,
+    );
+  }
+  Object.assign(state, mergeWorkspaceHydration({
+    ...projected,
+    progress: runtimeProgressFromHydration(projected.progress, catalog),
+  }, { ...auxiliary, favorites: mergedFavorites }));
   return { projected, auxiliary };
 }
 
@@ -685,7 +742,7 @@ async function init() {
       });
       return legacyClaimFlow.migrate({ workspaceId, session });
     },
-    hydrate: async ({ workspaceId, boot, hydrationStorage, writeHydration }) => {
+    hydrate: async ({ workspaceId, boot, hydrationStorage, writeHydration, catalog }) => {
       const auxiliary = projectWorkspaceAuxiliaryState(
         hydrationStorage.getItem(STORAGE_KEY),
       );
@@ -700,7 +757,14 @@ async function init() {
       });
       return {
         snapshot: hydration,
-        ...applyHydratedWorkspace(hydration, auxiliary, writeHydration),
+        ...applyHydratedWorkspace(
+          hydration,
+          auxiliary,
+          hydrationStorage.getItem(DAILY_KEY) != null,
+          writeHydration,
+          catalog,
+          hydrationStorage,
+        ),
       };
     },
     onState: snapshot => renderWorkspaceBoot(snapshot, bootDiagnostics({ details: snapshot.details })),
@@ -746,13 +810,13 @@ async function init() {
   }
   saveState(storage);
 
-  // lazy 模式：確保當前課程的卡片已載入
-  await ensureLessonLoaded(state.currentLessonId, { silentUI: false });
+  // 跨課程操作前再次確認 catalog 已完整採用。
+  await ensureCatalogReady();
 
   // 今日分頁的三局遊戲要最新一堂課的卡片，不一定跟目前選中的課程是同一堂
   if (state.mode === 'today') {
     const newest = state.lessons[state.lessons.length - 1];
-    if (newest) await ensureLessonLoaded(newest.id, { silentUI: true });
+    if (newest) await ensureCatalogReady();
   }
 
   if (deepLink) {
@@ -877,7 +941,7 @@ async function init() {
         state.currentLessonId = state.lessons[0]?.id || null;
         state.cardIndex = 0;
         state.flipped = false;
-        await ensureLessonLoaded(state.currentLessonId, { force: true });
+        await ensureCatalogReady();
         setLastSync(newInput || DEFAULT_SHEET_URL);
       } catch (e) {
         console.warn('URL 變更後重抓失敗：', e);
@@ -956,16 +1020,26 @@ async function init() {
     if (btn.dataset.cloudAction === 'logout') {
       if (!confirm('登出後這台裝置就不再同步（本機已有的紀錄不會被刪）。確定登出？')) return;
       btn.disabled = true;
-      // 先切斷舊 operation；Supabase signOut 不保證已送出的 token 立刻失效。
-      legacyClaimFlow?.invalidate();
-      invalidateSync();
-      await cloudAuth.logout();
-      // 連同步 watermark 與別台的日誌視圖一起清掉，否則登出後統計還混著別台
-      // 的數字，換帳號登入也會沿用舊 watermark 漏拉資料。
-      clearSyncState(storage);
-      btn.disabled = false;
-      void updateCloudHint(storage);
-      rerender(storage);   // 別台的數字剛被清掉，統計與月曆要跟著回到只有這台的值
+      try {
+        await logoutToAnonymous({
+          deviceId: getDeviceId(),
+          invalidate: () => {
+            legacyClaimFlow?.invalidate();
+            invalidateSync();
+          },
+          clearAuth: cloudAuth.logout,
+          cleanup: () => {
+            // Auth 清除成功後才清掉帳號 workspace 的同步衍生狀態。
+            clearSyncState(storage);
+            practiceConnection?.close();
+          },
+          activate: () => {},
+          reload: () => location.reload(),
+        });
+      } catch (error) {
+        btn.disabled = false;
+        alert(`登出失敗，仍保留目前帳號資料。\n${error.message}`);
+      }
       return;
     }
     await cloudAuth.login();   // 會整頁跳轉去 Google
@@ -1010,7 +1084,7 @@ async function init() {
 
       const cur = state.lessons.find(l => l.id === state.currentLessonId);
       if (cur) showLoading(`同步「${cur.title}」…`);
-      await ensureLessonLoaded(state.currentLessonId, { force: true, silentUI: true });
+      await ensureCatalogReady();
 
       setLastSync(url);
       updateSyncHint();

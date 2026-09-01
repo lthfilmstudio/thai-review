@@ -671,6 +671,7 @@ export function getOrCreateWorkspaceInstallationId(storage, createId) {
 export async function logoutToAnonymous({
   deviceId,
   invalidate,
+  cleanup,
   clearAuth,
   activate,
   reload,
@@ -684,6 +685,7 @@ export async function logoutToAnonymous({
   const workspaceId = resolveWorkspaceId({ deviceId });
   invalidate();
   await clearAuth();
+  cleanup?.();
   activate(workspaceId);
   reload();
   return workspaceId;

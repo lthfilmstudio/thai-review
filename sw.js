@@ -1,7 +1,7 @@
 /* Service Worker：app shell cache + runtime CSV cache。
    改檔後升 CACHE 版本號強制更新。 */
 
-const CACHE = 'thai-review-v92';
+const CACHE = 'thai-review-v93';
 
 const SHELL = [
   './',
@@ -13,6 +13,7 @@ const SHELL = [
   './src/app.js',
   './src/state.js',
   './src/storage-scope.js',
+  './src/card-identity.js',
   './src/practice-db.js',
   './src/legacy-claim-flow.js',
   './src/remote-workspace-probe.js',
@@ -53,6 +54,7 @@ const SHELL = [
   // GitHub Action 每 30 分鐘重生 data.json，這邊 cache 同源讓離線可用；
   // fetch 端會帶 ?_=ts cache buster 從 network 拿最新版（network-first 在 fetch handler 裡）
   './data.json',
+  './data/card-id-lineage.json',
 ];
 
 self.addEventListener('install', e => {

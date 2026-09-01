@@ -18,6 +18,12 @@ const PRODUCTION_CORE = Object.freeze({
   planLegacyMigration,
 });
 
+const CLAIM_DECLINED_KEY = 'thai-review-legacy-claim-declined-v1';
+const DEFERRED_CLAIM_ERRORS = new Set([
+  'LEGACY_LINEAGE_UNAVAILABLE',
+  'REMOTE_WORKSPACE_PROBE_UNAVAILABLE',
+]);
+
 function codedError(code, message, cause = null) {
   const error = new Error(message, cause ? { cause } : undefined);
   error.code = code;
@@ -34,29 +40,77 @@ function accountLabel(session) {
   return session?.user?.email || session?.user?.user_metadata?.name || '目前帳號';
 }
 
+function abortable(value, signal) {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      const error = new Error('production lineage evidence request aborted');
+      error.name = 'AbortError';
+      reject(error);
+    };
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+    Promise.resolve(value).then(resolve, reject).finally(() => {
+      signal.removeEventListener('abort', onAbort);
+    });
+  });
+}
+
 export async function fetchProductionLineageEvidence({
   fetchImpl = (...args) => fetch(...args),
+  signal: parentSignal,
+  timeoutMs = 10000,
 } = {}) {
-  let response;
-  try {
-    response = await fetchImpl('/data/card-id-lineage.json', { cache: 'no-store' });
-  } catch (cause) {
-    throw codedError('LEGACY_LINEAGE_UNAVAILABLE', '無法讀取 production lineage evidence', cause);
+  const controller = new AbortController();
+  const onParentAbort = () => controller.abort();
+  if (parentSignal) {
+    if (parentSignal.aborted) controller.abort();
+    else parentSignal.addEventListener('abort', onParentAbort, { once: true });
   }
-  if (!response?.ok) {
-    throw codedError(
-      'LEGACY_LINEAGE_UNAVAILABLE',
-      `production lineage evidence request failed (${response?.status || 'unknown'})`,
-    );
-  }
+  const timer = setTimeout(
+    () => controller.abort(),
+    Math.max(1, Number(timeoutMs) || 1),
+  );
   try {
-    const evidence = await response.json();
-    if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {
-      throw new Error('invalid lineage payload');
+    let response;
+    try {
+      response = await abortable(fetchImpl('/data/card-id-lineage.json', {
+        cache: 'no-store', signal: controller.signal,
+      }), controller.signal);
+    } catch (cause) {
+      throw codedError(
+        'LEGACY_LINEAGE_UNAVAILABLE',
+        '無法讀取 production lineage evidence',
+        cause,
+      );
     }
-    return evidence;
-  } catch (cause) {
-    throw codedError('LEGACY_LINEAGE_INVALID', 'production lineage evidence is invalid', cause);
+    if (!response?.ok) {
+      throw codedError(
+        'LEGACY_LINEAGE_UNAVAILABLE',
+        `production lineage evidence request failed (${response?.status || 'unknown'})`,
+      );
+    }
+    try {
+      const evidence = await abortable(response.json(), controller.signal);
+      if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {
+        throw new Error('invalid lineage payload');
+      }
+      return evidence;
+    } catch (cause) {
+      if (cause?.name === 'AbortError') {
+        throw codedError('LEGACY_LINEAGE_UNAVAILABLE', '無法讀取 production lineage evidence', cause);
+      }
+      throw codedError(
+        'LEGACY_LINEAGE_INVALID',
+        'production lineage evidence is invalid',
+        cause,
+      );
+    }
+  } finally {
+    clearTimeout(timer);
+    parentSignal?.removeEventListener('abort', onParentAbort);
   }
 }
 
@@ -146,10 +200,13 @@ export function createLegacyClaimFlow({
       if (!Array.isArray(legacySnapshot?.facts) || legacySnapshot.facts.length === 0) {
         return finish({ status: 'not-offered', reason: 'legacy-empty', summary: null });
       }
+      if (eligibilityStorage.getItem(CLAIM_DECLINED_KEY) === legacySnapshot.snapshotId) {
+        return finish({ status: 'not-offered', reason: 'user-declined', summary: null });
+      }
 
       let lineageEvidence;
       try {
-        lineageEvidence = await loadLineageEvidence();
+        lineageEvidence = await loadLineageEvidence({ signal: operation.signal });
       } catch (error) {
         throw error?.code
           ? error
@@ -184,7 +241,9 @@ export function createLegacyClaimFlow({
       assertActive(workspaceId);
       if (firstRemotePull?.completed !== true) {
         throw codedError(
-          'REMOTE_WORKSPACE_PROBE_FAILED',
+          ['request-failed', 'aborted'].includes(firstRemotePull?.reason)
+            ? 'REMOTE_WORKSPACE_PROBE_UNAVAILABLE'
+            : 'REMOTE_WORKSPACE_PROBE_FAILED',
           `remote workspace probe failed (${firstRemotePull?.reason || 'unknown'})`,
           firstRemotePull?.error,
         );
@@ -222,6 +281,7 @@ export function createLegacyClaimFlow({
       assertActive(workspaceId);
       if (decision === 'cancel') {
         const cancelled = core.evaluateLegacyClaim({ ...claimInput, decision });
+        eligibilityStorage.setItem(CLAIM_DECLINED_KEY, legacySnapshot.snapshotId);
         return finish({ status: cancelled.status, reason: 'user-cancelled', summary: null });
       }
       if (decision !== 'claim') {
@@ -250,6 +310,10 @@ export function createLegacyClaimFlow({
       return finish({ status: committed.status, summary: committed.summary });
     } catch (error) {
       invalidate();
+      if (DEFERRED_CLAIM_ERRORS.has(error?.code)) {
+        onDiagnostics({ phase: 'legacy-claim', code: error.code, error });
+        return { status: 'not-offered', reason: 'deferred-offline', summary: null };
+      }
       return reportAndThrow(error, 'LEGACY_CLAIM_FAILED');
     }
   }

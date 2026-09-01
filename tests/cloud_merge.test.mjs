@@ -149,6 +149,15 @@ test('collectLocalChanges 只挑 watermark 之後改過的卡', () => {
   assert.deepEqual(rows.map(r => r.card_key), ['L1:new']);
 });
 
+test('collectLocalChanges 不上傳尚未翻譯的 stable card_id progress key', () => {
+  const rows = collectLocalChanges({
+    '550e8400-e29b-41d4-a716-446655440000': entry({ updatedAt: 4000 }),
+    'L1:可同步': entry({ updatedAt: 4000 }),
+  }, {}, 0);
+
+  assert.deepEqual(rows.map(row => row.card_key), ['L1:可同步']);
+});
+
 test('collectLocalChanges 把該卡的歷史一起帶上去', () => {
   const localProgress = { 'L1:a': entry({ updatedAt: 5000 }) };
   const rows = collectLocalChanges(localProgress, { 'L1:a': [[2, 10]] }, 0);

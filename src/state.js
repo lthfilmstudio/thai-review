@@ -244,10 +244,10 @@ export function projectHydratedWorkspaceState(snapshot) {
   return { progress, projections };
 }
 
-/* Fresh boot 只從 scoped learning blob 採用仍留在 localStorage 的輔助資料。
-   progress 由 IndexedDB hydration 唯一決定；這裡即使看到同名欄位也刻意忽略。 */
+/* U4 runtime write path 接線前，scoped learning blob 仍保存本機評分；
+   IndexedDB 有同 card ID 時由 authoritative row 覆蓋。 */
 export function projectWorkspaceAuxiliaryState(raw) {
-  if (raw == null) return { favorites: {}, edits: {} };
+  if (raw == null) return { progress: {}, favorites: {}, edits: {} };
 
   let value;
   try {
@@ -256,10 +256,14 @@ export function projectWorkspaceAuxiliaryState(raw) {
     throw new TypeError('invalid workspace auxiliary state JSON');
   }
   if (!isPlainRecord(value)
+      || (Object.hasOwn(value, 'progress') && !isPlainRecord(value.progress))
       || (Object.hasOwn(value, 'favorites') && !isPlainRecord(value.favorites))
       || (Object.hasOwn(value, 'edits') && !isPlainRecord(value.edits))) {
     throw new TypeError('invalid workspace auxiliary state schema');
   }
+
+  const progress = structuredClone(value.progress || {});
+  migrateProgress(progress);
 
   const favorites = {};
   for (const [key, entry] of Object.entries(value.favorites || {})) {
@@ -293,7 +297,21 @@ export function projectWorkspaceAuxiliaryState(raw) {
     edits[key] = structuredClone(entry);
   }
 
-  return { favorites, edits };
+  return { progress, favorites, edits };
+}
+
+export function mergeWorkspaceHydration(projected, auxiliary) {
+  if (!isPlainRecord(projected?.progress)
+      || !isPlainRecord(auxiliary?.progress)
+      || !isPlainRecord(auxiliary?.favorites)
+      || !isPlainRecord(auxiliary?.edits)) {
+    throw new TypeError('invalid workspace hydration merge');
+  }
+  return {
+    progress: { ...auxiliary.progress, ...projected.progress },
+    favorites: auxiliary.favorites,
+    edits: auxiliary.edits,
+  };
 }
 
 function isPlainRecord(value) {

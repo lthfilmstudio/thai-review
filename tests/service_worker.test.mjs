@@ -1,8 +1,32 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { dirname, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const sw = await readFile(new URL('../sw.js', import.meta.url), 'utf8');
+const root = fileURLToPath(new URL('../', import.meta.url));
+
+async function staticModuleGraph(entry) {
+  const visited = new Set();
+  async function visit(filePath) {
+    const modulePath = relative(root, filePath).split(sep).join('/');
+    if (visited.has(modulePath)) return;
+    visited.add(modulePath);
+    const source = await readFile(filePath, 'utf8');
+    const imports = [
+      ...source.matchAll(
+        /(?:import|export)\s+(?:[^'";]*?\sfrom\s*)?['"](\.[^'"]+\.js)['"]/g,
+      ),
+      ...source.matchAll(/import\s*\(\s*['"](\.[^'"]+\.js)['"]\s*\)/g),
+    ];
+    for (const match of imports) {
+      await visit(resolve(dirname(filePath), match[1]));
+    }
+  }
+  await visit(entry);
+  return visited;
+}
 
 test('service worker fetches mutable deployment metadata network-first', () => {
   const networkFirstBlock = [
@@ -36,8 +60,8 @@ test('service worker refreshes mutable Thai audio indexes before using cache', (
   }
 });
 
-test('service worker cache version invalidates the stale v91 home bundle', () => {
-  assert.ok(sw.includes("const CACHE = 'thai-review-v92';"));
+test('service worker cache version invalidates the stale v92 home bundle', () => {
+  assert.ok(sw.includes("const CACHE = 'thai-review-v93';"));
   assert.ok(sw.includes("'./src/storage-scope.js'"),
     'app boot dependency must be available in the offline shell');
   assert.ok(sw.includes("'./src/practice-db.js'"),
@@ -48,6 +72,20 @@ test('service worker cache version invalidates the stale v91 home bundle', () =>
     'legacy claim remote probe must be available in the offline shell');
   assert.ok(sw.includes("'./src/production-lineage-trust.js'"),
     'legacy claim trust manifest must be available in the offline shell');
+  assert.ok(sw.includes("'./src/card-identity.js'"),
+    'card identity dependency must be available in the offline shell');
+  assert.ok(sw.includes("'./data/card-id-lineage.json'"),
+    'legacy claim evidence must be available in the offline shell');
+});
+
+test('service worker precaches the complete static app import graph', async () => {
+  const modules = await staticModuleGraph(resolve(root, 'src/app.js'));
+  for (const modulePath of modules) {
+    assert.ok(
+      sw.includes(`'./${modulePath}'`),
+      `${modulePath} must be available in the offline shell`,
+    );
+  }
 });
 
 test('service worker refreshes production lineage evidence before using cache', () => {

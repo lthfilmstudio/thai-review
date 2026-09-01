@@ -62,5 +62,20 @@ test('versionchange、boot failure 與 logout 都 invalidate legacy claim flow',
   const failedBoot = appSource.indexOf("if (bootResult.status !== 'ready')");
   assert.match(appSource.slice(failedBoot, failedBoot + 300), /legacyClaimFlow\?\.invalidate\(\)/);
   const logout = appSource.indexOf("btn.dataset.cloudAction === 'logout'");
-  assert.match(appSource.slice(logout, logout + 500), /legacyClaimFlow\?\.invalidate\(\)/);
+  assert.match(appSource.slice(logout, logout + 900), /legacyClaimFlow\?\.invalidate\(\)/);
+});
+
+test('hydration 保留 scoped progress、legacy daily 只在空 workspace 套用一次', () => {
+  assert.match(appSource, /mergeWorkspaceHydration\(\{[\s\S]*runtimeProgressFromHydration/);
+  assert.match(appSource, /runtimeProgressFromHydration\(projected\.progress, catalog\)/);
+  assert.match(appSource, /keyByCardId\.set\(card\.card_id/);
+  assert.match(appSource, /hydrationStorage\.getItem\(DAILY_KEY\) != null/);
+  assert.match(appSource, /if \(!dailyStateExists\s*&& daily\?\.schemaVersion === 1/);
+});
+
+test('production logout 清掉帳號 handle 後 reload 成匿名 workspace', () => {
+  assert.match(appSource, /await logoutToAnonymous\(\{/);
+  assert.match(appSource, /clearAuth: cloudAuth\.logout/);
+  assert.match(appSource, /cleanup: \(\) => \{/);
+  assert.match(appSource, /reload: \(\) => location\.reload\(\)/);
 });

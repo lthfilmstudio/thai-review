@@ -311,7 +311,7 @@ export async function loadPublishedCatalog(pubUrl, {
 
   return {
     ...manifest,
-    lessons: applyTtsPromptsToLessons(lessons),
+    lessons,
     dialogues,
   };
 }

@@ -27,7 +27,12 @@ function fixture({
 } = {}) {
   const calls = [];
   const rootStorage = storageWithLegacy();
-  const eligibilityStorage = { workspaceId: 'user:A' };
+  const eligibilityValues = new Map();
+  const eligibilityStorage = {
+    workspaceId: 'user:A',
+    getItem(key) { return eligibilityValues.get(key) ?? null; },
+    setItem(key, value) { eligibilityValues.set(key, String(value)); },
+  };
   const snapshot = {
     snapshotId: 'legacy:snapshot',
     facts: [{ sourceStore: 'state', sourceKey: 'legacy', value: { grade: 'good' } }],
@@ -132,7 +137,7 @@ function fixture({
     core,
   });
   return {
-    flow, calls, diagnostics, rootStorage, eligibilityStorage, snapshot, plan,
+    flow, calls, diagnostics, rootStorage, eligibilityStorage, eligibilityValues, snapshot, plan,
     localEligibility, remoteReceipt, port, probe, offerToken, authorization,
   };
 }
@@ -152,10 +157,24 @@ test('production lineage evidence 固定讀絕對路徑並使用 no-store', asyn
   });
 
   assert.deepEqual(evidence, { kind: 'lineage' });
-  assert.deepEqual(calls, [[
-    '/data/card-id-lineage.json',
-    { cache: 'no-store' },
-  ]]);
+  assert.equal(calls[0][0], '/data/card-id-lineage.json');
+  assert.equal(calls[0][1].cache, 'no-store');
+  assert.equal(calls[0][1].signal?.aborted, false);
+});
+
+test('production lineage evidence timeout fails closed instead of hanging boot', async () => {
+  let requestSignal;
+  await assert.rejects(
+    fetchProductionLineageEvidence({
+      timeoutMs: 1,
+      fetchImpl: async (_url, options) => {
+        requestSignal = options.signal;
+        return new Promise(() => {});
+      },
+    }),
+    { code: 'LEGACY_LINEAGE_UNAVAILABLE' },
+  );
+  assert.equal(requestSignal?.aborted, true);
 });
 
 test('anonymous boot 不讀 legacy、不 probe、也不顯示 claim', async () => {
@@ -219,36 +238,42 @@ test('local v2 非空或 remote 非空時不 offer', async t => {
   }
 });
 
-test('lineage 無效或 request failure 都 fail closed，只送 diagnostics', async t => {
-  for (const scenario of [
-    { name: 'invalid', options: { lineageValid: false }, code: 'LEGACY_LINEAGE_INVALID' },
-    {
-      name: 'request-failed',
-      options: { lineageFailure: new Error('offline') },
-      code: 'LEGACY_LINEAGE_UNAVAILABLE',
-    },
-  ]) {
-    await t.test(scenario.name, async () => {
-      const fx = fixture(scenario.options);
-      await assert.rejects(fx.flow.migrate(authenticated), { code: scenario.code });
-      assert.equal(fx.calls.some(([name]) => name === 'decision'), false);
-      assert.equal(fx.calls.some(([name]) => name === 'inspect-remote'), false);
-      assert.equal(fx.diagnostics.length, 1);
-      assert.equal(fx.diagnostics[0].code, scenario.code);
-      assert.equal(fx.calls.at(-1)[0], 'invalidate-probe');
-    });
-  }
+test('lineage 無效會 fail closed；離線讀不到 evidence 則延後 claim 但不阻塞 boot', async () => {
+  const invalid = fixture({ lineageValid: false });
+  await assert.rejects(invalid.flow.migrate(authenticated), { code: 'LEGACY_LINEAGE_INVALID' });
+  assert.equal(invalid.diagnostics[0].code, 'LEGACY_LINEAGE_INVALID');
+
+  const offline = fixture({ lineageFailure: new Error('offline') });
+  assert.deepEqual(await offline.flow.migrate(authenticated), {
+    status: 'not-offered', reason: 'deferred-offline', summary: null,
+  });
+  assert.equal(offline.calls.some(([name]) => name === 'decision'), false);
+  assert.equal(offline.calls.some(([name]) => name === 'inspect-remote'), false);
+  assert.equal(offline.diagnostics[0].code, 'LEGACY_LINEAGE_UNAVAILABLE');
 });
 
-test('remote probe request failure 進 diagnostics，不 offer 或 ready', async () => {
+test('remote probe request failure 進 diagnostics，延後 claim 且不假 offer', async () => {
   const fx = fixture({ remoteCompleted: false });
 
-  await assert.rejects(fx.flow.migrate(authenticated), {
-    code: 'REMOTE_WORKSPACE_PROBE_FAILED',
+  assert.deepEqual(await fx.flow.migrate(authenticated), {
+    status: 'not-offered', reason: 'deferred-offline', summary: null,
   });
   assert.equal(fx.calls.some(([name]) => name === 'decision'), false);
-  assert.equal(fx.diagnostics[0].code, 'REMOTE_WORKSPACE_PROBE_FAILED');
+  assert.equal(fx.diagnostics[0].code, 'REMOTE_WORKSPACE_PROBE_UNAVAILABLE');
   assert.equal(fx.calls.at(-1)[0], 'invalidate-probe');
+});
+
+test('先不要會記住同一 snapshot，下一次 boot 不再阻塞詢問或打 remote probe', async () => {
+  const fx = fixture({ decision: 'cancel' });
+  assert.equal((await fx.flow.migrate(authenticated)).reason, 'user-cancelled');
+  const firstDecisionCount = fx.calls.filter(([name]) => name === 'decision').length;
+  const firstRemoteCount = fx.calls.filter(([name]) => name === 'inspect-remote').length;
+
+  assert.deepEqual(await fx.flow.migrate(authenticated), {
+    status: 'not-offered', reason: 'user-declined', summary: null,
+  });
+  assert.equal(fx.calls.filter(([name]) => name === 'decision').length, firstDecisionCount);
+  assert.equal(fx.calls.filter(([name]) => name === 'inspect-remote').length, firstRemoteCount);
 });
 
 test('stale remote/local recheck 失敗後 diagnostics，不能重用 token 或假成功', async () => {
