@@ -917,6 +917,11 @@ function normalizeLineageEvidence(evidence, trustedRevisionManifest) {
         typeof revision !== 'string' || !revision.trim() || revision !== revision.trim()
       ))
       || !['production-lineage-evidence-v1', 'production-lineage-evidence-v2'].includes(evidence?.kind)
+      // v1 的 evidenceId 沒有從內容重算，任何人湊出對的 expectedRevisions 就能塞任意
+      // alias 對應。Production 產生的 trust manifest 不會開這個旗標；只有拿手寫 manifest
+      // 的歷史 snapshot 測試才收 v1。
+      || (evidence.kind === 'production-lineage-evidence-v1'
+        && trustedRevisionManifest?.allowHistoricalSnapshotEvidence !== true)
       || typeof evidence?.evidenceId !== 'string'
       || !evidence.evidenceId.trim()
       || evidence.evidenceId !== evidence.evidenceId.trim()
@@ -998,7 +1003,18 @@ function normalizeLineageEvidence(evidence, trustedRevisionManifest) {
   };
 }
 
+/* evidenceId 是 32-bit FNV，塞得進額外欄位就有空間湊碰撞。只收已知欄位，
+   多一個就整份不收。 */
+const COMPACT_LINEAGE_FIELDS = Object.freeze(new Set([
+  'kind', 'schemaVersion', 'completeness', 'generatedAt', 'expectedRevisions',
+  'source', 'resolvedAliases', 'unresolvedReasons', 'collisionAliases',
+  'canonicalCardIds', 'summary', 'evidenceId',
+]));
+
 function normalizeCompactLineageEvidence(evidence, trustedRevisionManifest) {
+  if (Object.keys(evidence).some(field => !COMPACT_LINEAGE_FIELDS.has(field))) {
+    return { complete: false, snapshots: [] };
+  }
   const resolvedAliases = evidence?.resolvedAliases;
   const unresolvedReasons = evidence?.unresolvedReasons;
   const collisionAliases = evidence?.collisionAliases;

@@ -66,6 +66,9 @@ function trustedRevisionManifest(revisions) {
   return {
     kind: 'trusted-lineage-revision-manifest-v1',
     revisions,
+    // 歷史 snapshot（v1）格式沒有內容綁定的 evidenceId，production 的 trust manifest
+    // 不會開這個旗標；這裡明確開，才能繼續測歷史 lineage 解析邏輯。
+    allowHistoricalSnapshotEvidence: true,
   };
 }
 
@@ -1418,4 +1421,98 @@ test('相同 source key 的重複 facts 仍逐筆保存，不被 storage key 覆
       .map(([, value]) => value.value),
     [[[0, 123]], [[2, 456]]],
   );
+});
+
+/* --- lineage 信任邊界（CWE-345 迴歸） ---
+   v1 的 evidenceId 從來沒有從內容重算過，複製一份公開的 evidenceId 就能塞任意
+   alias 對應；v2 的 evidenceId 是 32-bit FNV，塞得進未知欄位就有空間湊碰撞。 */
+
+function forgedHistoricalEvidence(aliases) {
+  return {
+    kind: 'production-lineage-evidence-v1',
+    evidenceId: 'production-lineage-evidence-v2:fnv1a32:05c747d1',
+    completeness: 'complete',
+    expectedRevisions: ['deploy:r1'],
+    snapshots: [{ revision: 'deploy:r1', complete: true, aliases }],
+  };
+}
+
+test('偽造的 v1 lineage 在 production trust manifest 下不被採信', () => {
+  const legacySnapshot = snapshot([fact('state', 'progress/x', 'L1:x', { interval: 3 })]);
+  const productionShapedManifest = {
+    kind: 'trusted-lineage-revision-manifest-v1',
+    projectName: 'thai-review',
+    environment: 'production',
+    evidenceId: 'production-lineage-evidence-v2:fnv1a32:05c747d1',
+    revisions: ['deploy:r1'],
+  };
+
+  const plan = planLegacyMigration({
+    legacySnapshot,
+    lineageEvidence: forgedHistoricalEvidence({ 'L1:x': [CARD_A] }),
+    trustedRevisionManifest: productionShapedManifest,
+  });
+
+  assert.equal(plan.summary.resolved, 0, '偽造證據不可以解出任何 alias');
+  assert.equal(plan.summary.quarantined, 1);
+  assert.notEqual(plan.lineageProvenance?.evidenceId, productionShapedManifest.evidenceId);
+});
+
+test('同一份 v1 證據在明確開旗標的 manifest 下才收', () => {
+  const legacySnapshot = snapshot([fact('state', 'progress/x', 'L1:x', { interval: 3 })]);
+
+  const plan = planLegacyMigration({
+    legacySnapshot,
+    lineageEvidence: forgedHistoricalEvidence({ 'L1:x': [CARD_A] }),
+    trustedRevisionManifest: {
+      kind: 'trusted-lineage-revision-manifest-v1',
+      revisions: ['deploy:r1'],
+      allowHistoricalSnapshotEvidence: true,
+    },
+  });
+
+  assert.equal(plan.summary.resolved, 1, '旗標開了就走原本的歷史解析路徑');
+});
+
+test('v2 lineage 夾帶未知 top-level 欄位整份不收', () => {
+  const legacySnapshot = snapshot([fact('state', 'progress/stable', 'L1:stable', { interval: 3 })]);
+  const evidence = {
+    kind: 'production-lineage-evidence-v2',
+    completeness: 'complete',
+    expectedRevisions: ['deploy:r1'],
+    source: {
+      projectName: 'thai-review',
+      environment: 'production',
+      deploymentManifestSha256: 'deployment-sha',
+    },
+    resolvedAliases: { 'L1:stable': CARD_A },
+    unresolvedReasons: {},
+    collisionAliases: [],
+    canonicalCardIds: [CARD_A],
+    summary: {
+      currentAliasCount: 1,
+      resolvedAliasCount: 1,
+      unresolvedAliasCount: 0,
+      historicalCollisionAliasCount: 0,
+    },
+    nonce: '⁠⁠⁠⁠',   // 碰撞用的填充欄位
+  };
+  const { evidenceId: _unused, ...evidenceCore } = evidence;
+  evidence.evidenceId = `production-lineage-evidence-v2:fnv1a32:${fixtureStableHash(fixtureStableSerialize(evidenceCore))}`;
+
+  const plan = planLegacyMigration({
+    legacySnapshot,
+    lineageEvidence: evidence,
+    trustedRevisionManifest: {
+      kind: 'trusted-lineage-revision-manifest-v1',
+      projectName: 'thai-review',
+      environment: 'production',
+      sourceManifestSha256: 'deployment-sha',
+      evidenceId: evidence.evidenceId,
+      revisions: ['deploy:r1'],
+    },
+  });
+
+  assert.equal(plan.summary.resolved, 0, '自洽但夾帶未知欄位的證據不可以被採信');
+  assert.equal(plan.summary.quarantined, 1);
 });

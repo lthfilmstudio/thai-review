@@ -1,7 +1,7 @@
 /* Service Worker：app shell cache + runtime CSV cache。
    改檔後升 CACHE 版本號強制更新。 */
 
-const CACHE = 'thai-review-v93';
+const CACHE = 'thai-review-v94';
 
 const SHELL = [
   './',
@@ -114,12 +114,24 @@ self.addEventListener('fetch', e => {
   }
 });
 
+/* SPA fallback 與 Cloudflare Access 的登入頁都是 200 text/html。只看 res.ok 會把
+   HTML 存進 JSON 的 cache key，之後離線開機拿到那份 HTML 就再也解不開。 */
+function cacheableJsonResponse(req, res) {
+  if (!res.ok) return false;
+  if (!new URL(req.url).pathname.endsWith('.json')) return true;
+  return (res.headers.get('content-type') || '').toLowerCase().includes('json');
+}
+
 async function networkFirst(req) {
   const cache = await caches.open(CACHE);
   try {
     const res = await fetch(req);
-    if (res.ok) cache.put(req, res.clone());
-    return res;
+    if (cacheableJsonResponse(req, res)) {
+      cache.put(req, res.clone());
+      return res;
+    }
+    // 型別不對就不污染 cache；有舊的正確版本先用舊的，沒有才把原樣回去讓呼叫端報錯。
+    return (res.ok && await cache.match(req)) || res;
   } catch (e) {
     const cached = await cache.match(req);
     return cached || Response.error();

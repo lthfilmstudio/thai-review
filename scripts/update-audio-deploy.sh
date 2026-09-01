@@ -65,7 +65,9 @@ fi
 
 ensure_preview_shell() {
   mkdir -p "$out_dir"
-  for item in index.html data.json styles icons manifest.webmanifest sw.js src; do
+  # data/ 放 card-id-lineage.json：legacy 認領開機時要抓，漏掉的話 Pages 會回
+  # SPA fallback 的 200 text/html，migrate 直接炸成 recoverable-failure 進不了 App。
+  for item in index.html data.json data styles icons manifest.webmanifest sw.js src; do
     if [[ ! -e "$out_dir/$item" ]]; then
       ln -s "../../$item" "$out_dir/$item"
     fi
@@ -264,8 +266,10 @@ if [[ "$deploy" -eq 1 ]]; then
   if [[ "$skip_tests" -ne 1 ]]; then
     echo
     echo "== Tests =="
-    node --test tests/*.test.mjs
-    python3 -m unittest discover -s tests -p '*_test.py'
+    # 每日結算／streak 的測資都綁台北日界線，不釘 TZ 的話換個環境就會出現
+    # 一批跟改動無關的紅字，release gate 會變得不可信。
+    TZ=Asia/Taipei node --test tests/*.test.mjs
+    TZ=Asia/Taipei python3 -m unittest discover -s tests -p '*_test.py'
   fi
 
   echo

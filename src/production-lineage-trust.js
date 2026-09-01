@@ -87,7 +87,8 @@ export const TRUSTED_PRODUCTION_LINEAGE = Object.freeze({
   "projectName": "thai-review",
   "environment": "production",
   "sourceManifestSha256": "e74dcf79927faea9855fee2d982cd6ace56957f8e1fa60c31602f3e3928116d9",
-  "evidenceId": "production-lineage-evidence-v2:fnv1a32:05c747d1"
+  "evidenceId": "production-lineage-evidence-v2:fnv1a32:05c747d1",
+  "evidenceSha256": "6a664518878fd54c4c1aaece5e18e4b4ceebb69c0cb59830f8e5b9ad06b864ea"
 ,
   "revisions": TRUSTED_REVISIONS
 });

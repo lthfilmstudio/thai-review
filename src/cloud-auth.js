@@ -122,10 +122,38 @@ export async function login() {
   if (error) console.warn('Google 登入失敗：', error.message);
 }
 
+/* 登出成功的定義是「這台裝置不再留著 session bytes」，不是「signOut() 有回來」。
+   GoTrue 有幾條路徑是回 { error } 而不是丟例外，而且不保證已經清掉 persisted
+   session；以前這裡把所有錯誤都吞掉，呼叫端拿不到失敗，共用裝置上會出現「畫面
+   登出了、帳號 workspace 還開得起來」。 */
 export async function logout() {
+  let failure = null;
   try {
-    await (await getClient()).signOut();
+    const { error } = (await (await getClient()).signOut()) || {};
+    if (error) failure = error;
   } catch (e) {
-    console.warn('登出失敗：', e.message);
+    failure = e;
+  }
+
+  if (storedSessionPresence().present) {
+    // signOut 沒清掉就自己清：使用者要的是登出，不是「網路請求成功」。
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {
+      failure = failure || e;
+    }
+  }
+
+  const presence = storedSessionPresence();
+  if (presence.status !== 'ok' || presence.present) {
+    const error = new Error(
+      `登出未完成，本機仍留有登入狀態${failure?.message ? `（${failure.message}）` : ''}`,
+      { cause: failure || presence.error || null },
+    );
+    error.code = 'AUTH_LOGOUT_INCOMPLETE';
+    throw error;
+  }
+  if (failure) {
+    console.warn('登出時 Supabase 回報錯誤，但本機登入狀態已清除：', failure.message);
   }
 }

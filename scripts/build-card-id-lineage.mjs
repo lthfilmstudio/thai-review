@@ -410,13 +410,17 @@ async function run() {
   });
   const lineageOutput = resolve(args['lineage-output']);
   mkdirSync(dirname(lineageOutput), { recursive: true });
-  writeFileSync(lineageOutput, jsonBytes(evidence));
+  const evidenceBytes = jsonBytes(evidence);
+  writeFileSync(lineageOutput, evidenceBytes);
   const trust = {
     kind: 'trusted-lineage-revision-manifest-v1',
     projectName: deploymentManifest.projectName,
     environment: deploymentManifest.environment,
     sourceManifestSha256: deploymentManifest.manifestSha256,
     evidenceId: evidence.evidenceId,
+    // evidenceId 是 32-bit FNV，只防意外損壞。真正的完整性綁定是這支 SHA-256：
+    // runtime 對「實際取回的 bytes」比對，格式降級與雜湊碰撞都過不了。
+    evidenceSha256: sha256(evidenceBytes),
     revisions: deploymentManifest.trustedRevisionManifest.revisions,
   };
   const trustOutput = resolve(args['trust-output']);

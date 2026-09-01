@@ -391,6 +391,8 @@ async function run() {
     lineageEvidence,
     trustedRevisionManifest: {
       kind: 'trusted-lineage-revision-manifest-v1', revisions: ['r1', 'r2'],
+      // 這份 fixture 用歷史 snapshot（v1）格式；production 的 manifest 不開這個旗標。
+      allowHistoricalSnapshotEvidence: true,
     },
   });
   let migrationPort = createLegacyMigrationTransactionPort(reopened, {

@@ -58,10 +58,24 @@ function abortable(value, signal) {
   });
 }
 
+/* 非安全脈絡（例如用 http:// 加區網 IP 開）沒有 SubtleCrypto。「驗不了」跟「驗不過」
+   要分開：前者不該把已登入的人鎖在開機畫面外，走 UNAVAILABLE 讓 claim 延後就好，
+   反正沒驗過就不會有任何 migration 寫入。 */
+async function sha256Hex(text) {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    throw codedError('LEGACY_LINEAGE_UNAVAILABLE', '這個環境沒有 SubtleCrypto，無法驗證 lineage evidence');
+  }
+  const bytes = new TextEncoder().encode(text);
+  const digest = await subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export async function fetchProductionLineageEvidence({
   fetchImpl = (...args) => fetch(...args),
   signal: parentSignal,
   timeoutMs = 10000,
+  expectedEvidenceSha256 = TRUSTED_PRODUCTION_LINEAGE.evidenceSha256,
 } = {}) {
   const controller = new AbortController();
   const onParentAbort = () => controller.abort();
@@ -93,7 +107,14 @@ export async function fetchProductionLineageEvidence({
       );
     }
     try {
-      const evidence = await abortable(response.json(), controller.signal);
+      const raw = await abortable(response.text(), controller.signal);
+      // 先綁 bytes 再談內容：payload 自報的 kind／evidenceId 都是攻擊者可控的，
+      // 只有跟編進 bundle 的 SHA-256 對得起來才往下走。
+      const digest = await abortable(sha256Hex(raw), controller.signal);
+      if (digest !== expectedEvidenceSha256) {
+        throw new Error(`lineage evidence digest mismatch (${digest})`);
+      }
+      const evidence = JSON.parse(raw);
       if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {
         throw new Error('invalid lineage payload');
       }
@@ -102,6 +123,7 @@ export async function fetchProductionLineageEvidence({
       if (cause?.name === 'AbortError') {
         throw codedError('LEGACY_LINEAGE_UNAVAILABLE', '無法讀取 production lineage evidence', cause);
       }
+      if (cause?.code) throw cause;   // 已經分類過的（例如驗不了 vs 驗不過）不要再被蓋掉
       throw codedError(
         'LEGACY_LINEAGE_INVALID',
         'production lineage evidence is invalid',

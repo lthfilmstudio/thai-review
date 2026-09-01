@@ -147,12 +147,23 @@ const authenticated = {
   session: { user: { id: 'A', email: 'nalin@example.com' } },
 };
 
+async function sha256Hex(text) {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function servedBytes(body) {
+  return { ok: true, status: 200, async text() { return body; } };
+}
+
 test('production lineage evidence 固定讀絕對路徑並使用 no-store', async () => {
   const calls = [];
+  const body = JSON.stringify({ kind: 'lineage' });
   const evidence = await fetchProductionLineageEvidence({
+    expectedEvidenceSha256: await sha256Hex(body),
     fetchImpl: async (...args) => {
       calls.push(args);
-      return { ok: true, async json() { return { kind: 'lineage' }; } };
+      return servedBytes(body);
     },
   });
 
@@ -160,6 +171,46 @@ test('production lineage evidence 固定讀絕對路徑並使用 no-store', asyn
   assert.equal(calls[0][0], '/data/card-id-lineage.json');
   assert.equal(calls[0][1].cache, 'no-store');
   assert.equal(calls[0][1].signal?.aborted, false);
+});
+
+/* payload 自報的 kind／evidenceId 都是攻擊者可控的，唯一不可控的是編進 bundle 的
+   SHA-256。少了這道，偽造的 v1 payload 或 FNV 碰撞版本都能一路走到 migration。 */
+test('lineage evidence bytes 對不上 trust manifest 的 SHA-256 就 fail closed', async () => {
+  const genuine = JSON.stringify({ kind: 'production-lineage-evidence-v2' });
+  const expected = await sha256Hex(genuine);
+
+  await assert.rejects(
+    fetchProductionLineageEvidence({
+      expectedEvidenceSha256: expected,
+      fetchImpl: async () => servedBytes(`${genuine} `),   // 只多一個空白
+    }),
+    error => error.code === 'LEGACY_LINEAGE_INVALID'
+      && /digest mismatch/.test(error.cause?.message || ''),
+  );
+});
+
+test('Pages SPA fallback 的 200 text/html 不會被當成 evidence', async () => {
+  await assert.rejects(
+    fetchProductionLineageEvidence({
+      expectedEvidenceSha256: await sha256Hex('{}'),
+      fetchImpl: async () => servedBytes('<!DOCTYPE html>\n<html lang="zh-Hant">'),
+    }),
+    { code: 'LEGACY_LINEAGE_INVALID' },
+  );
+});
+
+test('編進 bundle 的 evidenceSha256 跟實際 artifact 一致', async () => {
+  const [{ TRUSTED_PRODUCTION_LINEAGE }, { readFile }] = await Promise.all([
+    import('../src/production-lineage-trust.js'),
+    import('node:fs/promises'),
+  ]);
+  const artifact = await readFile(new URL('../data/card-id-lineage.json', import.meta.url), 'utf8');
+
+  assert.equal(
+    TRUSTED_PRODUCTION_LINEAGE.evidenceSha256,
+    await sha256Hex(artifact),
+    'trust manifest 與 data/card-id-lineage.json 不同步；重跑 build-card-id-lineage.mjs',
+  );
 });
 
 test('production lineage evidence timeout fails closed instead of hanging boot', async () => {
@@ -297,4 +348,21 @@ test('成功回傳一次性 migration summary 給 ready 後顯示', async () => 
   });
   assert.equal(fx.calls.filter(([name]) => name === 'inspect-local').length, 1);
   assert.equal(fx.calls.filter(([name]) => name === 'inspect-remote').length, 1);
+});
+
+test('沒有 SubtleCrypto 的環境走「驗不了」而不是「驗不過」，不把人鎖在開機畫面外', async () => {
+  // globalThis.crypto 在 Node 是 getter-only，要用 defineProperty 蓋掉再還原
+  const realCrypto = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+  Object.defineProperty(globalThis, 'crypto', { value: {}, configurable: true });
+  try {
+    await assert.rejects(
+      fetchProductionLineageEvidence({
+        expectedEvidenceSha256: 'deadbeef',
+        fetchImpl: async () => servedBytes('{"kind":"production-lineage-evidence-v2"}'),
+      }),
+      { code: 'LEGACY_LINEAGE_UNAVAILABLE' },
+    );
+  } finally {
+    Object.defineProperty(globalThis, 'crypto', realCrypto);
+  }
 });
