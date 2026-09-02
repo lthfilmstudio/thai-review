@@ -5,7 +5,7 @@ import {
   createLegacyMigrationTransactionPort,
   hydrateWorkspaceSnapshot,
 } from '../../src/practice-db.js';
-import { commitPracticeAttempt } from '../../src/practice-commit.js';
+import { acknowledgeResweepCursor, commitPracticeAttempt } from '../../src/practice-commit.js';
 import { buildPracticeAttemptEvent } from '../../src/practice-events.js';
 import {
   commitRuntimeSrsBaseline,
@@ -76,6 +76,15 @@ function rawIndexCount(database, storeName, indexName, key) {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([storeName], 'readonly');
     const request = transaction.objectStore(storeName).index(indexName).count(key);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function rawIndexGetAll(database, storeName, indexName, key) {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([storeName], 'readonly');
+    const request = transaction.objectStore(storeName).index(indexName).getAll(key);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
@@ -333,6 +342,19 @@ async function run() {
     abortObserved = error.message === 'intentional browser transaction abort';
   }
   if (!abortObserved) throw new Error('browser transaction abort was not observed');
+  // R9：retry-limit 的游標 ack 走真的 IndexedDB transaction，重播不得多推。
+  const resweepReceipt = {
+    expectedCardId: IDS.cardId, expectedPosition: 0, catalogDigest: 'sha256:browser-catalog-a',
+  };
+  const resweepAcked = await acknowledgeResweepCursor({
+    port: portA, workspaceId: 'user:A', receipt: resweepReceipt,
+  });
+  let resweepReplayError = null;
+  try {
+    await acknowledgeResweepCursor({ port: portA, workspaceId: 'user:A', receipt: resweepReceipt });
+  } catch (error) {
+    resweepReplayError = error.code || error.message;
+  }
   closeConnection(connection);
 
   let reopened = trackConnection(await openPracticeDatabase({ name: DB_NAME }));
@@ -346,6 +368,13 @@ async function run() {
   const outboxRow = await rawGet(reopened.database, 'outbox', ['user:A', winner.event.eventId]);
   const foreignRow = await rawGet(
     reopened.database, 'practice_events', ['user:B', winner.event.eventId],
+  );
+  // AE5：commit 完、localStorage mirror 之前掛掉，reload 要從 IDB 看到一樣的投影。
+  const dailyRow = await rawGet(
+    reopened.database, 'projections', ['user:A', 'daily:2026-08-24'],
+  );
+  const historyRow = await rawGet(
+    reopened.database, 'projections', ['user:A', `history:${IDS.cardId}`],
   );
   const counts = {
     events: await rawCount(reopened.database, 'practice_events'),
@@ -712,9 +741,14 @@ async function run() {
     materializedSrs: await rawIndexCount(
       migrationReload.database, 'srs_v2', 'by_workspace', 'user:B',
     ),
-    materializedProjections: await rawIndexCount(
+    // 同一個 workspace 現在也有 U3 寫的 ledger 投影，光數總數已經不能代表
+    // 「migration 產出幾份」了，要按 projectorVersion 分開數。
+    materializedProjections: (await rawIndexGetAll(
       migrationReload.database, 'projections', 'by_workspace', 'user:B',
-    ),
+    )).filter(row => row.projectorVersion === 'legacy-workspace-facts-v1').length,
+    ledgerProjections: (await rawIndexGetAll(
+      migrationReload.database, 'projections', 'by_workspace', 'user:B',
+    )).map(row => row.projectorVersion).filter(v => v !== 'legacy-workspace-facts-v1').sort(),
   };
   const journal = await rawGet(
     migrationReload.database, 'claim_journals', ['user:B', legacySnapshot.snapshotId],
@@ -780,6 +814,15 @@ async function run() {
       observedError: authoritativeAddCollisionError,
       ...authoritativeAddRollback,
     },
+    ledgerProjections: {
+      dailyReviewed: dailyRow?.reviewed ?? null,
+      dailyPractice: dailyRow?.practice ?? null,
+      dailyGood: dailyRow?.good ?? null,
+      historyEntries: historyRow?.entries?.length ?? null,
+      historyEventId: historyRow?.entries?.[0]?.[2] ?? null,
+      resweepAfterAck: resweepAcked?.position ?? null,
+      resweepReplayError: resweepReplayError,
+    },
     reloadReadBack: {
       eventId: eventRow?.event?.eventId || null,
       srsVersion: srsRow?.version ?? null,
@@ -833,6 +876,13 @@ async function run() {
       || output.runtimeBaseline.secondStatus !== 'no-op'
       || output.runtimeBaseline.seeded !== 1
       || output.runtimeBaseline.replaySkipped !== 1
+      || output.ledgerProjections.dailyReviewed !== 1
+      || output.ledgerProjections.dailyGood !== 1
+      || output.ledgerProjections.dailyPractice !== 0
+      || output.ledgerProjections.historyEntries !== 1
+      || output.ledgerProjections.historyEventId !== winner.event.eventId
+      || output.ledgerProjections.resweepAfterAck !== 1
+      || output.ledgerProjections.resweepReplayError !== 'RESWEEP_RECEIPT_POSITION_STALE'
       || output.reloadReadBack.eventId !== winner.event.eventId
       || output.reloadReadBack.srsVersion !== 1
       || output.reloadReadBack.sourceEventId !== winner.event.eventId
@@ -853,6 +903,7 @@ async function run() {
       || migrationCounts.journals !== 1
       || migrationCounts.materializedSrs !== 1
       || migrationCounts.materializedProjections !== 1
+      || migrationCounts.ledgerProjections.join(',') !== 'practice-daily-v1,practice-history-v1'
       || output.migration.hydration.srsCardIds.join(',')
         !== 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
       || output.migration.hydration.progressKeys.join(',')

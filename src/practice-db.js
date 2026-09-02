@@ -392,6 +392,24 @@ export function createPracticeTransactionPort(connection, {
             ...structuredClone(row),
           }));
         },
+        async getProjection(_workspaceId, name) {
+          active();
+          assertWorkspaceArgument(workspace, _workspaceId);
+          const row = await requestPromise(store('projections').get([
+            workspace, requiredRowKey(name, 'projection name'),
+          ]));
+          return row ? structuredClone(row) : null;
+        },
+        async putProjection(_workspaceId, name, row) {
+          active();
+          assertWorkspaceArgument(workspace, _workspaceId);
+          assertEnvelope(workspace, row);
+          const projectionName = requiredRowKey(name, 'projection name');
+          if (row.name !== projectionName) {
+            throw codedError('PRACTICE_ROW_INVALID', 'projection identity mismatch');
+          }
+          await requestPromise(store('projections').put(structuredClone(row)));
+        },
         async getWorkspaceMeta(_workspaceId, metaKey) {
           active();
           assertWorkspaceArgument(workspace, _workspaceId);

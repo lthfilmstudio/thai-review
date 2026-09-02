@@ -7,8 +7,20 @@ import { buildPracticeAttemptEvent, samePracticeEvent } from './practice-events.
 
 const PRACTICE_STORES = Object.freeze([
   'practiceEvents', 'srsV2', 'formalDueClaims', 'dailyLaneClaims',
-  'dailyCardClaims', 'attemptPhaseClaims', 'outbox',
+  'dailyCardClaims', 'attemptPhaseClaims', 'outbox', 'projections',
 ]);
+
+const DAILY_PROJECTOR_VERSION = 'practice-daily-v1';
+const HISTORY_PROJECTOR_VERSION = 'practice-history-v1';
+const GRADE_FIELDS = Object.freeze(['again', 'hard', 'good', 'easy']);
+/* 跟 src/grade-history.js 對齊：code 0-3、時間存秒、每張卡最多留 5 筆。 */
+const GRADE_CODE = Object.freeze({ again: 0, hard: 1, good: 2, easy: 3 });
+const MAX_HISTORY_PER_CARD = 5;
+const RESWEEP_PROJECTOR_VERSION = 'practice-resweep-v1';
+/* legacy 的 resweep 是單一持續游標（startedAt 設一次不重設，見 src/resweep.js），
+   所以 ledger 這邊也是每個 workspace 一份，不切日。 */
+const RESWEEP_PROJECTION_NAME = 'resweep';
+const RESWEEP_STORES = Object.freeze(['projections']);
 
 const DAY_CONTEXT_STORES = Object.freeze(['dailyCardClaims', 'attemptPhaseClaims']);
 
@@ -97,6 +109,185 @@ function attemptPhaseClaim(workspaceId, attempt, eventId) {
   };
 }
 
+function dailyProjectionName(dayKey) {
+  return `daily:${dayKey}`;
+}
+
+function emptyDailyProjection(workspaceId, dayKey) {
+  return {
+    workspaceId,
+    name: dailyProjectionName(dayKey),
+    schemaVersion: 1,
+    projectorVersion: DAILY_PROJECTOR_VERSION,
+    dayKey,
+    reviewed: 0,
+    again: 0,
+    hard: 0,
+    good: 0,
+    easy: 0,
+    practice: 0,
+    lastEventId: null,
+  };
+}
+
+async function readDailyProjection(tx, workspace, dayKey) {
+  const row = await tx.getProjection(workspace, dailyProjectionName(dayKey));
+  if (row && row.schemaVersion !== 1) {
+    throw codedError(
+      'PRACTICE_PROJECTION_INCOMPATIBLE',
+      'daily projection was written by another schema version',
+    );
+  }
+  // 缺欄位就從空投影補齊：舊 projectorVersion 少一欄的話，直接 += 會變成 NaN。
+  return { ...emptyDailyProjection(workspace, dayKey), ...(row || {}) };
+}
+
+/* R5／R7：只有 due + first 進 reviewed 與 grade；其他有存下來的 attempt（Sweep、
+   Weak、All 非 Due、以及 retry）只增加 practice attendance，不得冒充正式複習。 */
+async function applyDailyProjection(tx, workspace, event, isFormalDue) {
+  const next = await readDailyProjection(tx, workspace, event.dayKey);
+  if (isFormalDue) {
+    next.reviewed += 1;
+    if (GRADE_FIELDS.includes(event.formalGrade)) next[event.formalGrade] += 1;
+  } else {
+    next.practice += 1;
+  }
+  next.projectorVersion = DAILY_PROJECTOR_VERSION;
+  next.lastEventId = event.eventId;
+  await tx.putProjection(workspace, next.name, next);
+  return next;
+}
+
+function historyProjectionName(cardId) {
+  return `history:${cardId}`;
+}
+
+function emptyHistoryProjection(workspaceId, cardId) {
+  return {
+    workspaceId,
+    name: historyProjectionName(cardId),
+    schemaVersion: 1,
+    projectorVersion: HISTORY_PROJECTOR_VERSION,
+    cardId,
+    entries: [],
+  };
+}
+
+async function readHistoryProjection(tx, workspace, cardId) {
+  const row = await tx.getProjection(workspace, historyProjectionName(cardId));
+  if (row && row.schemaVersion !== 1) {
+    throw codedError(
+      'PRACTICE_PROJECTION_INCOMPATIBLE',
+      'history projection was written by another schema version',
+    );
+  }
+  const next = { ...emptyHistoryProjection(workspace, cardId), ...(row || {}) };
+  next.entries = Array.isArray(next.entries) ? structuredClone(next.entries) : [];
+  return next;
+}
+
+/* R8：只有正式複習進 formal history（formalGrade 沒有對應 code 就不寫，Sweep／Weak／
+   retry 都落在這裡）。第三欄放 eventId 讓後續路徑追得回來源，但舊的兩欄 [code, ts]
+   仍然照收——legacy 與別台裝置同步回來的都是兩欄。
+   同一個 event 重播的冪等由上面 event-exists 的早退保證，這裡不再自己擋一次。 */
+async function applyHistoryProjection(tx, workspace, event) {
+  const next = await readHistoryProjection(tx, workspace, event.cardId);
+  const code = GRADE_CODE[event.formalGrade];
+  if (code === undefined) return next;
+  next.entries.push([code, Math.round(Date.parse(event.occurredAt) / 1000), event.eventId]);
+  while (next.entries.length > MAX_HISTORY_PER_CARD) next.entries.shift();
+  next.projectorVersion = HISTORY_PROJECTOR_VERSION;
+  await tx.putProjection(workspace, next.name, next);
+  return next;
+}
+
+function emptyResweepProjection(workspaceId) {
+  return {
+    workspaceId,
+    name: RESWEEP_PROJECTION_NAME,
+    schemaVersion: 1,
+    projectorVersion: RESWEEP_PROJECTOR_VERSION,
+    position: 0,
+    catalogDigest: null,
+    lastEventId: null,
+    lastCardId: null,
+  };
+}
+
+async function readResweepProjection(tx, workspace) {
+  const row = await tx.getProjection(workspace, RESWEEP_PROJECTION_NAME);
+  if (row && row.schemaVersion !== 1) {
+    throw codedError(
+      'PRACTICE_PROJECTION_INCOMPATIBLE',
+      'resweep projection was written by another schema version',
+    );
+  }
+  return { ...emptyResweepProjection(workspace), ...(row || {}) };
+}
+
+function normalizedReceipt(receipt) {
+  if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) {
+    throw codedError('RESWEEP_RECEIPT_INVALID', 'resweep receipt must be an object');
+  }
+  const expectedCardId = canonicalUuid(receipt.expectedCardId);
+  const catalogDigest = typeof receipt.catalogDigest === 'string' ? receipt.catalogDigest.trim() : '';
+  if (!expectedCardId || !catalogDigest
+      || !Number.isSafeInteger(receipt.expectedPosition) || receipt.expectedPosition < 0) {
+    throw codedError(
+      'RESWEEP_RECEIPT_INVALID',
+      'resweep receipt needs expectedCardId, expectedPosition and catalogDigest',
+    );
+  }
+  return { expectedCardId, expectedPosition: receipt.expectedPosition, catalogDigest };
+}
+
+/* R9：游標只認「這張卡、這個位置、這份 catalog」。對不上就不推進，也不讓這筆
+   attempt 落地——背景換 catalog 或別的 tab 先推過了，硬推會把沒答的卡當成答過。 */
+async function advanceResweepCursor(tx, workspace, receipt, { cardId, eventId }) {
+  const expected = normalizedReceipt(receipt);
+  if (cardId && expected.expectedCardId !== cardId) {
+    throw codedError('RESWEEP_RECEIPT_CARD_MISMATCH', 'resweep receipt names another card');
+  }
+  const current = await readResweepProjection(tx, workspace);
+  if (current.position !== expected.expectedPosition) {
+    throw codedError(
+      'RESWEEP_RECEIPT_POSITION_STALE',
+      `resweep cursor is at ${current.position}, receipt expected ${expected.expectedPosition}`,
+    );
+  }
+  if (current.catalogDigest !== null && current.catalogDigest !== expected.catalogDigest) {
+    throw codedError('RESWEEP_RECEIPT_DIGEST_STALE', 'resweep receipt was built on another catalog');
+  }
+  const next = {
+    ...current,
+    projectorVersion: RESWEEP_PROJECTOR_VERSION,
+    position: expected.expectedPosition + 1,
+    catalogDigest: expected.catalogDigest,
+    lastEventId: eventId ?? null,
+    lastCardId: expected.expectedCardId,
+  };
+  await tx.putProjection(workspace, RESWEEP_PROJECTION_NAME, next);
+  return next;
+}
+
+/* retry-limit 不產生 event，但游標還是該往前——那張卡今天已經處理到底了。 */
+export async function acknowledgeResweepCursor({
+  port,
+  workspaceId,
+  receipt,
+} = {}) {
+  if (!port || typeof port.transaction !== 'function') {
+    throw codedError('STORAGE_UNAVAILABLE', 'practice transaction port is unavailable');
+  }
+  const workspace = requiredWorkspace(workspaceId);
+  return port.transaction(RESWEEP_STORES, 'readwrite', async tx => {
+    for (const method of ['getProjection', 'putProjection']) {
+      requiredFunction(tx?.[method], `transaction.${method}`);
+    }
+    return advanceResweepCursor(tx, workspace, receipt, { cardId: null, eventId: null });
+  });
+}
+
 async function readAttemptPhases(tx, workspace, attemptId) {
   const phases = [];
   for (const phase of ATTEMPT_PHASES) {
@@ -166,6 +357,9 @@ async function resolveAttemptPhaseReplay(tx, workspace, attempt, claim) {
     status: 'already-committed',
     event: structuredClone(existing),
     srs: existing.srsAfter || null,
+    daily: await readDailyProjection(tx, workspace, existing.dayKey),
+    history: await readHistoryProjection(tx, workspace, existing.cardId),
+    resweep: await readResweepProjection(tx, workspace),
   };
 }
 
@@ -204,6 +398,7 @@ export async function commitPracticeAttempt({
       'addFormalDueClaim', 'addDailyLaneClaim',
       'getDailyCardClaim', 'addDailyCardClaim',
       'getAttemptPhaseClaim', 'addAttemptPhaseClaim',
+      'getProjection', 'putProjection',
     ]) {
       requiredFunction(tx?.[method], `transaction.${method}`);
     }
@@ -241,7 +436,14 @@ export async function commitPracticeAttempt({
           }
         }
       }
-      return { status: 'already-committed', event: structuredClone(existing), srs: existing.srsAfter || null };
+      return {
+        status: 'already-committed',
+        event: structuredClone(existing),
+        srs: existing.srsAfter || null,
+        daily: await readDailyProjection(tx, workspace, existing.dayKey),
+        history: await readHistoryProjection(tx, workspace, existing.cardId),
+        resweep: await readResweepProjection(tx, workspace),
+      };
     }
 
     const priorAttemptPhase = await tx.getAttemptPhaseClaim(
@@ -286,6 +488,9 @@ export async function commitPracticeAttempt({
           context: dayContextFromClaim(winner, phases.length ? phases : ['first']),
           event: null,
           srs: null,
+          daily: await readDailyProjection(tx, workspace, attemptSnapshot.dayKey),
+          history: await readHistoryProjection(tx, workspace, attemptSnapshot.cardId),
+          resweep: await readResweepProjection(tx, workspace),
         };
       }
       const claimRow = {
@@ -305,6 +510,9 @@ export async function commitPracticeAttempt({
           status: isFormalDue ? 'formal-due-already-claimed' : 'daily-lane-already-claimed',
           event: null,
           srs: null,
+          daily: await readDailyProjection(tx, workspace, attemptSnapshot.dayKey),
+          history: await readHistoryProjection(tx, workspace, attemptSnapshot.cardId),
+          resweep: await readResweepProjection(tx, workspace),
         };
       }
     }
@@ -364,6 +572,20 @@ export async function commitPracticeAttempt({
       }));
     }
     await Promise.all(writes);
-    return { status: 'committed', event: structuredClone(event), srs: structuredClone(srsAfter) };
+    const daily = await applyDailyProjection(tx, workspace, event, isFormalDue);
+    const history = await applyHistoryProjection(tx, workspace, event);
+    const resweep = attemptSnapshot.resweep
+      ? await advanceResweepCursor(tx, workspace, attemptSnapshot.resweep, {
+        cardId: event.cardId, eventId: event.eventId,
+      })
+      : await readResweepProjection(tx, workspace);
+    return {
+      status: 'committed',
+      history,
+      resweep,
+      event: structuredClone(event),
+      srs: structuredClone(srsAfter),
+      daily,
+    };
   });
 }

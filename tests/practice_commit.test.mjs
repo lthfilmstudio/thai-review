@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { commitPracticeAttempt, readPracticeDayContext } from '../src/practice-commit.js';
+import {
+  acknowledgeResweepCursor,
+  commitPracticeAttempt,
+  readPracticeDayContext,
+} from '../src/practice-commit.js';
 
 const IDs = {
   eventId: '11111111-1111-4111-8111-111111111111',
@@ -27,7 +31,7 @@ function transactionalPort({ failBeforeCommit = false } = {}) {
   const data = {
     events: new Map(), srs: new Map(), formalDueClaims: new Map(),
     dailyLaneClaims: new Map(), dailyCardClaims: new Map(),
-    attemptPhaseClaims: new Map(), outbox: new Map(),
+    attemptPhaseClaims: new Map(), outbox: new Map(), projections: new Map(),
   };
   let transactionTail = Promise.resolve();
   return {
@@ -41,9 +45,9 @@ function transactionalPort({ failBeforeCommit = false } = {}) {
       try {
         assert.deepEqual(storeNames, mode === 'readonly' ? [
           'dailyCardClaims', 'attemptPhaseClaims',
-        ] : [
+        ] : storeNames.length === 1 ? ['projections'] : [
           'practiceEvents', 'srsV2', 'formalDueClaims', 'dailyLaneClaims',
-          'dailyCardClaims', 'attemptPhaseClaims', 'outbox',
+          'dailyCardClaims', 'attemptPhaseClaims', 'outbox', 'projections',
         ]);
         const draft = structuredClone(data);
         const key = (workspace, id) => `${workspace}:${id}`;
@@ -69,6 +73,12 @@ function transactionalPort({ failBeforeCommit = false } = {}) {
             if (draft.dailyLaneClaims.has(k)) return false;
             draft.dailyLaneClaims.set(k, structuredClone(row));
             return true;
+          },
+          getProjection: (workspace, name) => (
+            draft.projections.get(key(workspace, name)) || null
+          ),
+          putProjection: (workspace, name, row) => {
+            draft.projections.set(key(workspace, name), structuredClone(row));
           },
           getDailyCardClaim: (workspace, dayKey, cardId) => (
             draft.dailyCardClaims.get(key(workspace, `${dayKey}:${cardId}`)) || null
@@ -366,6 +376,7 @@ test('transaction abort leaves no half-written Due claim, event, SRS, or outbox'
     dailyCardClaims: 0,
     attemptPhaseClaims: 0,
     outbox: 0,
+    projections: 0,
   });
 });
 
@@ -535,4 +546,333 @@ test('v2→v3 升級空窗：已有 formal Due claim 但還沒有 daily-card cla
   assert.equal(result.status, 'formal-due-already-claimed');
   assert.equal(port.data.events.size, 0);
   assert.equal(port.data.srs.size, 0);
+});
+
+function dailyOf(port, workspace = 'user:A', dayKey = '2026-08-24') {
+  return port.data.projections.get(`${workspace}:daily:${dayKey}`) || null;
+}
+
+test('AE1：Due first 記進 daily projection 的 reviewed 與該 grade，不算 practice', async () => {
+  const port = transactionalPort();
+  const result = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'due', formalGrade: 'good' }),
+  });
+
+  assert.equal(result.status, 'committed');
+  const daily = dailyOf(port);
+  assert.equal(daily.name, 'daily:2026-08-24');
+  assert.equal(daily.projectorVersion, 'practice-daily-v1');
+  assert.equal(daily.reviewed, 1);
+  assert.equal(daily.good, 1);
+  assert.equal(daily.again + daily.hard + daily.easy, 0);
+  assert.equal(daily.practice, 0, 'formal Due 不重複算成 practice attendance');
+  assert.deepEqual(result.daily, daily, 'commit 要把投影一起回傳');
+});
+
+test('AE2：Sweep／Weak 與 All 非 Due 只加 practice attendance，不動 reviewed 或 grade', async () => {
+  const port = transactionalPort();
+  for (const [index, lane] of ['sweep', 'weak'].entries()) {
+    // eslint-disable-next-line no-await-in-loop
+    await commitPracticeAttempt({
+      port, workspaceId: 'user:A', deviceId: 'device-1',
+      createId: () => `0000000${index}-0000-4000-8000-00000000000${index}`,
+      attempt: attempt({
+        lane,
+        eventId: `0000000${index}-0000-4000-8000-00000000000${index}`,
+        cardId: `9999999${index}-9999-4999-8999-99999999999${index}`,
+        attemptId: `8888888${index}-8888-4888-8888-88888888888${index}`,
+      }),
+    });
+  }
+
+  const daily = dailyOf(port);
+  assert.equal(daily.practice, 2);
+  assert.equal(daily.reviewed, 0, 'practice 不得冒充正式複習');
+  assert.equal(daily.again + daily.hard + daily.good + daily.easy, 0);
+  assert.equal(port.data.srs.size, 0);
+});
+
+test('retry 也算 practice attendance，但不動 reviewed', async () => {
+  const port = transactionalPort();
+  await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'due', formalGrade: 'easy' }),
+  });
+  await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => OTHER.eventId, deviceId: 'device-1',
+    attempt: attempt({ eventId: OTHER.eventId, lane: 'due', phase: 'retry-1' }),
+  });
+
+  const daily = dailyOf(port);
+  assert.equal(daily.reviewed, 1, 'retry 不再加一次正式複習');
+  assert.equal(daily.easy, 1);
+  assert.equal(daily.practice, 1);
+});
+
+test('已提交過的 event 重播：回傳同一份投影，計數不重複加', async () => {
+  const port = transactionalPort();
+  const options = {
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'due', formalGrade: 'hard' }),
+  };
+  const first = await commitPracticeAttempt(options);
+  const replay = await commitPracticeAttempt(options);
+
+  assert.equal(replay.status, 'already-committed');
+  assert.deepEqual(replay.daily, first.daily, 'already-committed 要回傳一致的投影');
+  assert.equal(dailyOf(port).reviewed, 1);
+  assert.equal(dailyOf(port).hard, 1);
+});
+
+test('不同日期各自一份 daily projection', async () => {
+  const port = transactionalPort();
+  await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'due', formalGrade: 'good' }),
+  });
+  await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => OTHER.eventId, deviceId: 'device-1',
+    attempt: attempt({ ...OTHER, dayKey: '2026-08-25', lane: 'due', formalGrade: 'again' }),
+  });
+
+  assert.equal(dailyOf(port, 'user:A', '2026-08-24').good, 1);
+  assert.equal(dailyOf(port, 'user:A', '2026-08-25').again, 1);
+  assert.equal(dailyOf(port, 'user:A', '2026-08-25').good, 0);
+});
+
+test('搶輸 daily-card claim 的一方也拿得到當下的投影', async () => {
+  const port = transactionalPort();
+  await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'due', formalGrade: 'good' }),
+  });
+  const blocked = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => OTHER.eventId, deviceId: 'device-1',
+    attempt: attempt({ ...OTHER, lane: 'sweep' }),
+  });
+
+  assert.equal(blocked.status, 'daily-card-already-claimed');
+  assert.equal(blocked.daily.reviewed, 1);
+});
+
+test('舊 projectorVersion 少寫的欄位要補齊，不能累加成 NaN', async () => {
+  const port = transactionalPort();
+  // 模擬更早的 projector 寫下、還沒有 practice 這欄的那份投影
+  port.data.projections.set('user:A:daily:2026-08-24', {
+    workspaceId: 'user:A',
+    name: 'daily:2026-08-24',
+    schemaVersion: 1,
+    projectorVersion: 'practice-daily-v0',
+    dayKey: '2026-08-24',
+    reviewed: 3, again: 0, hard: 1, good: 2, easy: 0,
+  });
+
+  const result = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'sweep' }),
+  });
+
+  assert.equal(result.daily.practice, 1);
+  assert.equal(result.daily.reviewed, 3, '既有計數要留著');
+  assert.equal(result.daily.good, 2);
+  assert.equal(result.daily.projectorVersion, 'practice-daily-v1');
+});
+
+test('未知 schemaVersion 的 daily projection 不硬寫，直接失敗', async () => {
+  const port = transactionalPort();
+  port.data.projections.set('user:A:daily:2026-08-24', {
+    workspaceId: 'user:A', name: 'daily:2026-08-24', schemaVersion: 2, dayKey: '2026-08-24',
+  });
+  await assert.rejects(commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'sweep' }),
+  }), { code: 'PRACTICE_PROJECTION_INCOMPATIBLE' });
+  assert.equal(port.data.events.size, 0, '投影不相容時整筆 transaction 都不留下');
+});
+
+function historyOf(port, cardId = IDs.cardId, workspace = 'user:A') {
+  return port.data.projections.get(`${workspace}:history:${cardId}`) || null;
+}
+
+test('R8：Due first 寫進 history projection，第三欄是 eventId', async () => {
+  const port = transactionalPort();
+  const result = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    now: Date.parse('2026-08-24T10:00:00.000Z'),
+    attempt: attempt({ lane: 'due', formalGrade: 'hard' }),
+  });
+
+  const history = historyOf(port);
+  assert.equal(history.projectorVersion, 'practice-history-v1');
+  assert.deepEqual(history.entries, [[
+    1, Math.round(Date.parse('2026-08-24T10:00:00.000Z') / 1000), IDs.eventId,
+  ]], 'hard 的 code 是 1，時間存秒');
+  assert.deepEqual(result.history, history);
+});
+
+test('R5：Sweep 與 retry 不碰 formal history', async () => {
+  const port = transactionalPort();
+  await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'sweep' }),
+  });
+  assert.equal(historyOf(port), null, 'sweep 不建 history 投影');
+
+  await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => OTHER.eventId, deviceId: 'device-1',
+    attempt: attempt({ eventId: OTHER.eventId, lane: 'sweep', phase: 'retry-1' }),
+  });
+  assert.equal(historyOf(port), null, 'retry 也不寫');
+});
+
+test('R8：同一個 event 重播不重複 append（靠 event-exists 早退，不靠事後去重）', async () => {
+  const port = transactionalPort();
+  const options = {
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'due', formalGrade: 'good' }),
+  };
+  const first = await commitPracticeAttempt(options);
+  const replay = await commitPracticeAttempt(options);
+
+  assert.equal(replay.status, 'already-committed');
+  assert.equal(historyOf(port).entries.length, 1);
+  assert.deepEqual(replay.history.entries, first.history.entries);
+});
+
+test('R8：舊的兩欄 [code, ts] tuple 照收，超過 5 筆丟最舊的', async () => {
+  const port = transactionalPort();
+  // 別台裝置同步回來的都是兩欄，沒有 eventId
+  port.data.projections.set(`user:A:history:${IDs.cardId}`, {
+    workspaceId: 'user:A',
+    name: `history:${IDs.cardId}`,
+    schemaVersion: 1,
+    projectorVersion: 'practice-history-v1',
+    cardId: IDs.cardId,
+    entries: [[0, 1000], [1, 2000], [2, 3000], [3, 4000], [0, 5000]],
+  });
+
+  const result = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    now: Date.parse('2026-08-24T10:00:00.000Z'),
+    attempt: attempt({ lane: 'due', formalGrade: 'easy' }),
+  });
+
+  const entries = result.history.entries;
+  assert.equal(entries.length, 5, '每張卡最多留 5 筆');
+  assert.deepEqual(entries[0], [1, 2000], '最舊的那筆被丟掉，其餘兩欄 tuple 原樣保留');
+  assert.equal(entries[4][0], 3);
+  assert.equal(entries[4][2], IDs.eventId);
+});
+
+const RECEIPT = { expectedCardId: IDs.cardId, expectedPosition: 0, catalogDigest: 'sha256:cat-a' };
+
+function resweepOf(port, workspace = 'user:A') {
+  return port.data.projections.get(`${workspace}:resweep`) || null;
+}
+
+test('R9：帶 receipt 的 sweep 推進游標，並綁住卡片、位置與 catalog digest', async () => {
+  const port = transactionalPort();
+  const result = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'sweep', resweep: RECEIPT }),
+  });
+
+  assert.equal(result.status, 'committed');
+  assert.equal(result.resweep.position, 1);
+  assert.equal(result.resweep.catalogDigest, 'sha256:cat-a');
+  assert.equal(result.resweep.lastCardId, IDs.cardId);
+  assert.equal(result.resweep.lastEventId, IDs.eventId);
+  assert.equal(resweepOf(port).position, 1);
+});
+
+test('R9：receipt 指到別張卡就整筆不落地', async () => {
+  const port = transactionalPort();
+  await assert.rejects(commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({
+      lane: 'sweep',
+      resweep: { ...RECEIPT, expectedCardId: '99999999-9999-4999-8999-999999999999' },
+    }),
+  }), { code: 'RESWEEP_RECEIPT_CARD_MISMATCH' });
+  assert.equal(port.data.events.size, 0, 'event 不能留下來');
+  assert.equal(resweepOf(port), null);
+});
+
+test('R9：別的 tab 先推過了，位置對不上就不重複推', async () => {
+  const port = transactionalPort();
+  await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'sweep', resweep: RECEIPT }),
+  });
+  await assert.rejects(commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => OTHER.eventId, deviceId: 'device-1',
+    attempt: attempt({
+      ...OTHER, lane: 'sweep',
+      cardId: '99999999-9999-4999-8999-999999999999',
+      resweep: { ...RECEIPT, expectedCardId: '99999999-9999-4999-8999-999999999999' },
+    }),
+  }), { code: 'RESWEEP_RECEIPT_POSITION_STALE' });
+  assert.equal(resweepOf(port).position, 1, '游標停在原地');
+  assert.equal(port.data.events.size, 1);
+});
+
+test('R9：背景換了 catalog，舊 receipt 不套用', async () => {
+  const port = transactionalPort();
+  await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'sweep', resweep: RECEIPT }),
+  });
+  await assert.rejects(commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => OTHER.eventId, deviceId: 'device-1',
+    attempt: attempt({
+      ...OTHER, lane: 'sweep',
+      cardId: '99999999-9999-4999-8999-999999999999',
+      resweep: {
+        expectedCardId: '99999999-9999-4999-8999-999999999999',
+        expectedPosition: 1,
+        catalogDigest: 'sha256:cat-b',
+      },
+    }),
+  }), { code: 'RESWEEP_RECEIPT_DIGEST_STALE' });
+  assert.equal(resweepOf(port).position, 1);
+});
+
+test('R9：retry-limit 可以 ack 游標但不造 event', async () => {
+  const port = transactionalPort();
+  const acked = await acknowledgeResweepCursor({
+    port, workspaceId: 'user:A', receipt: RECEIPT,
+  });
+  assert.equal(acked.position, 1);
+  assert.equal(acked.lastEventId, null, 'ack 不綁 event');
+  assert.equal(port.data.events.size, 0);
+  assert.equal(port.data.outbox.size, 0);
+
+  await assert.rejects(acknowledgeResweepCursor({
+    port, workspaceId: 'user:A', receipt: RECEIPT,
+  }), { code: 'RESWEEP_RECEIPT_POSITION_STALE' }, '重播不多推');
+  assert.equal(resweepOf(port).position, 1);
+});
+
+test('沒帶 receipt 的 attempt 不動游標', async () => {
+  const port = transactionalPort();
+  const result = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'due', formalGrade: 'good' }),
+  });
+  assert.equal(result.resweep.position, 0);
+  assert.equal(resweepOf(port), null, '沒事就不要寫一份空投影出來');
+});
+
+test('resweep receipt 是 caller 的輸入，不得混進 event payload', async () => {
+  const port = transactionalPort();
+  const result = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'sweep', resweep: RECEIPT }),
+  });
+  assert.equal(Object.hasOwn(result.event, 'resweep'), false);
+  assert.equal(
+    Object.hasOwn(port.data.events.get(`user:A:${IDs.eventId}`), 'resweep'),
+    false,
+  );
 });
