@@ -110,3 +110,11 @@ export function reconcileLedgerMirror({
   }
   return summary;
 }
+
+/* 評分成功之後的鏡射。commitPracticeAttempt 回傳的 daily／history／resweep 就是
+   權威投影本身，直接餵給同一支 reconcile——開機鏡射跟評分後鏡射走同一條路，語意
+   才不會分岔（其中一邊是累加、另一邊是設定的話，重開一次數字就對不上）。 */
+export function applyLedgerCommitToMirror(result, { cardKeyById = null, storage = localStorage } = {}) {
+  const projections = [result?.daily, result?.history, result?.resweep].filter(Boolean);
+  return reconcileLedgerMirror({ projections, cardKeyById, storage });
+}

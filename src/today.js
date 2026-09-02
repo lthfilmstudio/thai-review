@@ -86,6 +86,16 @@ export function buildDailyQueue(allCards, progress, lessons, todaySeconds, stora
   // cards can put a later resweep card before the cursor's next card; the
   // existing app API has no card ID to prove that such an out-of-order grade
   // is safe to count toward the flat cursor.
+  // R2：lane 在這裡決定，不在評分時回推——這裡才知道每張卡是憑什麼進佇列的。
+  // 三組本來就互斥：resweepCards 建的時候排除了 dueKeys，weakCards 排除了 usedKeys。
+  // cursorIsUniqueDue 那張卡同時是 Due 也是掃描游標所指，但它只進 dueCards、不進
+  // resweepCards，所以這裡就是 'due'（R2 的 Due 勝出）；它仍然留在 resweepKeys 裡
+  // 當作「游標這張已經處理過」的證據，兩件事分開記。
+  const laneByCardKey = new Map();
+  for (const card of weakCards) laneByCardKey.set(card._cardKey, 'weak');
+  for (const card of resweepCards) laneByCardKey.set(card._cardKey, 'sweep');
+  for (const card of dueCards) laneByCardKey.set(card._cardKey, 'due');
+
   return {
     cards: [
       ...interleaveByLesson(dueCards),
@@ -93,6 +103,7 @@ export function buildDailyQueue(allCards, progress, lessons, todaySeconds, stora
       ...interleaveByLesson(weakCards),
     ],
     resweepKeys,
+    laneByCardKey,
   };
 }
 

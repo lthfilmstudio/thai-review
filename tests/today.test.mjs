@@ -681,3 +681,50 @@ test('mirrorLedgerDay 不動 legacy 貢獻，materialize 之後才是合起來�
   assert.equal(view['2026-08-20'].easy, 2);
   assert.equal(view['2026-08-20'].practice, 1);
 });
+
+test('R2：buildDailyQueue 交出 lane 快照，佇列裡每張卡都有 lane', () => {
+  stored.clear();
+  const now = NOON_TAIPEI(2026, 8, 20);
+  const cards = [
+    queueCard('L1', 'due-one'),
+    queueCard('L1', 'due-two'),
+    queueCard('L2', 'fresh-one'),
+    queueCard('L2', 'fresh-two'),
+  ];
+  const progress = {
+    'L1:due-one': { grade: 'good', nextReviewAt: now - 1000, reviewedAt: now - 90000, interval: 1, easeFactor: 2.5, reps: 1, updatedAt: now - 90000 },
+    'L1:due-two': { grade: 'hard', nextReviewAt: now - 2000, reviewedAt: now - 90000, interval: 1, easeFactor: 2.3, reps: 1, updatedAt: now - 90000 },
+  };
+  const { cards: queue, laneByCardKey } = buildDailyQueue(
+    cards, progress, [{ id: 'L1', cards: [] }, { id: 'L2', cards: [] }], 0,
+  );
+
+  assert.ok(laneByCardKey instanceof Map);
+  assert.equal(laneByCardKey.get('L1:due-one'), 'due');
+  assert.equal(laneByCardKey.get('L1:due-two'), 'due');
+  for (const card of queue) {
+    const lane = laneByCardKey.get(card._cardKey);
+    assert.ok(['due', 'sweep', 'weak'].includes(lane), `${card._cardKey} 應該有 lane，拿到 ${lane}`);
+  }
+  // 進佇列的每一張都要有 lane，不然評分時會不知道該記成哪一軌
+  assert.equal(laneByCardKey.size >= queue.length, true);
+});
+
+test('R2：掃描游標指到一張到期卡時，lane 是 due，但仍算游標處理過', () => {
+  stored.clear();
+  const now = NOON_TAIPEI(2026, 8, 20);
+  // 游標在最前面，第一張又剛好到期 → cursorIsUniqueDue
+  const cards = [queueCard('L1', 'cursor-due'), queueCard('L1', 'later')];
+  const progress = {
+    'L1:cursor-due': {
+      grade: 'good', nextReviewAt: now - 1000, reviewedAt: now - 90000,
+      interval: 1, easeFactor: 2.5, reps: 1, updatedAt: now - 90000,
+    },
+  };
+  const { resweepKeys, laneByCardKey } = buildDailyQueue(
+    cards, progress, [{ id: 'L1', cards: [] }], 0,
+  );
+
+  assert.equal(laneByCardKey.get('L1:cursor-due'), 'due', '到期優先，不記成掃描');
+  assert.equal(resweepKeys.has('L1:cursor-due'), true, '但游標這張仍算處理過');
+});

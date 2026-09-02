@@ -1200,10 +1200,10 @@ async function init() {
       e.stopPropagation();
       const log = loadDailyLog(storage);
       const todaySeconds = log.days[localDateKey()]?.seconds || 0;
-      const { cards, resweepKeys } = buildDailyQueue(
+      const { cards, resweepKeys, laneByCardKey } = buildDailyQueue(
         allCardsWithLessonId(), state.progress, state.lessons, todaySeconds, storage,
       );
-      setDailyQueue(cards, resweepKeys);
+      setDailyQueue(cards, resweepKeys, laneByCardKey);
       state.currentLessonId = '__TODAY__';
       state.mode = 'srs';
       state.cardIndex = 0;

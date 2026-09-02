@@ -204,6 +204,7 @@ export const state = {
   // localStorage——重開 App 或明天再點「開始複習」都會重新組隊列，不需要持久化。
   dailyQueueKeys: null,       // string[] | null
   dailyQueueResweepKeys: null, // Set<string> | null，評分時判斷要不要推進 resweep 游標
+  dailyQueueLaneByCardKey: null, // Map<string, 'due'|'sweep'|'weak'> | null，ledger 評分的 lane 快照
 };
 
 export function projectHydratedWorkspaceState(snapshot) {
@@ -752,9 +753,11 @@ export function getDueCount(lessonId) {
 
 /* 開始今日複習：today.js buildDailyQueue() 的結果存進 state，
    currentLesson()/filteredCards() 之後就讀這裡（見上方 __TODAY__ 分支）。 */
-export function setDailyQueue(cards, resweepKeys) {
+export function setDailyQueue(cards, resweepKeys, laneByCardKey = null) {
   state.dailyQueueKeys = cards.map(c => c._cardKey);
   state.dailyQueueResweepKeys = resweepKeys || new Set();
+  // ledger 評分用的 lane 快照（R2）。建佇列時就定下來，評分時不回推。
+  state.dailyQueueLaneByCardKey = laneByCardKey || new Map();
 }
 
 /* 評完一張 __TODAY__ 隊列裡的卡就從隊列拿掉（不管是到期／掃描／弱項哪一

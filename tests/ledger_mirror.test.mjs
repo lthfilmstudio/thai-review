@@ -140,3 +140,60 @@ test('hydration 給的陣列形式也收，名稱以 row.name 為準', () => {
   assert.equal(loadDailyLog().days['2026-08-24'].ledger.reviewed, 2);
   assert.equal(loadDailyLog().days['2026-08-25'].ledger.practice, 1);
 });
+
+test('評分後的鏡射走跟開機同一支 reconcile', async () => {
+  const { applyLedgerCommitToMirror } = await import('../src/ledger-mirror.js');
+  stored.clear();
+  const cardKeyById = new Map([[CARD_A, 'L1:สวัสดี']]);
+  const result = {
+    status: 'committed',
+    event: { eventId: 'evt-1', dayKey: '2026-08-24', cardId: CARD_A },
+    daily: daily('2026-08-24', { reviewed: 1, good: 1 }),
+    history: {
+      workspaceId: 'user:A', name: `history:${CARD_A}`, schemaVersion: 1,
+      projectorVersion: 'practice-history-v1', cardId: CARD_A,
+      entries: [[2, 1_700_000_000, 'evt-1']],
+    },
+    resweep: {
+      workspaceId: 'user:A', name: 'resweep', schemaVersion: 1,
+      projectorVersion: 'practice-resweep-v1', position: 4,
+    },
+  };
+
+  const first = applyLedgerCommitToMirror(result, { cardKeyById });
+  assert.deepEqual(
+    { days: first.days, resweep: first.resweep, entries: first.historyEntries },
+    { days: 1, resweep: 1, entries: 1 },
+  );
+  assert.equal(loadDailyLog().days['2026-08-24'].ledger.reviewed, 1);
+  assert.equal(loadResweepState().position, 4);
+  assert.equal(loadGradeHistory().cards['L1:สวัสดี'].length, 1);
+
+  // 同一筆結果重播（例如鏡射失敗後 repairProjection）不得重複累加
+  const replay = applyLedgerCommitToMirror(result, { cardKeyById });
+  assert.deepEqual(
+    { days: replay.days, resweep: replay.resweep, entries: replay.historyEntries },
+    { days: 0, resweep: 0, entries: 0 },
+  );
+  assert.equal(loadGradeHistory().cards['L1:สวัสดี'].length, 1);
+});
+
+test('非正式評分的結果只動 daily，不碰 history 與游標', async () => {
+  const { applyLedgerCommitToMirror } = await import('../src/ledger-mirror.js');
+  stored.clear();
+  const summary = applyLedgerCommitToMirror({
+    daily: daily('2026-08-24', { practice: 1 }),
+    history: {
+      workspaceId: 'user:A', name: `history:${CARD_A}`, schemaVersion: 1,
+      cardId: CARD_A, entries: [],
+    },
+    resweep: {
+      workspaceId: 'user:A', name: 'resweep', schemaVersion: 1, position: 0,
+    },
+  }, { cardKeyById: new Map([[CARD_A, 'L1:a']]) });
+
+  assert.equal(summary.days, 1);
+  assert.equal(summary.historyEntries, 0);
+  assert.equal(summary.resweep, 0);
+  assert.equal(loadGradeHistory().cards['L1:a'], undefined);
+});
