@@ -725,6 +725,17 @@ export function setGrade(idxOrCard, gradeStr, storage = localStorage) {
   saveState(storage);
 }
 
+/* KTD11：ledger 路徑的 after-state 已經由 commitPracticeAttempt 呼叫過一次
+   nextReview() 算好了，這裡只把它鏡射進 legacy 的 state.progress，不重算——
+   算兩次會得到兩個不同的排程，畫面跟帳本就對不起來。
+   非正式評分（Sweep／Weak／retry）沒有 after-state，一律不動 progress（R5）。 */
+export function setGradeFromLedger(idxOrCard, srsAfter, storage = localStorage) {
+  if (!srsAfter || typeof srsAfter !== 'object' || Array.isArray(srsAfter)) return false;
+  state.progress[progKey(idxOrCard)] = structuredClone(srsAfter);
+  saveState(storage);
+  return true;
+}
+
 /* 攤平 state.lessons 成單一 cards 陣列，每張都帶 _lessonId（給 SRS 跨課程查詢用）。
    未載入的課程會被 ensureAllLoaded 補上，這裡單純取現有 cards。 */
 export function allCardsWithLessonId() {

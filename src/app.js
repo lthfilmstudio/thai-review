@@ -1,7 +1,7 @@
 /* 入口：init → 載入狀態 → 抓資料 → 綁事件。 */
 
 import {
-  state, loadDeviceStateResult, saveState as persistState, localDateKey,
+  state, loadDeviceStateResult, saveState as persistState, localDateKey, setGradeFromLedger,
   STORAGE_KEY, projectHydratedWorkspaceState, projectWorkspaceAuxiliaryState,
   mergeWorkspaceHydration,
   DEFAULT_SHEET_URL,
@@ -18,7 +18,7 @@ import { DAILY_KEY, initDailyLog, logReview, buildAchievementCtx, notifyAchievem
 import { advanceResweepCursor } from './resweep.js';
 import { syncProgressThrottled, syncProgressOnHide } from './progress-sync.js';
 import * as cloudAuth from './cloud-auth.js';
-import { syncNow, syncThrottled, syncSoon, flushOnHide, lastSyncedAt, resetProgressEverywhere, invalidateSync, clearSyncState } from './cloud-sync.js';
+import { syncNow, syncThrottled, syncSoon, flushOnHide, lastSyncedAt, resetProgressEverywhere, invalidateSync, clearSyncState, setRemoteProgressHook } from './cloud-sync.js';
 import { recordGrade } from './grade-history.js';
 import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices, preloadRealAudioAvailability } from './tts.js';
@@ -27,11 +27,13 @@ import { exitDialogueGame } from './game-dialogue.js';
 import {
   createWorkspaceStorage, requireWorkspaceStorage as assertWorkspaceStorage,
   bootScreenFor, createWorkspaceBoot, logoutToAnonymous, runWorkspaceBoot,
+  getOrCreateWorkspaceInstallationId,
 } from './storage-scope.js';
 import { getDeviceId } from './srs.js';
 import { hydrateWorkspaceSnapshot, openPracticeDatabase } from './practice-db.js';
 import { createLegacyClaimFlow, fetchProductionLineageEvidence } from './legacy-claim-flow.js';
-import { startPracticeLedgerRuntime } from './practice-ledger-runtime.js';
+import { startPracticeLedgerRuntime, catalogCardKeyIndex } from './practice-ledger-runtime.js';
+import { createLedgerGradeSession, ledgerGradeEligible } from './practice-grade-session.js';
 import { TRUSTED_PRODUCTION_LINEAGE } from './production-lineage-trust.js';
 import {
   renderSidebar, renderTopbarTitle, renderStats, renderContent,
@@ -43,6 +45,8 @@ let workspaceStorage = null;
 /* ledger runtime handle。status 不是 'ready' 就代表這次開機不開放 ledger 評分，
    評分照舊走 legacy 路徑（見 gradeAndAdvance）。 */
 let practiceLedger = null;
+/* ledger 評分 session。null 代表這次開機沒有帳本路徑可走。 */
+let ledgerSession = null;
 
 function requireWorkspaceStorage(storage = workspaceStorage) {
   return assertWorkspaceStorage(storage);
@@ -221,17 +225,18 @@ function nextCard(storage) {
    - SRS active：剛評的那張 nextReviewAt > now → 從 due 列表消失，cardIndex 不變但 list 變短，
      直接 rerender 自然指到下一張；clamp 防越界
    - 一般 mode：cards 不變，往下一張前進 */
-function gradeAndAdvance(g, storage) {
-  const runtimeStorage = requireWorkspaceStorage(storage);
-  const gradedCard = filteredCards()[state.cardIndex];
-  const gradedCardKey = gradedCard ? (gradedCard._cardKey || cardKey(gradedCard)) : '';
-  setGrade(state.cardIndex, g, runtimeStorage);
-  const improvementMoment = gradedCard
-    ? recordGrade(gradedCardKey, g, Date.now(), runtimeStorage)
-    : false;
-  logReview(g, Date.now(), runtimeStorage);
-  // 評分是唯一會產生要同步的資料的動作，所以在這裡就排同步（去抖動 4 秒）。
-  // 只靠「切背景」不夠：評完就關 App 的話那批評分會留在本機上不去。
+/* saving 期間鎖住評分區與導覽（AE7）。狀態由 controller 推過來。 */
+function renderLedgerSavingState(status) {
+  const busy = status !== 'idle';
+  document.body.dataset.ledgerSaving = busy ? status : '';
+  for (const el of document.querySelectorAll('[data-grade], .nav-prev, .nav-next')) {
+    el.toggleAttribute('disabled', busy);
+    el.setAttribute('aria-disabled', busy ? 'true' : 'false');
+  }
+}
+
+/* 評分之後的畫面收尾。legacy 與 ledger 兩條路都走這裡，前進行為才會一致。 */
+function afterGradeAdvance(runtimeStorage, gradedCardKey, improvementMoment) {
   if (cloudAuth.hasStoredSession()) syncSoon(runtimeStorage);
   if (state.currentLessonId === '__TODAY__' && gradedCardKey) {
     const wasResweep = removeFromDailyQueue(gradedCardKey);
@@ -255,6 +260,24 @@ function gradeAndAdvance(g, storage) {
     renderSidebar(id => selectLesson(id, runtimeStorage), runtimeStorage);
     renderTopbarTitle();
   }
+}
+
+function gradeAndAdvance(g, storage) {
+  const runtimeStorage = requireWorkspaceStorage(storage);
+  // R1：只有 Today／All 而且 ledger 這次開機是 ready 的時候走帳本路徑，其餘一律
+  // 維持原本的同步流程。controller 自己有 CAS guard，重複觸發會被擋掉。
+  if (ledgerSession && ledgerGradeEligible(practiceLedger, state.currentLessonId)) {
+    void ledgerSession.controller.submitGrade(g);
+    return;
+  }
+  const gradedCard = filteredCards()[state.cardIndex];
+  const gradedCardKey = gradedCard ? (gradedCard._cardKey || cardKey(gradedCard)) : '';
+  setGrade(state.cardIndex, g, runtimeStorage);
+  const improvementMoment = gradedCard
+    ? recordGrade(gradedCardKey, g, Date.now(), runtimeStorage)
+    : false;
+  logReview(g, Date.now(), runtimeStorage);
+  afterGradeAdvance(runtimeStorage, gradedCardKey, improvementMoment);
 }
 
 function prevCard(storage) {
@@ -817,6 +840,46 @@ async function init() {
     },
   });
 
+  if (practiceLedger.status === 'ready') {
+    const cardKeyById = catalogCardKeyIndex(bootResult.catalog);
+    ledgerSession = createLedgerGradeSession({
+      ledger: practiceLedger,
+      cardKeyById,
+      storage,
+      deviceId: getOrCreateWorkspaceInstallationId(storage, () => crypto.randomUUID()),
+      createId: () => crypto.randomUUID(),
+      readContext: () => {
+        const card = filteredCards()[state.cardIndex];
+        const key = card ? (card._cardKey || cardKey(card)) : '';
+        return {
+          workspaceId: bootResult.workspaceId,
+          workspaceGeneration: workspaceBoot.snapshot().epoch,
+          currentLessonId: state.currentLessonId,
+          mode: state.mode,
+          dayKey: localDateKey(),
+          cardId: card?.card_id || card?.cardId || key,
+          cardKey: key,
+          card,
+          todayLaneByCardKey: state.dailyQueueLaneByCardKey || new Map(),
+          // 本輪只接 __TODAY__（lane 來自佇列快照），走不到這個欄位；
+          // __ALL__ 接上時這裡要換成 IDB 的權威 SRS，理由見 practice-grade-session.js。
+          authoritativeSrs: { status: 'not-ready', state: null },
+        };
+      },
+      advance: result => {
+        // KTD11：after-state 已經在交易裡算過一次，這裡只鏡射，不重算。
+        // 非正式評分沒有 after-state，照 R5 完全不動 legacy 的排程。
+        const card = filteredCards()[state.cardIndex];
+        const key = card ? (card._cardKey || cardKey(card)) : '';
+        if (result?.srs) setGradeFromLedger(card, result.srs, storage);
+        afterGradeAdvance(storage, key, false);
+      },
+      onStateChange: ({ status }) => { renderLedgerSavingState(status); },
+    });
+    // 遠端進度併進來 = 底下的到期狀態變了，讓還在路上的評分失效。
+    setRemoteProgressHook(() => ledgerSession?.bumpContextEpoch());
+  }
+
   const deepLink = parseDeepLinkParam();
   const today = localDateKey();
   state.lastOpenDate = today;
@@ -1204,6 +1267,8 @@ async function init() {
         allCardsWithLessonId(), state.progress, state.lessons, todaySeconds, storage,
       );
       setDailyQueue(cards, resweepKeys, laneByCardKey);
+      // 新的一輪佇列＝新的 round，同時讓還在路上的評分失效（它的 lane 快照已經舊了）。
+      ledgerSession?.startRound();
       state.currentLessonId = '__TODAY__';
       state.mode = 'srs';
       state.cardIndex = 0;

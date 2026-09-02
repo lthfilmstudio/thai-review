@@ -183,6 +183,7 @@ sequenceDiagram
 - **Execution note:** Test-first controller；DOM wiring 另加 caller-level test，不能只測 helper。
 - **Test scenarios:** click+key double submit、saving navigation/context lock、failure zero side effects、same-attempt retry、already-committed replay、mirror failure no re-commit、workspace/catalog/context invalid token、legacy contexts unchanged、a11y saving/error/focus。
 - **Verification:** focused controller/app tests + 320px/desktop keyboard and touch browser QA。
+- **Deviation（2026-09-02 實作時）:** 本輪只把 **`__TODAY__`** 接上 ledger 評分，**`__ALL__` 維持 legacy**。`classifyPracticeLane` 對 `__ALL__` 要求 `authoritativeSrs.status === 'ready'`，那份資料在 IDB、要 async 讀，但 controller 的 `readContext()` 是同步的：改成 async 會波及整條 controller，拿 `state.progress` 當代理又正好是那道 gate 要擋的「用未稽核資料判 lane」。`__TODAY__` 的 lane 來自 `buildDailyQueue()` 的 `laneByCardKey` 快照，不需要那道讀取。接 `__ALL__` 時要先決定context 讀取要不要非同步化。另外三個計畫沒寫死、實作時定下的語意（round／cycle 界線、contextEpoch bump 時機）記在 `src/practice-grade-session.js` 檔頭。
 
 ### U7. 更新 Service Worker、release gates 與 production read-back
 

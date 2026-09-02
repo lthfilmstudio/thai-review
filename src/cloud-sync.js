@@ -49,6 +49,21 @@ const defaultSyncDeps = {
 };
 let syncDeps = { ...defaultSyncDeps };
 
+/* 遠端進度併進本機後通知呼叫端。用 hook 而不是直接 import，理由跟 today.js 的
+   setLogChangeHook 一樣：那邊已經 import 這個檔，互 import 會變成循環相依。
+   ledger 用它 bump context epoch——卡片與課程沒變，但底下的到期狀態變了，
+   還在路上的那筆評分不該把結果套到已經換過內容的畫面上（AE7）。 */
+let remoteProgressHook = null;
+export function setRemoteProgressHook(fn) { remoteProgressHook = fn; }
+
+function notifyRemoteProgress(reason) {
+  try {
+    remoteProgressHook?.(reason);
+  } catch (e) {
+    console.warn('remote progress hook failed:', e.message);
+  }
+}
+
 /* 測試只替換 transport／session／clock，不改 production merge 語意。 */
 export function __setSyncTestDeps(overrides = {}) {
   syncDeps = { ...defaultSyncDeps, ...overrides };
@@ -420,6 +435,7 @@ async function runSync(op) {
     if (clearedKeys.length) {
       for (const k of clearedKeys) delete state.progress[k];
       saveState(op.storage);
+      notifyRemoteProgress('reset-epoch');
     }
 
     // 1) 拉遠端變動並合併進本機
@@ -436,6 +452,7 @@ async function runSync(op) {
       for (const k of changedKeys) state.progress[k] = progress[k];
       for (const k of editKeys) state.edits[k] = edits[k];
       saveState(op.storage);
+      notifyRemoteProgress('remote-merge');
     }
     writeMergedHistory(mergedHistory, op.storage);
 

@@ -1,7 +1,7 @@
 /* Service Worker：app shell cache + runtime CSV cache。
    改檔後升 CACHE 版本號強制更新。 */
 
-const CACHE = 'thai-review-v96';
+const CACHE = 'thai-review-v97';
 
 const SHELL = [
   './',
@@ -17,6 +17,11 @@ const SHELL = [
   './src/practice-db.js',
   './src/ledger-mirror.js',
   './src/practice-ledger-runtime.js',
+  './src/practice-grade-session.js',
+  './src/practice-grade-controller.js',
+  './src/practice-runtime.js',
+  './src/practice-commit.js',
+  './src/practice-events.js',
   './src/legacy-claim-flow.js',
   './src/remote-workspace-probe.js',
   './src/production-lineage-trust.js',
