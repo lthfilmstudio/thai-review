@@ -29,7 +29,7 @@ function loadServiceWorker({ fetchImpl, cacheEntries = new Map() }) {
     console,
   };
   const exported = runInNewContext(
-    `${sw}\n;({ networkFirst, cacheableJsonResponse, precache })`,
+    `${sw}\n;({ networkFirst, cacheableTypedResponse, precache })`,
     context,
   );
   return { ...exported, puts, cache };
@@ -102,8 +102,8 @@ test('service worker refreshes mutable Thai audio indexes before using cache', (
   }
 });
 
-test('service worker cache version invalidates the stale v96 bundle', () => {
-  assert.ok(sw.includes("const CACHE = 'thai-review-v97';"));
+test('service worker cache version invalidates the stale v97 bundle', () => {
+  assert.ok(sw.includes("const CACHE = 'thai-review-v98';"));
   assert.ok(sw.includes("'./src/practice-grade-session.js'"),
     'ledger grade session must be available in the offline shell');
   assert.ok(sw.includes("'./src/practice-commit.js'"),
@@ -247,3 +247,64 @@ async function sw1Cache(sw1) {
   // loadServiceWorker 的 caches.open() 一律回同一個 cache 物件
   return sw1.cache;
 }
+
+/* R15：JS／CSS 被 200 text/html 冒充比 JSON 更糟——JSON 只是 parse 失敗，
+   module 載入拿到 HTML 是直接炸掉，整個 App 起不來。 */
+test('precache 對 JS／CSS 同樣拒收 200 text/html', () => {
+  const { cacheableTypedResponse } = loadServiceWorker({ fetchImpl: async () => stubResponse('x', 'text/plain') });
+  const html = stubResponse('<!DOCTYPE html>', 'text/html; charset=utf-8');
+
+  for (const path of ['/src/app.js', '/src/practice-commit.js', '/styles/components.css',
+    '/manifest.webmanifest', '/data.json']) {
+    assert.equal(cacheableTypedResponse(jsonRequest(path), html), false, `${path} 不該收下 HTML`);
+  }
+});
+
+test('正確 content-type 的靜態資源照收；缺 content-type 一律不收', () => {
+  const { cacheableTypedResponse } = loadServiceWorker({ fetchImpl: async () => stubResponse('x', 'text/plain') });
+  const ok = [
+    ['/src/app.js', 'text/javascript; charset=utf-8'],
+    ['/styles/components.css', 'text/css'],
+    ['/data.json', 'application/json'],
+  ];
+  for (const [path, type] of ok) {
+    assert.equal(cacheableTypedResponse(jsonRequest(path), stubResponse('x', type)), true, `${path} 應該收`);
+  }
+  // Pages 對真的靜態檔一定帶 content-type；帶不出來的多半是 fallback 或錯誤頁
+  assert.equal(cacheableTypedResponse(jsonRequest('/src/app.js'), stubResponse('x', null)), false);
+  // 沒有副檔名的路徑（例如 SPA 導覽）維持原本行為
+  assert.equal(cacheableTypedResponse(jsonRequest('/today'), stubResponse('<html>', 'text/html')), true);
+});
+
+/* 部署後的 read-back 是「線上跑的等於本機驗過的那份」的唯一證據。SHELL 加了 ledger
+   相關模組卻忘記加進 read-back，就會出現「測試全綠、線上跑舊版、沒人發現」。 */
+test('ledger 相關的離線模組全部納入部署 read-back', async () => {
+  const deployScript = await readFile(new URL('../scripts/update-audio-deploy.sh', import.meta.url), 'utf8');
+  const listBlock = deployScript.match(/RUNTIME_READBACK_ASSETS=\(([\s\S]*?)\n\)/);
+  assert.ok(listBlock, 'RUNTIME_READBACK_ASSETS should be readable');
+  const readback = new Set([...listBlock[1].matchAll(/"([^"]+)"/g)].map(m => m[1]));
+
+  const shellBlock = sw.match(/const SHELL = \[(.*?)\];/s);
+  const shellPaths = [...shellBlock[1].matchAll(/'\.\/([^']+)'/g)].map(m => m[1]);
+  // 決定 ledger 正確性的那些模組；其餘（tts、遊戲、聽力）不必逐一 read-back。
+  const ledgerOwned = /^src\/(practice-|ledger-|storage-scope|legacy-claim-flow|production-lineage-trust|card-identity)/;
+
+  for (const shellPath of shellPaths.filter(p => ledgerOwned.test(p))) {
+    assert.ok(readback.has(shellPath), `${shellPath} 在 SHELL 裡但沒進部署 read-back`);
+  }
+  assert.ok(readback.has('data/card-id-lineage.json'), 'lineage 檔本身也要 read-back');
+  assert.ok(readback.has('sw.js'));
+});
+
+test('read-back 清單裡的每個路徑在 repo 裡都存在', async () => {
+  const { access } = await import('node:fs/promises');
+  const deployScript = await readFile(new URL('../scripts/update-audio-deploy.sh', import.meta.url), 'utf8');
+  const listBlock = deployScript.match(/RUNTIME_READBACK_ASSETS=\(([\s\S]*?)\n\)/);
+  const readback = [...listBlock[1].matchAll(/"([^"]+)"/g)].map(m => m[1]);
+
+  for (const rel of readback) {
+    // data.json 等產物由 build 步驟生出來，只驗版控裡有的那些
+    if (rel.endsWith('-manifest.json') || rel === 'data.json') continue;
+    await access(new URL(`../${rel}`, import.meta.url));
+  }
+});

@@ -97,6 +97,29 @@ print(m.group(1) if m else "")
 PY
 }
 
+# Ledger 正確性的關鍵資產。漏掉任何一個，線上跑的就不是本機驗過的那份，而且不會有人
+# 發現——之前 data/card-id-lineage.json 沒進部署清單，Pages 回 SPA fallback 的
+# 200 text/html，已登入又有 legacy 資料的使用者直接卡在 recoverable-failure。
+RUNTIME_READBACK_ASSETS=(
+  "sw.js"
+  "data.json"
+  "zh-manifest.json"
+  "audio-manifest.json"
+  "data/card-id-lineage.json"
+  "src/card-identity.js"
+  "src/production-lineage-trust.js"
+  "src/legacy-claim-flow.js"
+  "src/storage-scope.js"
+  "src/practice-db.js"
+  "src/practice-commit.js"
+  "src/practice-events.js"
+  "src/practice-runtime.js"
+  "src/practice-ledger-runtime.js"
+  "src/ledger-mirror.js"
+  "src/practice-grade-controller.js"
+  "src/practice-grade-session.js"
+)
+
 asset_sha() {
   shasum "$1" | awk '{print $1}'
 }
@@ -127,10 +150,10 @@ verify_deployment_readback() {
   local deployment_url="$1"
   echo
   echo "== Verify deployed assets =="
-  verify_deploy_asset "$deployment_url" "sw.js"
-  verify_deploy_asset "$deployment_url" "data.json"
-  verify_deploy_asset "$deployment_url" "zh-manifest.json"
-  verify_deploy_asset "$deployment_url" "audio-manifest.json"
+  local rel
+  for rel in "${RUNTIME_READBACK_ASSETS[@]}"; do
+    verify_deploy_asset "$deployment_url" "$rel"
+  done
   verify_deploy_asset "$deployment_url" "deploy-info.json"
   echo "Deployment URL: $deployment_url"
   echo "Source commit: $(git rev-parse --short HEAD)"
@@ -139,8 +162,10 @@ verify_deployment_readback() {
 
 write_deploy_info() {
   local deploy_info="out/pages-deploy/deploy-info.json"
+  RUNTIME_READBACK_ASSETS_LIST="$(printf '%s\n' "${RUNTIME_READBACK_ASSETS[@]}")" \
   python3 - <<PY
 import json
+import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -149,18 +174,19 @@ from zoneinfo import ZoneInfo
 def sha(path):
     return subprocess.check_output(["shasum", path], text=True).split()[0]
 
+assets = {
+    rel: sha(f"out/pages-deploy/{rel}")
+    for rel in os.environ["RUNTIME_READBACK_ASSETS_LIST"].split()
+    if rel
+}
+
 info = {
     "generated_at": datetime.now(ZoneInfo("Asia/Taipei")).isoformat(timespec="seconds"),
     "source_commit": subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip(),
     "source_branch": subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip(),
     "sw_cache": "$(sw_cache_name)",
     "data_generated": "$data_generated",
-    "assets": {
-        "sw.js": sha("out/pages-deploy/sw.js"),
-        "data.json": sha("out/pages-deploy/data.json"),
-        "zh-manifest.json": sha("out/pages-deploy/zh-manifest.json"),
-        "audio-manifest.json": sha("out/pages-deploy/audio-manifest.json"),
-    },
+    "assets": assets,
 }
 Path("$deploy_info").write_text(json.dumps(info, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY

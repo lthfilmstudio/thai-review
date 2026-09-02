@@ -1,7 +1,7 @@
 /* Service Worker：app shell cache + runtime CSV cache。
    改檔後升 CACHE 版本號強制更新。 */
 
-const CACHE = 'thai-review-v97';
+const CACHE = 'thai-review-v98';
 
 const SHELL = [
   './',
@@ -72,7 +72,7 @@ async function precache(cache, url) {
   const request = new Request(url, { cache: 'reload' });
   const response = await fetch(request);
   if (!response.ok) throw new Error(`precache failed ${url} (${response.status})`);
-  if (cacheableJsonResponse(request, response)) await cache.put(request, response);
+  if (cacheableTypedResponse(request, response)) await cache.put(request, response);
 }
 
 self.addEventListener('install', e => {
@@ -133,18 +133,32 @@ self.addEventListener('fetch', e => {
 });
 
 /* SPA fallback 與 Cloudflare Access 的登入頁都是 200 text/html。只看 res.ok 會把
-   HTML 存進 JSON 的 cache key，之後離線開機拿到那份 HTML 就再也解不開。 */
-function cacheableJsonResponse(req, res) {
+   HTML 存進 JSON／JS／CSS 的 cache key，之後離線開機拿到那份 HTML 就再也解不開
+   ——JSON 是 parse 失敗，JS 更糟：module 載入直接炸掉，整個 App 起不來（R15）。 */
+const TYPED_ASSETS = Object.freeze([
+  ['.json', 'json'],
+  ['.mjs', 'javascript'],
+  ['.js', 'javascript'],
+  ['.css', 'css'],
+  ['.webmanifest', 'json'],
+]);
+
+function cacheableTypedResponse(req, res) {
   if (!res.ok) return false;
-  if (!new URL(req.url).pathname.endsWith('.json')) return true;
-  return (res.headers.get('content-type') || '').toLowerCase().includes('json');
+  const pathname = new URL(req.url).pathname.toLowerCase();
+  const expected = TYPED_ASSETS.find(([suffix]) => pathname.endsWith(suffix));
+  if (!expected) return true;
+  const type = (res.headers.get('content-type') || '').toLowerCase();
+  // content-type 缺席時不放行：Pages 對真的靜態檔一定會帶，帶不出來的多半是
+  // fallback 或錯誤頁。
+  return type.includes(expected[1]);
 }
 
 async function networkFirst(req) {
   const cache = await caches.open(CACHE);
   try {
     const res = await fetch(req);
-    if (cacheableJsonResponse(req, res)) {
+    if (cacheableTypedResponse(req, res)) {
       cache.put(req, res.clone());
       return res;
     }
