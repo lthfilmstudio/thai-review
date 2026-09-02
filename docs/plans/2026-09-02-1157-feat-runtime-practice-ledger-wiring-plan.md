@@ -170,6 +170,7 @@ sequenceDiagram
 - **Execution note:** Proof-first；每個 crash/ownership race 先有 failing integration test。
 - **Test scenarios:** existing daily key 仍 reconcile、backfill 不雙算、pull reload 保留/重拉冪等/collision quarantine、reset 各 crash point不復活、logout/account switch隔離、catalog refresh stale token不套用。
 - **Verification:** focused cloud/boot/storage suites + reload integration。
+- **Deviation（2026-09-02 實作時）:** R11 寫「清 baseline state」，實作只清 `runtime-context`，**保留 `runtime-srs-baseline-v1` 的 `seededAliases`**。那份紀錄是 U2 定案的 add-only 語意裡「重置掉的進度不准被 legacy progress 救回來」的唯一依據；清掉的話下次開機 baseline 會從還沒被同步清乾淨的 legacy progress 整批重新 seed，重置形同無效。端到端測試釘在 `tests/storage_scope.test.mjs`「R11：重置後再跑一次 baseline，被重置掉的卡不會復活」。見 commit b94f1ef。這條需要 Nalin 或原作者確認。
 
 ### U6. 接上 async 評分 controller 與 UI context guard
 
