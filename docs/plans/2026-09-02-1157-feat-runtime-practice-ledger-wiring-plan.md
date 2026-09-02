@@ -132,10 +132,11 @@ sequenceDiagram
 - **Requirements:** R3–R4、R6、R10–R12；KTD2–KTD4、KTD7。
 - **Dependencies:** U1。
 - **Files:** Modify `src/practice-db.js`、`src/storage-scope.js`、`tests/practice_db.test.mjs`、`tests/storage_scope.test.mjs`、`tests/browser/practice-db-browser.mjs`。
-- **Approach:** DB version 3 additive upgrade；新增 `dailyCardClaims`；runtime port 提供 claim/projection/context/baseline/import/reset 方法；baseline 同時驗 current catalog、trusted lineage、SRS shape，逐列 add-only，非法列 quarantine；新 store 納入 claim eligibility counts。
+- **Approach:** DB version 3 additive upgrade；新增 `dailyCardClaims`；runtime port 提供 claim/context/baseline 方法；baseline 同時驗 current catalog、trusted lineage、SRS shape，逐列 add-only，非法列 quarantine；新 store 納入 claim eligibility counts。
 - **Execution note:** Test-first；保留 transaction 前、中、complete 後 `assertActive()` 與 DB 名稱。
 - **Test scenarios:** v2→v3 保留 rows、Today/All cross-lane uniqueness、valid seed v0、existing IDB wins、historical collision/incomplete evidence/duplicate ID/invalid shape quarantine、rerun idempotence、workspace/versionchange/abort 無半套 seed。
 - **Verification:** focused Node tests + served-origin DB upgrade/read-back fixture。
+- **Deviation（2026-09-02 審查後）:** import/reset primitives（`getAllSrs`／`deleteSrs`／`deleteProjection`／`deleteWorkspaceMeta`／syncCursor 存取）本來排在 U2，實作時發現沒有任何 caller，已移到 U5 跟真正的 reconciliation 一起加——它們不是 schema，補加不需要再升 IDB 版本。practice port 的 `getProjection`／`putProjection` 則在 U3 有真正的 caller，該單元再加回。U5 動工前先確認 reset 那批還不存在。見 commit 198f884。
 
 ### U3. 原子提交 daily-card claim 與 authoritative projections
 

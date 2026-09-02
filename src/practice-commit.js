@@ -7,8 +7,16 @@ import { buildPracticeAttemptEvent, samePracticeEvent } from './practice-events.
 
 const PRACTICE_STORES = Object.freeze([
   'practiceEvents', 'srsV2', 'formalDueClaims', 'dailyLaneClaims',
-  'attemptPhaseClaims', 'outbox',
+  'dailyCardClaims', 'attemptPhaseClaims', 'outbox',
 ]);
+
+const DAY_CONTEXT_STORES = Object.freeze(['dailyCardClaims', 'attemptPhaseClaims']);
+
+/* 同日同卡的第一筆才建 claim，之後只讀不改。phases 不存在 claim 裡，是從
+   attemptPhaseClaims 現查——那些列跟 event 同一個 transaction 寫進去，本來就是
+   權威紀錄。存進 claim 再更新的話，Today 跟 All 兩個 tab 會變成 read-modify-write
+   互相蓋。 */
+const ATTEMPT_PHASES = Object.freeze(['first', 'retry-1', 'retry-2']);
 
 function codedError(code, message) {
   const error = new Error(message);
@@ -89,6 +97,56 @@ function attemptPhaseClaim(workspaceId, attempt, eventId) {
   };
 }
 
+async function readAttemptPhases(tx, workspace, attemptId) {
+  const phases = [];
+  for (const phase of ATTEMPT_PHASES) {
+    // eslint-disable-next-line no-await-in-loop
+    if (!await tx.getAttemptPhaseClaim(workspace, attemptId, phase)) break;
+    phases.push(phase);
+  }
+  return phases;
+}
+
+function dayContextFromClaim(claim, phases) {
+  return {
+    phases,
+    lane: claim.lane,
+    roundId: claim.roundId,
+    cycleId: claim.cycleId,
+    cycleOrdinal: claim.cycleOrdinal,
+    attemptId: claim.attemptId,
+  };
+}
+
+/* U6 的評分 controller 在送出前得先知道「今天這張卡是不是已經有人評過」，才決定
+   這次是 first 還是 retry-N。回傳的形狀就是 resolvePracticePhase 的 existingContext。 */
+export async function readPracticeDayContext({
+  port,
+  workspaceId,
+  dayKey,
+  cardId,
+} = {}) {
+  if (!port || typeof port.transaction !== 'function') {
+    throw codedError('STORAGE_UNAVAILABLE', 'practice transaction port is unavailable');
+  }
+  const workspace = requiredWorkspace(workspaceId);
+  return port.transaction(DAY_CONTEXT_STORES, 'readonly', async tx => {
+    for (const method of ['getDailyCardClaim', 'getAttemptPhaseClaim']) {
+      requiredFunction(tx?.[method], `transaction.${method}`);
+    }
+    const claim = await tx.getDailyCardClaim(workspace, dayKey, canonicalUuid(cardId));
+    if (!claim) return null;
+    const phases = await readAttemptPhases(tx, workspace, claim.attemptId);
+    if (!phases.length) {
+      throw codedError(
+        'DAILY_CARD_CLAIM_DANGLING',
+        'daily-card claim has no committed attempt phase',
+      );
+    }
+    return dayContextFromClaim(claim, phases);
+  });
+}
+
 async function resolveAttemptPhaseReplay(tx, workspace, attempt, claim) {
   const existing = await tx.getEvent(workspace, claim.eventId);
   if (!existing) {
@@ -144,6 +202,7 @@ export async function commitPracticeAttempt({
     for (const method of [
       'getEvent', 'putEvent', 'putOutbox', 'getSrs', 'putSrs',
       'addFormalDueClaim', 'addDailyLaneClaim',
+      'getDailyCardClaim', 'addDailyCardClaim',
       'getAttemptPhaseClaim', 'addAttemptPhaseClaim',
     ]) {
       requiredFunction(tx?.[method], `transaction.${method}`);
@@ -198,6 +257,37 @@ export async function commitPracticeAttempt({
     let srsAfterVersion = null;
 
     if (attemptSnapshot.phase === 'first') {
+      // R3：跨 Today／All、跨 lane 的唯一 first。key 不含 lane，所以 All 的 sweep
+      // 擋得住 Today 的 due，反之亦然。
+      const dailyCardClaimed = await tx.addDailyCardClaim(workspace, {
+        workspaceId: workspace,
+        dayKey: attemptSnapshot.dayKey,
+        cardId: attemptSnapshot.cardId,
+        lane: attemptSnapshot.lane,
+        roundId: attemptSnapshot.roundId,
+        cycleId: attemptSnapshot.cycleId,
+        cycleOrdinal: attemptSnapshot.cycleOrdinal,
+        attemptId: attemptSnapshot.attemptId,
+        eventId,
+      });
+      if (dailyCardClaimed !== true) {
+        const winner = await tx.getDailyCardClaim(
+          workspace, attemptSnapshot.dayKey, attemptSnapshot.cardId,
+        );
+        if (!winner) {
+          throw codedError(
+            'DAILY_CARD_CLAIM_DANGLING',
+            'daily-card claim collided but could not be read back',
+          );
+        }
+        const phases = await readAttemptPhases(tx, workspace, winner.attemptId);
+        return {
+          status: 'daily-card-already-claimed',
+          context: dayContextFromClaim(winner, phases.length ? phases : ['first']),
+          event: null,
+          srs: null,
+        };
+      }
       const claimRow = {
         workspaceId: workspace,
         cardId: attemptSnapshot.cardId,

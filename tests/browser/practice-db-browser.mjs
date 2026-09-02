@@ -212,10 +212,12 @@ async function run() {
     },
   });
 
+  // 這段只是驗 store 本身的唯一性，要用另一張卡——用 IDS.cardId 會把後面平行 Due
+  // 測試（AE3）要搶的 (day, card) 先占走，那個測試就永遠看不到 committed。
   const dailyClaim = {
     workspaceId: 'user:A',
     dayKey: '2026-08-24',
-    cardId: IDS.cardId,
+    cardId: '12121212-1212-4121-8121-121212121212',
     attemptId: IDS.attemptId,
     lane: 'due',
     roundId: IDS.roundId,
@@ -302,7 +304,8 @@ async function run() {
     )),
   ]);
   const statuses = [first.status, second.status].sort();
-  if (statuses.join(',') !== 'committed,formal-due-already-claimed') {
+  // R3 之後擋在最外層的是跨 lane 的 daily-card claim，不再是 formal Due claim。
+  if (statuses.join(',') !== 'committed,daily-card-already-claimed') {
     throw new Error(`parallel Due claim mismatch: ${statuses.join(',')}`);
   }
 

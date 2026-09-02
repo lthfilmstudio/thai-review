@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { commitPracticeAttempt } from '../src/practice-commit.js';
+import { commitPracticeAttempt, readPracticeDayContext } from '../src/practice-commit.js';
 
 const IDs = {
   eventId: '11111111-1111-4111-8111-111111111111',
@@ -26,7 +26,8 @@ function attempt(overrides = {}) {
 function transactionalPort({ failBeforeCommit = false } = {}) {
   const data = {
     events: new Map(), srs: new Map(), formalDueClaims: new Map(),
-    dailyLaneClaims: new Map(), attemptPhaseClaims: new Map(), outbox: new Map(),
+    dailyLaneClaims: new Map(), dailyCardClaims: new Map(),
+    attemptPhaseClaims: new Map(), outbox: new Map(),
   };
   let transactionTail = Promise.resolve();
   return {
@@ -38,11 +39,12 @@ function transactionalPort({ failBeforeCommit = false } = {}) {
       transactionTail = new Promise(resolve => { releaseTransaction = resolve; });
       await previousTransaction;
       try {
-        assert.deepEqual(storeNames, [
+        assert.deepEqual(storeNames, mode === 'readonly' ? [
+          'dailyCardClaims', 'attemptPhaseClaims',
+        ] : [
           'practiceEvents', 'srsV2', 'formalDueClaims', 'dailyLaneClaims',
-          'attemptPhaseClaims', 'outbox',
+          'dailyCardClaims', 'attemptPhaseClaims', 'outbox',
         ]);
-        assert.equal(mode, 'readwrite');
         const draft = structuredClone(data);
         const key = (workspace, id) => `${workspace}:${id}`;
         const tx = {
@@ -66,6 +68,15 @@ function transactionalPort({ failBeforeCommit = false } = {}) {
             const k = key(workspace, `${row.dayKey}:${row.cardId}:${row.lane}`);
             if (draft.dailyLaneClaims.has(k)) return false;
             draft.dailyLaneClaims.set(k, structuredClone(row));
+            return true;
+          },
+          getDailyCardClaim: (workspace, dayKey, cardId) => (
+            draft.dailyCardClaims.get(key(workspace, `${dayKey}:${cardId}`)) || null
+          ),
+          addDailyCardClaim: (workspace, row) => {
+            const k = key(workspace, `${row.dayKey}:${row.cardId}`);
+            if (draft.dailyCardClaims.has(k)) return false;
+            draft.dailyCardClaims.set(k, structuredClone(row));
             return true;
           },
           getAttemptPhaseClaim: (workspace, attemptId, phase) => (
@@ -290,7 +301,7 @@ test('concurrent retry claims commit exactly one event and outbox row', async ()
   assert.equal(port.data.attemptPhaseClaims.size, 1);
 });
 
-test('second formal Due for the same card/day does not create event, outbox, or SRS', async () => {
+test('同日同卡的第二筆 Due 不產生 event、outbox 或 SRS（R3 由 daily-card claim 擋下）', async () => {
   const port = transactionalPort();
   await commitPracticeAttempt({
     port,
@@ -307,7 +318,7 @@ test('second formal Due for the same card/day does not create event, outbox, or 
     ...options,
     createId: () => '66666666-6666-4666-8666-666666666666',
   });
-  assert.equal(second.status, 'formal-due-already-claimed');
+  assert.equal(second.status, 'daily-card-already-claimed');
   assert.equal(port.data.events.size, 1);
   assert.equal(port.data.outbox.size, 1);
   assert.equal(port.data.srs.size, 1);
@@ -324,7 +335,7 @@ test('same card/lane/day first is deduped while retry phases remain allowed', as
     }),
     ...options,
   });
-  assert.equal(duplicateFirst.status, 'daily-lane-already-claimed');
+  assert.equal(duplicateFirst.status, 'daily-card-already-claimed');
 
   const retry = await commitPracticeAttempt({
     port,
@@ -352,6 +363,7 @@ test('transaction abort leaves no half-written Due claim, event, SRS, or outbox'
     srs: 0,
     formalDueClaims: 0,
     dailyLaneClaims: 0,
+    dailyCardClaims: 0,
     attemptPhaseClaims: 0,
     outbox: 0,
   });
@@ -375,6 +387,152 @@ test('formal Due refuses device-global fallback when workspace installation ID i
     deviceId: '',
     attempt: attempt({ lane: 'due', formalGrade: 'good' }),
   }), error => error.code === 'PRACTICE_INPUT_INVALID');
+  assert.equal(port.data.events.size, 0);
+  assert.equal(port.data.srs.size, 0);
+});
+
+const OTHER = {
+  eventId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  roundId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  cycleId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  attemptId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+};
+
+test('first attempt 立起跨 lane 的 daily-card claim，並保存完整 attempt context', async () => {
+  const port = transactionalPort();
+  const result = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'sweep' }),
+  });
+
+  assert.equal(result.status, 'committed');
+  const claim = port.data.dailyCardClaims.get('user:A:2026-08-24:' + IDs.cardId);
+  assert.equal(claim.lane, 'sweep');
+  assert.equal(claim.attemptId, IDs.attemptId);
+  assert.equal(claim.roundId, IDs.roundId);
+  assert.equal(claim.cycleId, IDs.cycleId);
+  assert.equal(claim.cycleOrdinal, 1);
+  assert.equal(claim.eventId, IDs.eventId);
+});
+
+test('Today 與 All 同時評同一張卡：只成立一筆 first，另一筆拿到既有 context', async () => {
+  // AE3。dailyCardClaims 的 key 不含 lane，所以 All 的 sweep 也擋得住 Today 的 due。
+  const port = transactionalPort();
+  const [today, all] = await Promise.all([
+    commitPracticeAttempt({
+      port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+      attempt: attempt({ lane: 'due', formalGrade: 'good' }),
+    }),
+    commitPracticeAttempt({
+      port, workspaceId: 'user:A', createId: () => OTHER.eventId, deviceId: 'device-1',
+      attempt: attempt({ ...OTHER, lane: 'sweep' }),
+    }),
+  ]);
+
+  const statuses = [today.status, all.status].sort();
+  assert.deepEqual(statuses, ['committed', 'daily-card-already-claimed']);
+  assert.equal(port.data.events.size, 1, '同日同卡只准一筆 first event');
+  assert.equal(port.data.dailyCardClaims.size, 1);
+
+  const loser = today.status === 'committed' ? all : today;
+  const winner = today.status === 'committed' ? today : all;
+  assert.deepEqual(loser.context.phases, ['first']);
+  assert.equal(loser.context.lane, winner.event.lane, '輸的那邊要沿用 first 的 lane');
+  assert.equal(loser.context.attemptId, winner.event.attemptId);
+  assert.equal(loser.context.roundId, winner.event.roundId);
+  assert.equal(loser.event, null);
+  assert.equal(loser.srs, null);
+});
+
+test('拿到既有 context 之後以 retry-1 重送：沿用 first 的 attempt，不再碰 SRS', async () => {
+  const port = transactionalPort();
+  const first = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'due', formalGrade: 'good' }),
+  });
+  const srsAfterFirst = structuredClone(port.data.srs.get('user:A:' + IDs.cardId));
+
+  const blocked = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => OTHER.eventId, deviceId: 'device-1',
+    attempt: attempt({ ...OTHER, lane: 'sweep' }),
+  });
+  const retry = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => OTHER.eventId, deviceId: 'device-1',
+    attempt: attempt({
+      eventId: OTHER.eventId,
+      cardId: IDs.cardId,
+      lane: blocked.context.lane,
+      roundId: blocked.context.roundId,
+      cycleId: blocked.context.cycleId,
+      attemptId: blocked.context.attemptId,
+      phase: 'retry-1',
+    }),
+  });
+
+  assert.equal(retry.status, 'committed');
+  assert.equal(retry.event.attemptId, first.event.attemptId, 'retry 沿用 first 的 attempt');
+  assert.equal(Object.hasOwn(retry.event, 'srsAfter'), false, 'retry 的 event 不帶 SRS 欄位');
+  assert.equal(retry.srs, null);
+  assert.deepEqual(port.data.srs.get('user:A:' + IDs.cardId), srsAfterFirst,
+    'retry 不得動到 first 寫下的 SRS');
+  assert.equal(port.data.dailyCardClaims.size, 1, 'retry 不另立 daily-card claim');
+});
+
+test('readPracticeDayContext 從 claim 與已提交的 phase 推出 existingContext', async () => {
+  const port = transactionalPort();
+  assert.equal(
+    await readPracticeDayContext({
+      port, workspaceId: 'user:A', dayKey: '2026-08-24', cardId: IDs.cardId,
+    }),
+    null,
+    '還沒人評過就是 null',
+  );
+
+  await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'due', formalGrade: 'good' }),
+  });
+  const afterFirst = await readPracticeDayContext({
+    port, workspaceId: 'user:A', dayKey: '2026-08-24', cardId: IDs.cardId,
+  });
+  assert.deepEqual(afterFirst, {
+    phases: ['first'],
+    lane: 'due',
+    roundId: IDs.roundId,
+    cycleId: IDs.cycleId,
+    cycleOrdinal: 1,
+    attemptId: IDs.attemptId,
+  });
+
+  await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => OTHER.eventId, deviceId: 'device-1',
+    attempt: attempt({ eventId: OTHER.eventId, lane: 'due', phase: 'retry-1' }),
+  });
+  const afterRetry = await readPracticeDayContext({
+    port, workspaceId: 'user:A', dayKey: '2026-08-24', cardId: IDs.cardId,
+  });
+  assert.deepEqual(afterRetry.phases, ['first', 'retry-1']);
+});
+
+test('v2→v3 升級空窗：已有 formal Due claim 但還沒有 daily-card claim 時，內層閘門仍要擋', async () => {
+  // dailyCardClaims 是 v3 才有的 store，升級後是空的。既有的 formalDueClaims 因此
+  // 成為唯一還記得「今天這張卡已經正式複習過」的紀錄，內層閘門不能拿掉。
+  const port = transactionalPort();
+  port.data.formalDueClaims.set(`user:A:2026-08-24:${IDs.cardId}`, {
+    workspaceId: 'user:A',
+    cardId: IDs.cardId,
+    dayKey: '2026-08-24',
+    lane: 'due',
+    claimKind: 'formal-due',
+    eventId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+  });
+
+  const result = await commitPracticeAttempt({
+    port, workspaceId: 'user:A', createId: () => IDs.eventId, deviceId: 'device-1',
+    attempt: attempt({ lane: 'due', formalGrade: 'good' }),
+  });
+
+  assert.equal(result.status, 'formal-due-already-claimed');
   assert.equal(port.data.events.size, 0);
   assert.equal(port.data.srs.size, 0);
 });
