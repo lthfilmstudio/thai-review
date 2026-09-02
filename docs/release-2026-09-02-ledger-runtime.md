@@ -81,6 +81,16 @@ per-deployment URL（`<hash>.thai-review.pages.dev`）不在 Cloudflare Access �
 5. **既有進度**：用真的有 legacy progress 的裝置開一次，確認 `srs_v2` 有 seed 到、
    或 quarantine 的原因合理（`current_catalog_collision` 之類是正常的）。
 
+## 回滾
+
+鏡射把帳本的數字加進 `day` 的 top-level 欄位（`reviewed`／四檔／`practice`），
+`day.ledger` 只留「帳本貢獻了多少」給下次算差額用。所以 bundle 回滾之後，只讀
+top-level 的舊版仍然看得到那些日子有複習，不會把它們判成缺口去燒安神保護。
+
+殘留限制：**practice-only 的日子回滾後仍會被判成沒來過**。舊版的 `cameOnDay()` 只看
+`reviewed`／`games`／`bridged`，沒有任何欄位能表達「只掃過沒正式複習」。這種日子在
+回滾後會消耗一個安神保護。要完全避免的話得等 practice 有 v1 欄位。
+
 ## 已知還沒做的
 
 - U5c 的 cloud-sync 接線（上面第 2 點）

@@ -442,46 +442,38 @@ test('materializeDay：沒有 ledger 就原樣回傳（legacy-only 不受影響�
   assert.equal(materializeDay(undefined), undefined);
 });
 
-test('materializeDay：ledger-only 與 legacy+ledger 相加，且不改輸入', () => {
-  const ledgerOnly = { ledger: { reviewed: 2, good: 2, practice: 1 } };
-  assert.deepEqual(materializeDay(ledgerOnly), {
-    reviewed: 2, again: 0, hard: 0, good: 2, easy: 0, practice: 1,
-  });
-
-  const both = { reviewed: 3, good: 2, hard: 1, games: 1, ledger: { reviewed: 2, good: 2, practice: 4 } };
-  const out = materializeDay(both);
-  assert.equal(out.reviewed, 5);
+/* top-level 放總數、day.ledger 只記帳本貢獻多少，是為了回滾：舊版沒有
+   materializeDay()，只讀 top-level。詳見 mirrorLedgerDay 的註解。 */
+test('materializeDay 只拿掉 ledger 這個內部欄位，不再相加', () => {
+  const day = { reviewed: 5, good: 4, hard: 1, games: 1, practice: 4,
+    ledger: { reviewed: 2, good: 2, practice: 4 } };
+  const out = materializeDay(day);
+  assert.equal(out.reviewed, 5, 'top-level 已經是總數，再加一次就是雙算');
   assert.equal(out.good, 4);
-  assert.equal(out.hard, 1);
-  assert.equal(out.games, 1, 'games 只有 legacy 有，不受 ledger 影響');
   assert.equal(out.practice, 4);
-  assert.deepEqual(both, {
-    reviewed: 3, good: 2, hard: 1, games: 1, ledger: { reviewed: 2, good: 2, practice: 4 },
-  }, '輸入不得被改動');
+  assert.equal(Object.hasOwn(out, 'ledger'), false, 'ledger 是內部欄位，不外流');
+  assert.deepEqual(day, { reviewed: 5, good: 4, hard: 1, games: 1, practice: 4,
+    ledger: { reviewed: 2, good: 2, practice: 4 } }, '輸入不得被改動');
 });
 
-test('materializeDay 冪等：輸出不再帶 ledger，重複呼叫不重複加', () => {
-  const day = { reviewed: 1, ledger: { reviewed: 2, practice: 1 } };
+test('materializeDay 冪等', () => {
+  const day = { reviewed: 3, ledger: { reviewed: 2, practice: 1 } };
   const once = materializeDay(day);
-  const twice = materializeDay(once);
-  assert.equal(Object.hasOwn(once, 'ledger'), false);
-  assert.deepEqual(twice, once);
-  assert.equal(twice.reviewed, 3);
+  assert.deepEqual(materializeDay(once), once);
+  assert.equal(once.reviewed, 3);
 });
 
-test('own + remote 不膨脹：自己的 ledger 只算一次', () => {
-  // remote 的列是別台上傳的 materialized 數字（見 ownDaysToRows），
-  // 自己這邊先 materialize 再相加，兩邊都不會重複計。
-  const own = { '2026-08-24': { reviewed: 1, good: 1, ledger: { reviewed: 2, good: 2 } } };
+test('own + remote 不膨脹：自己那份的總數只算一次', () => {
+  const own = { '2026-08-24': { reviewed: 3, good: 3, ledger: { reviewed: 2, good: 2 } } };
   const remote = { '2026-08-24': { reviewed: 4, good: 4, again: 0, hard: 0, easy: 0, games: 0, seconds: 0 } };
   const merged = mergedDays(materializeDays(own), remote);
   assert.equal(merged['2026-08-24'].reviewed, 7);
   assert.equal(merged['2026-08-24'].good, 7);
 });
 
-test('ownDaysToRows 上傳 materialized 的正式計數，practice 不上傳（v1 沒這欄）', () => {
+test('ownDaysToRows 上傳的是總數，practice 不上傳（v1 沒這欄）', () => {
   const rows = ownDaysToRows({
-    '2026-08-24': { reviewed: 1, good: 1, ledger: { reviewed: 2, good: 2, practice: 5 } },
+    '2026-08-24': { reviewed: 3, good: 3, practice: 5, ledger: { reviewed: 2, good: 2, practice: 5 } },
   }, 'devA');
   assert.equal(rows.length, 1);
   assert.equal(rows[0].reviewed, 3);
@@ -490,7 +482,7 @@ test('ownDaysToRows 上傳 materialized 的正式計數，practice 不上傳（v
 });
 
 test('只有 practice 的一天不佔一列——沒有任何 v1 欄位有內容', () => {
-  const rows = ownDaysToRows({ '2026-08-24': { ledger: { practice: 3 } } }, 'devA');
+  const rows = ownDaysToRows({ '2026-08-24': { practice: 3, ledger: { practice: 3 } } }, 'devA');
   assert.deepEqual(rows, []);
 });
 

@@ -133,21 +133,19 @@ export function mergeRemoteRows(rows, localProgress, localHistory, resetAt = 0, 
    上去，加總後爆增。 */
 
 const DAY_COUNTERS = ['reviewed', 'again', 'hard', 'good', 'easy', 'games', 'seconds'];
-/* ledger 只貢獻正式複習的四檔與 reviewed；games／seconds 永遠只有 legacy 有。 */
-const LEDGER_FORMAL_COUNTERS = ['reviewed', 'again', 'hard', 'good', 'easy'];
-
-/* R7／KTD6：localStorage 那天的 top-level 欄位是 legacy 貢獻，day.ledger 是 ledger
-   貢獻，兩邊分開存才重播得回來。顯示、結算、上傳一律先走這支合起來看，不要各自
-   加一次。輸入不動，回傳新物件；輸出不再帶 ledger，所以重複呼叫不會重複加。 */
+/* R7／KTD6：top-level 欄位放的是總數（legacy ＋ ledger），day.ledger 只記帳本貢獻了
+   多少，給 mirrorLedgerDay 算 delta 用。top-level 存總數是為了回滾——舊版沒有這支
+   函式，只讀 top-level；帳本數字若只存在 day.ledger，回滾後那些日子會被判成缺口而
+   燒掉安神保護，而且救不回來。
+   這支現在只負責把 ledger 這個內部欄位拿掉，不做加總。輸入不動。 */
 export function materializeDay(day) {
   if (!day || typeof day !== 'object' || Array.isArray(day)) return day;
-  const ledger = day.ledger;
-  if (!ledger || typeof ledger !== 'object' || Array.isArray(ledger)) return day;
+  if (!Object.hasOwn(day, 'ledger')) return day;
+  // top-level 已經是總數（mirrorLedgerDay 把帳本的 delta 加進去了），這裡不再相加
+  // ——相加一次就是雙算。day.ledger 只是「帳本貢獻了多少」的帳，讀的時候要拿掉，
+  // 免得跟著上傳或跟 remote 再合併一次。
   const out = { ...day };
   delete out.ledger;
-  for (const k of LEDGER_FORMAL_COUNTERS) out[k] = (day[k] || 0) + (ledger[k] || 0);
-  // practice 不進 reviewed／accuracy，只用來判「今天有來」。
-  out.practice = (day.practice || 0) + (ledger.practice || 0);
   return out;
 }
 

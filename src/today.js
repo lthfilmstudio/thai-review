@@ -208,6 +208,16 @@ export function logReview(gradeStr, ts = Date.now(), storage = localStorage) {
   saveDailyLog(log, storage);
 }
 
+const LEDGER_MIRROR_FIELDS = Object.freeze([
+  'reviewed', 'again', 'hard', 'good', 'easy', 'practice',
+]);
+
+function plainLedgerContribution(source) {
+  const out = {};
+  for (const field of LEDGER_MIRROR_FIELDS) out[field] = Math.max(0, source?.[field] || 0);
+  return out;
+}
+
 /* ledger 的每日快照鏡射進本機日誌。刻意用「設定」而不是像 logReview() 那樣 +=1——
    ledger 是權威來源，重播一次、當掉重開一次都要收斂到同一個數字，累加會愈疊愈多。
    寫的是 day.ledger 子物件，top-level 那些欄位留給 legacy 貢獻（R7），兩邊分開才
@@ -217,21 +227,28 @@ export function mirrorLedgerDay(dayKey, snapshot, storage = localStorage) {
   if (!key) return false;
   const log = loadDailyLog(storage);
   const day = { ...(log.days[key] || {}) };
-  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
-    if (!Object.hasOwn(day, 'ledger')) return false;
-    delete day.ledger;
-  } else {
-    const ledger = {
-      reviewed: Math.max(0, snapshot.reviewed || 0),
-      again: Math.max(0, snapshot.again || 0),
-      hard: Math.max(0, snapshot.hard || 0),
-      good: Math.max(0, snapshot.good || 0),
-      easy: Math.max(0, snapshot.easy || 0),
-      practice: Math.max(0, snapshot.practice || 0),
-    };
-    if (JSON.stringify(day.ledger || null) === JSON.stringify(ledger)) return false;
-    day.ledger = ledger;
+  const previous = plainLedgerContribution(day.ledger);
+  const next = snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot)
+    ? plainLedgerContribution(snapshot)
+    : null;
+  if (JSON.stringify(day.ledger ?? null) === JSON.stringify(next)) return false;
+
+  // top-level 欄位放的是「總數」而不是只有 legacy 的部分。這是為了回滾：舊版沒有
+  // materializeDay()，只讀 top-level 的 day.reviewed。如果帳本的數字只存在
+  // day.ledger 裡，一旦 bundle 回滾，那些日子就會被 cameOnDay() 判成沒來過，
+  // runStreakSettlement 會當成缺口去花安神保護，而且結果會寫回 localStorage——
+  // 滾回新版也救不回被花掉的保護。
+  //
+  // day.ledger 留著當「帳本貢獻了多少」的帳，用來算 delta，所以重播仍然冪等：
+  // legacy 那邊 logReview() 照樣 +=1，下次鏡射算出來的 legacy 部分自然跟著變。
+  for (const field of LEDGER_MIRROR_FIELDS) {
+    const delta = (next?.[field] || 0) - (previous?.[field] || 0);
+    if (!delta) continue;
+    day[field] = Math.max(0, (day[field] || 0) + delta);
   }
+  if (next) day.ledger = next;
+  else delete day.ledger;
+
   log.days[key] = day;
   saveDailyLog(log, storage);
   return true;
