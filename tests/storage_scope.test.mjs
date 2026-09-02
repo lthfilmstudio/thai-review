@@ -14,6 +14,7 @@ import {
   inspectStorageDurability,
   logoutToAnonymous,
   commitRuntimeSrsBaseline,
+  ensureRuntimeLedgerContext,
   planRuntimeSrsBaseline,
   resolveWorkspaceId,
   runLegacyLearningBootGate,
@@ -999,4 +1000,126 @@ test('runtime baseline 不跨 workspace 寫入', async () => {
   });
   await assert.rejects(commitRuntimeSrsBaseline({ port, workspaceId: 'user:B', plan }));
   assert.equal(port.srs.size, 0);
+});
+
+function contextPort() {
+  const meta = new Map();
+  return {
+    meta,
+    async transaction(names, mode, work) {
+      assert.deepEqual(names, ['workspaceMeta']);
+      return work({
+        getWorkspaceMeta: (_w, key) => structuredClone(meta.get(key) || null),
+        putWorkspaceMeta: (_w, key, row) => {
+          if (mode !== 'readwrite') throw new Error('write in a readonly transaction');
+          meta.set(key, structuredClone(row));
+        },
+      });
+    },
+  };
+}
+
+test('catalog digest 沒變就不重跑 baseline audit', async () => {
+  const port = contextPort();
+  let audits = 0;
+  const audit = async () => { audits += 1; return { summary: { seeded: 1 } }; };
+
+  const first = await ensureRuntimeLedgerContext({
+    port, workspaceId: 'user:A', catalogDigest: 'sha256:a', auditBaseline: audit,
+  });
+  const second = await ensureRuntimeLedgerContext({
+    port, workspaceId: 'user:A', catalogDigest: 'sha256:a', auditBaseline: audit,
+  });
+
+  assert.deepEqual(first, {
+    status: 'ready', catalogDigest: 'sha256:a', audited: true, reason: null,
+  });
+  assert.equal(second.status, 'ready');
+  assert.equal(second.audited, false);
+  assert.equal(audits, 1);
+  assert.deepEqual(port.meta.get('runtime-context').baselineSummary, { seeded: 1 });
+});
+
+test('catalog digest 換了就重新 audit，過了才換 context', async () => {
+  const port = contextPort();
+  const seen = [];
+  const audit = async ({ catalogDigest }) => { seen.push(catalogDigest); return { summary: null }; };
+
+  await ensureRuntimeLedgerContext({
+    port, workspaceId: 'user:A', catalogDigest: 'sha256:a', auditBaseline: audit,
+  });
+  const afterRefresh = await ensureRuntimeLedgerContext({
+    port, workspaceId: 'user:A', catalogDigest: 'sha256:b', auditBaseline: audit,
+  });
+
+  assert.deepEqual(seen, ['sha256:a', 'sha256:b']);
+  assert.equal(afterRefresh.audited, true);
+  assert.equal(port.meta.get('runtime-context').catalogDigest, 'sha256:b');
+});
+
+test('audit 失敗回 blocked 而不是丟出去，context 維持舊的', async () => {
+  // 呼叫端是開機路徑。丟出去就是把使用者鎖在門外，legacy 也一起用不了。
+  const port = contextPort();
+  await ensureRuntimeLedgerContext({
+    port, workspaceId: 'user:A', catalogDigest: 'sha256:a', auditBaseline: async () => ({}),
+  });
+
+  const blocked = await ensureRuntimeLedgerContext({
+    port,
+    workspaceId: 'user:A',
+    catalogDigest: 'sha256:b',
+    auditBaseline: async () => {
+      throw Object.assign(new Error('lineage unavailable'), { code: 'LEGACY_LINEAGE_UNAVAILABLE' });
+    },
+  });
+
+  assert.deepEqual(blocked, {
+    status: 'blocked',
+    catalogDigest: 'sha256:b',
+    audited: false,
+    reason: 'LEGACY_LINEAGE_UNAVAILABLE',
+  });
+  assert.equal(port.meta.get('runtime-context').catalogDigest, 'sha256:a',
+    'audit 沒過就不能把 context 換成新的 digest');
+});
+
+test('audit 完成、context 還沒寫就當掉：下次開機重跑一次（baseline 冪等）', async () => {
+  const port = contextPort();
+  let audits = 0;
+  const audit = async () => { audits += 1; return {}; };
+  const crashingPort = {
+    ...port,
+    async transaction(names, mode, work) {
+      if (mode === 'readwrite') throw new Error('crashed before writing context');
+      return port.transaction(names, mode, work);
+    },
+  };
+
+  await assert.rejects(ensureRuntimeLedgerContext({
+    port: crashingPort, workspaceId: 'user:A', catalogDigest: 'sha256:a', auditBaseline: audit,
+  }), /crashed before writing context/);
+  assert.equal(port.meta.size, 0);
+
+  const retried = await ensureRuntimeLedgerContext({
+    port, workspaceId: 'user:A', catalogDigest: 'sha256:a', auditBaseline: audit,
+  });
+  assert.equal(retried.status, 'ready');
+  assert.equal(audits, 2, '重跑一次 audit，靠 baseline 自己冪等');
+});
+
+test('未知 schemaVersion 的 runtime context 當成失效，重新 audit', async () => {
+  const port = contextPort();
+  port.meta.set('runtime-context', {
+    workspaceId: 'user:A', key: 'runtime-context', schemaVersion: 2, catalogDigest: 'sha256:a',
+  });
+  let audits = 0;
+  const result = await ensureRuntimeLedgerContext({
+    port,
+    workspaceId: 'user:A',
+    catalogDigest: 'sha256:a',
+    auditBaseline: async () => { audits += 1; return {}; },
+  });
+  assert.equal(audits, 1);
+  assert.equal(result.audited, true);
+  assert.equal(port.meta.get('runtime-context').schemaVersion, 1);
 });

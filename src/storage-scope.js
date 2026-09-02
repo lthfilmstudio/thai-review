@@ -1215,6 +1215,12 @@ function migrationPlanSignature(plan) {
   return stableSerialize(migrationPlanCore(plan));
 }
 
+function requiredContextMethod(tx, name) {
+  if (typeof tx?.[name] !== 'function') {
+    throw codedError('PRACTICE_ADAPTER_INCOMPLETE', `runtime context transaction.${name} is required`);
+  }
+}
+
 function runtimeCatalogCards(currentCatalog) {
   if (!Array.isArray(currentCatalog?.lessons)) {
     throw codedError('RUNTIME_BASELINE_INVALID', 'runtime baseline requires a complete catalog');
@@ -1254,6 +1260,8 @@ const RUNTIME_BASELINE_PLANS = new WeakSet();
 /* baseline 是 add-only 的補寫，不是一次定生死：legacy progress 會被 cloud-sync
    在開機後改（多裝置合併、reset epoch 清除），所以「plan 跟上次不一樣」是正常狀態，
    帳要記在 alias 層級而不是整份 plan 層級。 */
+const RUNTIME_CONTEXT_META_KEY = 'runtime-context';
+const RUNTIME_CONTEXT_META_VERSION = 1;
 const RUNTIME_BASELINE_META_KEY = 'runtime-srs-baseline-v1';
 const RUNTIME_BASELINE_META_VERSION = 1;
 
@@ -1471,6 +1479,72 @@ export async function commitRuntimeSrsBaseline({
       };
     },
   );
+}
+
+/* R12：ledger 評分的開關綁在 catalog digest 上。digest 一變（發了新課、改了卡），
+   之前那份 baseline 的認領結論就不一定還成立——當初撞名被 quarantine 的 alias 現在
+   可能解得開，反過來也可能多出新的撞名。所以先重跑一次 baseline audit，過了才把
+   context 換成新的 digest。
+
+   audit 失敗不丟出去：呼叫端是開機路徑，丟出去就是把使用者鎖在門外（U2 那個
+   RUNTIME_BASELINE_CHANGED 就是這樣炸的）。回 blocked 讓 App 照舊走 legacy，
+   ledger 評分維持關著。audit 完成、context 還沒寫就當掉的話下次開機會重跑一次
+   ——baseline 是 add-only 而且冪等，重跑安全。 */
+export async function ensureRuntimeLedgerContext({
+  port,
+  workspaceId,
+  catalogDigest,
+  auditBaseline,
+} = {}) {
+  const workspace = requiredIdentity(workspaceId);
+  const digest = requiredIdentity(catalogDigest);
+  if (!port || typeof port.transaction !== 'function') {
+    throw codedError('STORAGE_UNAVAILABLE', 'runtime context transaction port is unavailable');
+  }
+  if (typeof auditBaseline !== 'function') {
+    throw codedError('PRACTICE_ADAPTER_INCOMPLETE', 'auditBaseline is required');
+  }
+
+  const prior = await port.transaction(['workspaceMeta'], 'readonly', async tx => {
+    requiredContextMethod(tx, 'getWorkspaceMeta');
+    return tx.getWorkspaceMeta(workspace, RUNTIME_CONTEXT_META_KEY);
+  });
+  if (prior
+      && prior.schemaVersion === RUNTIME_CONTEXT_META_VERSION
+      && prior.catalogDigest === digest) {
+    return Object.freeze({
+      status: 'ready', catalogDigest: digest, audited: false, reason: null,
+    });
+  }
+
+  let audit = null;
+  try {
+    audit = await auditBaseline({ workspaceId: workspace, catalogDigest: digest });
+  } catch (error) {
+    return Object.freeze({
+      status: 'blocked',
+      catalogDigest: digest,
+      audited: false,
+      reason: error?.code || 'RUNTIME_BASELINE_AUDIT_FAILED',
+    });
+  }
+
+  await port.transaction(['workspaceMeta'], 'readwrite', async tx => {
+    requiredContextMethod(tx, 'getWorkspaceMeta');
+    requiredContextMethod(tx, 'putWorkspaceMeta');
+    await tx.putWorkspaceMeta(workspace, RUNTIME_CONTEXT_META_KEY, {
+      workspaceId: workspace,
+      key: RUNTIME_CONTEXT_META_KEY,
+      schemaVersion: RUNTIME_CONTEXT_META_VERSION,
+      catalogDigest: digest,
+      baselineSummary: audit && typeof audit === 'object'
+        ? structuredClone(audit.summary || null)
+        : null,
+    });
+  });
+  return Object.freeze({
+    status: 'ready', catalogDigest: digest, audited: true, reason: null,
+  });
 }
 
 export function planLegacyMigration({
