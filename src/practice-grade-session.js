@@ -85,6 +85,9 @@ export function createLedgerGradeSession({
         attemptId: ctx.attemptId ?? ctx.cardId,
       });
     },
+    /* eventId 每次都新產生。「同一次作答不會變成兩筆」靠的不是重用 eventId，而是
+       attemptPhaseClaims 的 [workspaceId, attemptId, phase]——交易其實成功了但
+       promise 掛掉的重試會在那裡被攔下來走 replay。 */
     commit: ({ attempt }) => commit({
       port: ledger.port,
       workspaceId: readContext().workspaceId,

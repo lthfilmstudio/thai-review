@@ -137,7 +137,8 @@ export function createPracticeGradeController({
       return finish(attempt, operation);
     },
 
-    /* 失敗後重試：沿用同一個 attempt，不重新產生 ID，否則同一次作答會變成兩筆。 */
+    /* 失敗後重試：沿用同一個 attempt（同一組 attemptId／phase）。eventId 由呼叫端
+       每次新產生，擋住重複的是 attemptPhaseClaims，不是 eventId。 */
     async retry() {
       if (status !== 'save-failed' || !pendingRetry) return { status: 'nothing-to-retry' };
       const { attempt } = pendingRetry;

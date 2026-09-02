@@ -33,6 +33,7 @@ import { getDeviceId } from './srs.js';
 import { hydrateWorkspaceSnapshot, openPracticeDatabase } from './practice-db.js';
 import { createLegacyClaimFlow, fetchProductionLineageEvidence } from './legacy-claim-flow.js';
 import { startPracticeLedgerRuntime, catalogCardKeyIndex } from './practice-ledger-runtime.js';
+import { resetRuntimeLedgerAuthority } from './storage-scope.js';
 import { createLedgerGradeSession, ledgerGradeEligible } from './practice-grade-session.js';
 import { TRUSTED_PRODUCTION_LINEAGE } from './production-lineage-trust.js';
 import {
@@ -45,6 +46,7 @@ let workspaceStorage = null;
 /* ledger runtime handle。status 不是 'ready' 就代表這次開機不開放 ledger 評分，
    評分照舊走 legacy 路徑（見 gradeAndAdvance）。 */
 let practiceLedger = null;
+let practiceLedgerWorkspaceId = null;
 /* ledger 評分 session。null 代表這次開機沒有帳本路徑可走。 */
 let ledgerSession = null;
 
@@ -177,6 +179,9 @@ function syncModeButtons(m = state.mode) {
 }
 
 async function selectLesson(id, storage) {
+  // AE7：saving／失敗期間不准換 context。守門放在這裡而不是各個 handler，
+  // 側欄、抽屜、mode picker 全都會經過這兩支。
+  if (ledgerSession?.controller.isLocked()) return;
   state.currentLessonId = id;
   state.cardIndex = 0;
   state.flipped = false;
@@ -190,6 +195,9 @@ async function selectLesson(id, storage) {
 }
 
 async function selectMode(m, storage) {
+  // AE7：saving／失敗期間不准換 context。守門放在這裡而不是各個 handler，
+  // 側欄、抽屜、mode picker 全都會經過這兩支。
+  if (ledgerSession?.controller.isLocked()) return;
   state.mode = m;
   state.flipped = false;
   stopListen();
@@ -294,14 +302,25 @@ function afterGradeAdvance(runtimeStorage, gradedCardKey, improvementMoment) {
   }
 }
 
+/* 帳本收不下這筆時退回原本的同步流程。context 湊不齊（卡片索引越界、佇列與 lane
+   快照不同步、Sheet 新增了沒有 card_id 的列）時 submitGrade 只回狀態不丟錯，不接住
+   的話使用者按了評分畫面完全不動——宣稱的 fail-open 到 legacy 在那裡並不成立。 */
+const LEDGER_FALLBACK_STATUSES = Object.freeze(new Set(['context-invalid', 'not-eligible']));
+
 function gradeAndAdvance(g, storage) {
-  const runtimeStorage = requireWorkspaceStorage(storage);
   // R1：只有 Today／All 而且 ledger 這次開機是 ready 的時候走帳本路徑，其餘一律
   // 維持原本的同步流程。controller 自己有 CAS guard，重複觸發會被擋掉。
   if (ledgerSession && ledgerGradeEligible(practiceLedger, state.currentLessonId)) {
-    void ledgerSession.controller.submitGrade(g);
+    void ledgerSession.controller.submitGrade(g).then(result => {
+      if (LEDGER_FALLBACK_STATUSES.has(result?.status)) legacyGradeAndAdvance(g, storage);
+    });
     return;
   }
+  legacyGradeAndAdvance(g, storage);
+}
+
+function legacyGradeAndAdvance(g, storage) {
+  const runtimeStorage = requireWorkspaceStorage(storage);
   const gradedCard = filteredCards()[state.cardIndex];
   const gradedCardKey = gradedCard ? (gradedCard._cardKey || cardKey(gradedCard)) : '';
   setGrade(state.cardIndex, g, runtimeStorage);
@@ -872,6 +891,7 @@ async function init() {
     },
   });
 
+  practiceLedgerWorkspaceId = bootResult.workspaceId;
   if (practiceLedger.status === 'ready') {
     const cardKeyById = catalogCardKeyIndex(bootResult.catalog);
     ledgerSession = createLedgerGradeSession({
@@ -1128,6 +1148,23 @@ async function init() {
       }
     }
 
+    // 先清 IDB 的權威 SRS，再清本機鏡射。順序反過來的話，中途失敗或當掉，下次在
+    // Today 評分時 getSrs() 會讀到重置前那列，排程直接跳回重置前，而且會以新的
+    // updatedAt 通過 epoch 過濾推上雲端——重置等於沒發生。
+    if (practiceLedger?.port) {
+      try {
+        await resetRuntimeLedgerAuthority({
+          port: practiceLedger.port,
+          workspaceId: practiceLedgerWorkspaceId,
+        });
+      } catch (err) {
+        btn.textContent = '確定重置';
+        btn.disabled = false;
+        alert(`帳本重置失敗，本機也沒有清除（避免兩邊不一致）。\n${err.message}`);
+        return;
+      }
+    }
+
     state.progress = {};
     saveState(storage);
     closeResetModal();
@@ -1260,15 +1297,17 @@ async function init() {
     // 今日 / 練功 mode 沒有當前卡片，卡片快捷鍵（翻面 / 評分 / 換卡）不適用
     if (state.mode === 'today') return;
 
+    // saving／失敗期間鍵盤一律不放行。方向鍵也算 context mutation：換了卡片之後
+    // 交易回來會因為 operation token 對不上而整筆丟掉，那筆評分在 IDB 裡但本機
+    // 完全不知道（AE7）。所以這道鎖必須排在方向鍵之前。
+    if (ledgerSession?.controller.isLocked()) return;
+
     if (e.key === 'ArrowLeft') prevCard(storage);
     else if (e.key === 'ArrowRight') nextCard(storage);
     else if (e.code === 'Space') {
       e.preventDefault();
       state.flipped = !state.flipped;
       document.getElementById('cardStage')?.classList.toggle('flipped', state.flipped);
-    } else if (ledgerSession?.controller.isLocked()) {
-      // saving／失敗期間鍵盤也一律不放行（跟滑鼠同一道鎖）。
-      return;
     } else if (e.key === '1') { gradeAndAdvance('again', storage); }
     else if (e.key === '2') { gradeAndAdvance('hard', storage); }
     else if (e.key === '3') { gradeAndAdvance('good', storage); }

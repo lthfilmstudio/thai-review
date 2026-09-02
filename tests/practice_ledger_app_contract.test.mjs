@@ -94,13 +94,46 @@ test('KTD11：ledger 路徑鏡射交易算好的 after-state，不自己重算',
   assert.doesNotMatch(block, /recordGrade\(/, 'history 同理');
 });
 
-test('AE7：滑鼠與鍵盤共用同一道 saving 鎖', () => {
+test('AE7：滑鼠與鍵盤共用同一道 saving 鎖，鍵盤那道排在方向鍵之前', () => {
   assert.match(appSource, /if \(ledgerSession\?\.controller\.isLocked\(\)\) \{ e\.stopPropagation\(\); return; \}/);
-  assert.match(appSource, /\} else if \(ledgerSession\?\.controller\.isLocked\(\)\) \{/);
   // retry 按鈕本身不能被那道鎖擋掉，否則失敗後就出不去了
   const clickStart = appSource.indexOf("if (e.target.closest('[data-ledger-retry]'))");
-  const lockStart = appSource.indexOf('if (ledgerSession?.controller.isLocked()) { e.stopPropagation(); return; }');
-  assert.ok(clickStart > 0 && clickStart < lockStart, 'retry 要排在鎖前面');
+  const clickLock = appSource.indexOf('if (ledgerSession?.controller.isLocked()) { e.stopPropagation(); return; }');
+  assert.ok(clickStart > 0 && clickStart < clickLock, 'retry 要排在鎖前面');
+
+  // 方向鍵也是 context mutation：換了卡片，交易回來就會因為 token 對不上被丟掉。
+  const keyLock = appSource.indexOf('if (ledgerSession?.controller.isLocked()) return;\n\n    if (e.key === \'ArrowLeft\')');
+  assert.ok(keyLock > 0, '鍵盤的鎖要緊接在方向鍵之前');
+});
+
+test('AE7：換課與換 mode 也擋在同一道鎖後面', () => {
+  for (const fn of ['async function selectLesson(id, storage) {', 'async function selectMode(m, storage) {']) {
+    const start = appSource.indexOf(fn);
+    assert.ok(start > 0, `${fn} 應該存在`);
+    const head = appSource.slice(start, start + 400);
+    assert.match(head, /if \(ledgerSession\?\.controller\.isLocked\(\)\) return;/,
+      `${fn} 缺少 saving 守門`);
+  }
+});
+
+test('帳本收不下的評分要退回 legacy，不能靜默吞掉', () => {
+  const start = appSource.indexOf('function gradeAndAdvance(');
+  const end = appSource.indexOf('function legacyGradeAndAdvance(', start);
+  const block = appSource.slice(start, end);
+  assert.match(block, /LEDGER_FALLBACK_STATUSES\.has\(result\?\.status\)/);
+  assert.match(block, /legacyGradeAndAdvance\(g, storage\)/);
+  assert.match(appSource, /LEDGER_FALLBACK_STATUSES = Object\.freeze\(new Set\(\['context-invalid', 'not-eligible'\]\)\)/);
+});
+
+test('P0-3：重置要先清 IDB 權威 SRS 再清本機鏡射', () => {
+  const start = appSource.indexOf('await resetProgressEverywhere(storage);');
+  const end = appSource.indexOf('closeResetModal();', start);
+  const block = appSource.slice(start, end);
+  assert.match(block, /resetRuntimeLedgerAuthority\(\{/, '重置必須真的清 IDB');
+  const idbReset = block.indexOf('resetRuntimeLedgerAuthority');
+  const localReset = block.indexOf('state.progress = {};');
+  assert.ok(idbReset > 0 && idbReset < localReset, 'IDB 要清在本機鏡射之前');
+  assert.match(block, /return;/, '清 IDB 失敗要中止，不能只清一半');
 });
 
 test('失敗狀態一定給得出下一步，而且是可讀的 a11y 區域', () => {
