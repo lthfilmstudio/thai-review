@@ -10,6 +10,7 @@ globalThis.localStorage = {
 
 const {
   createLedgerGradeSession,
+  ledgerCardEligible,
   ledgerGradeEligible,
 } = await import('../src/practice-grade-session.js');
 const { loadDailyLog } = await import('../src/today.js');
@@ -183,4 +184,74 @@ test('AE7：送出後 epoch 被 bump，結果不套用也不前進', async () =>
   assert.equal(result.status, 'stale-operation');
   assert.equal(rig.calls.advances.length, 0);
   assert.equal(loadDailyLog().days?.['2026-08-24'], undefined, '不把結果套到已經變了的畫面');
+});
+
+/* ===== 逐卡閘門（P0-1）=====
+   認領失敗的卡沒有權威 SRS 列，硬走帳本會被拿空狀態當基準重算，把累積數月的
+   interval 重設成 1 再推上雲端。真實資料裡 12968 個 alias 只認得出 94 個。 */
+
+const OLD_STAMP = 1_780_000_000_000;
+const NEW_STAMP = 1_790_000_000_000;
+const srs = (interval, updatedAt) => ({
+  grade: 'good', interval, reps: 5, easeFactor: 2.6,
+  reviewedAt: updatedAt, nextReviewAt: updatedAt, updatedAt,
+});
+
+test('P0-1：認領失敗又有本機進度的卡，一律不走帳本', () => {
+  assert.equal(
+    ledgerCardEligible({ authoritativeSrs: null, legacyProgress: srs(64, OLD_STAMP) }),
+    false,
+    '這正是會把 interval 64 重設成 1 的那種',
+  );
+});
+
+test('全新的卡（本機也沒進度）可以走帳本——空狀態本來就是對的起點', () => {
+  assert.equal(ledgerCardEligible({ authoritativeSrs: null, legacyProgress: null }), true);
+});
+
+test('有權威列而且不比本機舊 → 收', () => {
+  assert.equal(
+    ledgerCardEligible({ authoritativeSrs: srs(30, NEW_STAMP), legacyProgress: srs(30, OLD_STAMP) }),
+    true,
+  );
+  assert.equal(
+    ledgerCardEligible({ authoritativeSrs: srs(30, OLD_STAMP), legacyProgress: srs(30, OLD_STAMP) }),
+    true,
+    '一樣新也算數',
+  );
+  assert.equal(ledgerCardEligible({ authoritativeSrs: srs(30, OLD_STAMP), legacyProgress: null }), true);
+});
+
+test('P0-2：權威列比本機舊 → 不收，避免排程回捲', () => {
+  // 使用者在單堂課或別台裝置評過，帳本還沒跟上
+  assert.equal(
+    ledgerCardEligible({ authoritativeSrs: srs(3, OLD_STAMP), legacyProgress: srs(50, NEW_STAMP) }),
+    false,
+  );
+});
+
+test('session 的 acceptsCard 用開機帶進來的權威列判斷', () => {
+  const rig = session({
+    session: {
+      authoritativeSrsRows: [
+        { cardId: CARD_A, version: 2, state: srs(30, NEW_STAMP) },
+      ],
+    },
+  });
+  assert.equal(rig.handle.authoritativeCardCount(), 1);
+  assert.equal(rig.handle.acceptsCard(CARD_A, srs(30, OLD_STAMP)), true);
+  assert.equal(rig.handle.acceptsCard(CARD_A, srs(50, NEW_STAMP + 1)), false, '本機較新就不收');
+  assert.equal(rig.handle.acceptsCard('unknown-card', srs(64, OLD_STAMP)), false, '認領失敗的不收');
+  assert.equal(rig.handle.acceptsCard('unknown-card', null), true, '全新的卡收');
+});
+
+test('commit 成功後權威快取跟著更新，下次仍然收得下', async () => {
+  stored.clear();
+  const rig = session({
+    session: { authoritativeSrsRows: [{ cardId: CARD_A, version: 1, state: srs(10, OLD_STAMP) }] },
+  });
+  await rig.handle.controller.submitGrade('good');
+  // commit 的 mirror 步驟把新的 after-state 記進快取；本機那份也會被 app 同步寫成
+  // 同一個值，所以下一輪仍然 eligible
+  assert.equal(rig.handle.acceptsCard(CARD_A, srs(10, OLD_STAMP)), true);
 });

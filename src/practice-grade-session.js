@@ -17,6 +17,7 @@ import {
 import { createPracticeGradeController } from './practice-grade-controller.js';
 import { commitPracticeAttempt, readPracticeDayContext } from './practice-commit.js';
 import { applyLedgerCommitToMirror } from './ledger-mirror.js';
+import { progressStamp } from './cloud-merge.js';
 
 /* 本輪只接 __TODAY__。__ALL__ 的 lane 要靠權威 SRS 判定（classifyPracticeLane 會
    要求 authoritativeSrs.status === 'ready'），而那份資料在 IDB、要 async 讀，
@@ -28,6 +29,23 @@ const LEDGER_LESSONS = Object.freeze(['__TODAY__']);
 
 export function ledgerGradeEligible(ledger, currentLessonId) {
   return ledger?.status === 'ready' && LEDGER_LESSONS.includes(currentLessonId);
+}
+
+/* 逐卡閘門。整份 catalog 開不開放是一回事，這張卡能不能安全地走帳本是另一回事。
+
+   帳本把 IDB 的 srsV2 當權威：commitPracticeAttempt 讀不到那一列就拿空狀態算下一次
+   到期。認領失敗（lineage 認不出這個 alias）的卡沒有那一列，硬走帳本就會把使用者
+   累積數月的 interval 重設成 1，再經 LWW 推上雲端擴散。所以：
+
+   - 有權威列、而且不比本機那份舊 → 收。帳本確實掌握這張卡最新的狀態。
+   - 有權威列但比本機舊 → 不收。使用者在單堂課或別台裝置評過、帳本還沒跟上，
+     用舊的當基準算出來的排程會回捲。
+   - 沒有權威列，本機也沒有進度 → 收。全新的卡，空狀態本來就是對的起點。
+   - 沒有權威列、本機卻有進度 → 不收。這正是會毀資料的那種，一律留給 legacy。 */
+export function ledgerCardEligible({ authoritativeSrs = null, legacyProgress = null } = {}) {
+  if (!authoritativeSrs) return !legacyProgress;
+  if (!legacyProgress) return true;
+  return progressStamp(authoritativeSrs) >= progressStamp(legacyProgress);
 }
 
 export function createLedgerGradeSession({
@@ -42,10 +60,18 @@ export function createLedgerGradeSession({
   onStateChange = () => {},
   commit = commitPracticeAttempt,
   readDayContext = readPracticeDayContext,
+  authoritativeSrsRows = null,
 } = {}) {
   let roundId = createId();
   let cycleId = createId();
   let contextEpoch = 0;
+  /* cardId → 這張卡在 IDB 的權威 SRS state。開機由 hydration 帶進來，每次 commit
+     成功後更新。逐卡閘門靠它做同步判斷，不必為了一次評分去 await 一個 IDB 讀。 */
+  const authoritativeByCardId = new Map(
+    (authoritativeSrsRows || [])
+      .filter(row => row && typeof row.cardId === 'string' && row.state)
+      .map(row => [row.cardId, structuredClone(row.state)]),
+  );
 
   const snapshot = () => {
     const ctx = readContext();
@@ -109,13 +135,27 @@ export function createLedgerGradeSession({
       createId,
       deviceId,
     }),
-    mirror: result => applyLedgerCommitToMirror(result, { cardKeyById, storage }),
+    mirror: result => {
+      // 交易已經落地，這張卡的權威狀態換人了；逐卡閘門下次才判得準。
+      if (result?.srs && result.event?.cardId) {
+        authoritativeByCardId.set(result.event.cardId, structuredClone(result.srs));
+      }
+      return applyLedgerCommitToMirror(result, { cardKeyById, storage });
+    },
     advance,
     onStateChange,
   });
 
   return {
     controller,
+    /* 這張卡這次能不能走帳本。呼叫端在送出前問一次，不行就走 legacy。 */
+    acceptsCard(cardId, legacyProgress) {
+      return ledgerCardEligible({
+        authoritativeSrs: authoritativeByCardId.get(cardId) || null,
+        legacyProgress: legacyProgress || null,
+      });
+    },
+    authoritativeCardCount: () => authoritativeByCardId.size,
     /* 佇列重建、或 cloud-sync 併入遠端進度時呼叫：卡片與課程沒變，但底下的到期
        狀態變了，進行中的那筆評分不該把結果套到已經換過內容的畫面上。 */
     bumpContextEpoch() {

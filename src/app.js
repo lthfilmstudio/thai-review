@@ -302,6 +302,18 @@ function afterGradeAdvance(runtimeStorage, gradedCardKey, improvementMoment) {
   }
 }
 
+/* 逐卡閘門：認領失敗的卡（IDB 沒有權威 SRS 列、但本機有進度）一律留給 legacy。
+   硬走帳本的話 commitPracticeAttempt 會拿空狀態當基準，把累積數月的排程重設成
+   interval 1 再推上雲端。判斷邏輯在 practice-grade-session.js。 */
+function ledgerAcceptsCurrentCard() {
+  const card = filteredCards()[state.cardIndex];
+  if (!card) return false;
+  const key = card._cardKey || cardKey(card);
+  const cardId = card.card_id || card.cardId || null;
+  if (!cardId) return false;
+  return ledgerSession.acceptsCard(cardId, state.progress[key] || null);
+}
+
 /* 帳本收不下這筆時退回原本的同步流程。context 湊不齊（卡片索引越界、佇列與 lane
    快照不同步、Sheet 新增了沒有 card_id 的列）時 submitGrade 只回狀態不丟錯，不接住
    的話使用者按了評分畫面完全不動——宣稱的 fail-open 到 legacy 在那裡並不成立。 */
@@ -310,7 +322,8 @@ const LEDGER_FALLBACK_STATUSES = Object.freeze(new Set(['context-invalid', 'not-
 function gradeAndAdvance(g, storage) {
   // R1：只有 Today／All 而且 ledger 這次開機是 ready 的時候走帳本路徑，其餘一律
   // 維持原本的同步流程。controller 自己有 CAS guard，重複觸發會被擋掉。
-  if (ledgerSession && ledgerGradeEligible(practiceLedger, state.currentLessonId)) {
+  if (ledgerSession && ledgerGradeEligible(practiceLedger, state.currentLessonId)
+      && ledgerAcceptsCurrentCard()) {
     void ledgerSession.controller.submitGrade(g).then(result => {
       if (LEDGER_FALLBACK_STATUSES.has(result?.status)) legacyGradeAndAdvance(g, storage);
     });
@@ -927,6 +940,7 @@ async function init() {
         afterGradeAdvance(storage, key, false);
       },
       onStateChange: ({ status }) => { renderLedgerSavingState(status); },
+      authoritativeSrsRows: bootResult.hydration?.snapshot?.srs || null,
     });
     // 遠端進度併進來 = 底下的到期狀態變了，讓還在路上的評分失效。
     setRemoteProgressHook(() => ledgerSession?.bumpContextEpoch());
