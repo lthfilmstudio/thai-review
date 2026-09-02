@@ -9,6 +9,7 @@ import {
   resolveLegacyAlias,
 } from './card-identity.js';
 import { isSrsStateSnapshot } from './srs.js';
+import { progressStamp } from './cloud-merge.js';
 
 const BOOT_SCREENS = Object.freeze({
   'checking-session': {
@@ -1256,6 +1257,7 @@ function runtimeBaselineSignature(plan) {
    刻一份出來」——那兩個函式都在出貨的 bundle 裡。真正的閘門是這個 WeakSet：要進得來
    就一定得走 planRuntimeSrsBaseline，也就一定過了 lineage 檢查。 */
 const RUNTIME_BASELINE_PLANS = new WeakSet();
+const LEGACY_V1_IMPORT_PLANS = new WeakSet();
 
 /* baseline 是 add-only 的補寫，不是一次定生死：legacy progress 會被 cloud-sync
    在開機後改（多裝置合併、reset epoch 清除），所以「plan 跟上次不一樣」是正常狀態，
@@ -1265,28 +1267,30 @@ const RUNTIME_CONTEXT_META_VERSION = 1;
 const RUNTIME_BASELINE_META_KEY = 'runtime-srs-baseline-v1';
 const RUNTIME_BASELINE_META_VERSION = 1;
 
-/* Runtime cutover is deliberately stricter than current-catalog resolution.
-   An alias must resolve uniquely in today's catalog and in trusted production
-   lineage, and both sources must name the same stable card. */
-export function planRuntimeSrsBaseline({
+/* baseline（U2）跟 v1 雲端匯入（U5c）用的是同一套認領規則，只寫一次。alias 要在
+   今天的 catalog 與可信 production lineage 各自唯一 resolve，而且兩邊指到同一張
+   stable card；任何一關過不了就 quarantine，不猜。這段是 security critical 的判斷，
+   分兩份遲早會漂。 */
+function resolveLegacyProgressEntries({
   progress,
   currentCatalog,
   catalogDigest,
   lineageEvidence = null,
   trustedRevisionManifest = null,
-} = {}) {
+  invalidCode,
+}) {
   if (!plainRecord(progress)) {
-    throw codedError('RUNTIME_BASELINE_INVALID', 'runtime progress must be an object');
+    throw codedError(invalidCode, 'legacy progress must be an object');
   }
   const digest = requiredIdentity(catalogDigest);
-  // digest 是冪等鍵。跟它描述的 catalog 對不起來的話，整份 baseline 會被記在錯的
-  // 鍵底下，之後就靜默不再執行。
+  // digest 是冪等鍵。跟它描述的 catalog 對不起來的話，整份計畫會被記在錯的鍵底下，
+  // 之後就靜默不再執行。
   if (typeof currentCatalog?.digest === 'string' && currentCatalog.digest !== digest) {
-    throw codedError('RUNTIME_BASELINE_INVALID', 'catalogDigest does not match the given catalog');
+    throw codedError(invalidCode, 'catalogDigest does not match the given catalog');
   }
   const catalogIndex = indexLegacyAliases(runtimeCatalogCards(currentCatalog));
   const lineage = normalizeLineageEvidence(lineageEvidence, trustedRevisionManifest);
-  const seeds = [];
+  const resolved = [];
   const quarantined = [];
 
   for (const legacyAlias of Object.keys(progress).sort()) {
@@ -1316,9 +1320,30 @@ export function planRuntimeSrsBaseline({
       }
     }
 
-    if (cardId) seeds.push({ cardId, legacyAlias, state });
+    if (cardId) resolved.push({ cardId, legacyAlias, state });
     else quarantined.push({ legacyAlias, reason, state });
   }
+  return { digest, lineage, resolved, quarantined };
+}
+
+/* Runtime cutover is deliberately stricter than current-catalog resolution.
+   An alias must resolve uniquely in today's catalog and in trusted production
+   lineage, and both sources must name the same stable card. */
+export function planRuntimeSrsBaseline({
+  progress,
+  currentCatalog,
+  catalogDigest,
+  lineageEvidence = null,
+  trustedRevisionManifest = null,
+} = {}) {
+  const { digest, lineage, resolved: seeds, quarantined } = resolveLegacyProgressEntries({
+    progress,
+    currentCatalog,
+    catalogDigest,
+    lineageEvidence,
+    trustedRevisionManifest,
+    invalidCode: 'RUNTIME_BASELINE_INVALID',
+  });
 
   const core = {
     kind: 'runtime-srs-baseline-plan-v1',
@@ -1582,6 +1607,155 @@ export async function resetRuntimeLedgerAuthority({
     }
     await tx.deleteWorkspaceMeta(workspace, RUNTIME_CONTEXT_META_KEY);
     return { clearedSrs: cleared };
+  });
+}
+
+function legacyV1ImportCore(plan) {
+  return {
+    kind: plan?.kind,
+    schemaVersion: plan?.schemaVersion,
+    catalogDigest: plan?.catalogDigest,
+    lineageProvenance: plan?.lineageProvenance,
+    imports: plan?.imports,
+    quarantined: plan?.quarantined,
+    summary: plan?.summary,
+  };
+}
+
+function legacyV1ImportSignature(plan) {
+  return stableSerialize(legacyV1ImportCore(plan));
+}
+
+/* R10／KTD7：v1 雲端同步拉回來的 winner 要先過信任閘門轉成 stable card ID 再寫進
+   IDB，之後才鏡射給 state。winners 就是 mergeRemoteRows() 的 progress——只包含
+   「遠端比較新、需要覆蓋本機」的項目，合併判斷已經在那裡做完了。 */
+export function planLegacyV1Import({
+  winners,
+  currentCatalog,
+  catalogDigest,
+  lineageEvidence = null,
+  trustedRevisionManifest = null,
+} = {}) {
+  const { digest, lineage, resolved, quarantined } = resolveLegacyProgressEntries({
+    progress: winners,
+    currentCatalog,
+    catalogDigest,
+    lineageEvidence,
+    trustedRevisionManifest,
+    invalidCode: 'LEGACY_V1_IMPORT_INVALID',
+  });
+
+  const core = {
+    kind: 'legacy-v1-import-plan-v1',
+    schemaVersion: 1,
+    catalogDigest: digest,
+    lineageProvenance: structuredClone(lineage.lineageProvenance || {
+      evidenceId: null, digest: null, revisionManifest: null,
+    }),
+    // stamp 用跟 cloud-merge 同一支 progressStamp，兩邊對「哪個比較新」的定義
+    // 才會一致。
+    imports: resolved.map(row => ({ ...row, stamp: progressStamp(row.state) })),
+    quarantined,
+    summary: {
+      original: Object.keys(winners).length,
+      importable: resolved.length,
+      quarantined: quarantined.length,
+    },
+  };
+  const planSignature = legacyV1ImportSignature(core);
+  const plan = Object.freeze({
+    ...core,
+    planId: `legacy-v1-import-${smallStableHash(planSignature)}`,
+    planSignature,
+  });
+  LEGACY_V1_IMPORT_PLANS.add(plan);
+  return plan;
+}
+
+export async function commitLegacyV1Import({
+  port,
+  workspaceId,
+  plan,
+} = {}) {
+  const workspace = requiredIdentity(workspaceId);
+  if (!workspace.startsWith('anon:') && !workspace.startsWith('user:')) {
+    throw codedError('WORKSPACE_ID_MISSING', 'legacy v1 import requires a workspace');
+  }
+  if (!port || typeof port.transaction !== 'function') {
+    throw codedError('STORAGE_UNAVAILABLE', 'legacy v1 import transaction port is unavailable');
+  }
+  if (!LEGACY_V1_IMPORT_PLANS.has(plan)) {
+    throw codedError('LEGACY_V1_IMPORT_INVALID', 'plan did not come from planLegacyV1Import');
+  }
+  if (plan.kind !== 'legacy-v1-import-plan-v1'
+      || plan.schemaVersion !== 1
+      || plan.planSignature !== legacyV1ImportSignature(plan)
+      || !Array.isArray(plan.imports)
+      || !Array.isArray(plan.quarantined)
+      || plan.summary?.importable !== plan.imports.length
+      || plan.summary?.quarantined !== plan.quarantined.length
+      || plan.summary?.original !== plan.imports.length + plan.quarantined.length) {
+    throw codedError('LEGACY_V1_IMPORT_INVALID', 'legacy v1 import plan is invalid');
+  }
+  const snapshot = structuredClone(plan);
+
+  return port.transaction(['srsV2', 'quarantine'], 'readwrite', async tx => {
+    for (const method of ['getSrs', 'putSrs', 'addQuarantine']) {
+      requiredContextMethod(tx, method);
+    }
+
+    let imported = 0;
+    let unchanged = 0;
+    let skippedOlder = 0;
+    for (const row of snapshot.imports) {
+      const existing = await tx.getSrs(workspace, row.cardId);
+      // 同一批 snapshot 重拉：stamp 一樣就什麼都不做（R10 的冪等）。
+      if (existing?.v1Import?.stamp === row.stamp) {
+        unchanged += 1;
+        continue;
+      }
+      // 單調：本機那份比較新就不覆蓋。不倚賴「鏡射一定跟得上」這個假設——
+      // 本機可能已經有 ledger 寫下、還沒鏡射進 state.progress 的較新評分。
+      if (existing && progressStamp(existing.state) > row.stamp) {
+        skippedOlder += 1;
+        continue;
+      }
+      await tx.putSrs(workspace, row.cardId, {
+        workspaceId: workspace,
+        cardId: row.cardId,
+        version: (existing?.version || 0) + 1,
+        state: structuredClone(row.state),
+        // KTD7：v1 匯入不偽造 practice event，所以沒有來源 event 可指。
+        sourceEventId: null,
+        v1Import: {
+          kind: 'legacy-v1-pull',
+          stamp: row.stamp,
+          legacyAlias: row.legacyAlias,
+          catalogDigest: snapshot.catalogDigest,
+          lineageProvenance: structuredClone(snapshot.lineageProvenance),
+        },
+      });
+      imported += 1;
+    }
+
+    let quarantined = 0;
+    for (const row of snapshot.quarantined) {
+      const added = await tx.addQuarantine(workspace, {
+        workspaceId: workspace,
+        quarantineId: `legacy-v1-import:${snapshot.catalogDigest}:${row.legacyAlias}`,
+        snapshotId: snapshot.planId,
+        reason: row.reason,
+        legacyAlias: row.legacyAlias,
+        value: structuredClone(row.state),
+        source: 'legacy-v1-import-v1',
+      });
+      if (added) quarantined += 1;
+    }
+
+    return {
+      status: imported || quarantined ? 'applied' : 'no-op',
+      summary: { imported, unchanged, skippedOlder, quarantined },
+    };
   });
 }
 

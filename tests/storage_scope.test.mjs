@@ -13,8 +13,10 @@ import {
   requireWorkspaceStorage,
   inspectStorageDurability,
   logoutToAnonymous,
+  commitLegacyV1Import,
   commitRuntimeSrsBaseline,
   ensureRuntimeLedgerContext,
+  planLegacyV1Import,
   planRuntimeSrsBaseline,
   resetRuntimeLedgerAuthority,
   resolveWorkspaceId,
@@ -1221,4 +1223,160 @@ test('重置需要完整的 adapter，缺方法就整筆不動', async () => {
     resetRuntimeLedgerAuthority({ port, workspaceId: 'user:A' }),
     { code: 'PRACTICE_ADAPTER_INCOMPLETE' },
   );
+});
+
+/* ===== U5c：v1 雲端 winner 先進 IDB ===== */
+
+function v1ImportPort(existing = []) {
+  const srs = new Map(existing.map(row => [row.cardId, structuredClone(row)]));
+  const quarantine = new Map();
+  return {
+    srs,
+    quarantine,
+    async transaction(names, mode, work) {
+      assert.deepEqual(names, ['srsV2', 'quarantine']);
+      assert.equal(mode, 'readwrite');
+      return work({
+        getSrs: (_w, cardId) => structuredClone(srs.get(cardId) || null),
+        putSrs: (_w, cardId, row) => { srs.set(cardId, structuredClone(row)); },
+        addQuarantine: (_w, row) => {
+          if (quarantine.has(row.quarantineId)) return false;
+          quarantine.set(row.quarantineId, structuredClone(row));
+          return true;
+        },
+      });
+    },
+  };
+}
+
+function v1Winner(overrides = {}) {
+  return {
+    grade: 'good', reviewedAt: 1000, nextReviewAt: 5000,
+    interval: 3, easeFactor: 2.5, reps: 2, updatedAt: 1000, ...overrides,
+  };
+}
+
+const V1_CATALOG = [{ thai: 'one', card_id: CARD_A }, { thai: 'two', card_id: CARD_B }];
+const V1_LINEAGE = () => completeLineage([
+  ['r1', { 'L1:one': [CARD_A], 'L1:two': [CARD_B] }],
+  ['r2', { 'L1:one': [CARD_A], 'L1:two': [CARD_B] }],
+]);
+
+function v1Plan(winners, catalog = V1_CATALOG, lineage = V1_LINEAGE()) {
+  return planLegacyV1Import({
+    winners,
+    currentCatalog: runtimeCatalog(catalog),
+    catalogDigest: 'sha256:catalog-a',
+    ...lineage,
+  });
+}
+
+test('R10：v1 winner 過信任閘門轉成 stable ID 才寫進 IDB，不偽造 event', async () => {
+  const port = v1ImportPort();
+  const result = await commitLegacyV1Import({
+    port, workspaceId: 'user:A', plan: v1Plan({ 'L1:one': v1Winner() }),
+  });
+
+  assert.equal(result.status, 'applied');
+  assert.deepEqual(result.summary, { imported: 1, unchanged: 0, skippedOlder: 0, quarantined: 0 });
+  const row = port.srs.get(CARD_A);
+  assert.equal(row.version, 1);
+  assert.equal(row.sourceEventId, null, 'v1 匯入不偽造 practice event');
+  assert.equal(row.v1Import.kind, 'legacy-v1-pull');
+  assert.equal(row.v1Import.stamp, 1000);
+  assert.equal(row.v1Import.legacyAlias, 'L1:one');
+});
+
+test('R10：同一批 snapshot 重拉是冪等的', async () => {
+  const port = v1ImportPort();
+  const winners = { 'L1:one': v1Winner() };
+  const first = await commitLegacyV1Import({ port, workspaceId: 'user:A', plan: v1Plan(winners) });
+  const second = await commitLegacyV1Import({ port, workspaceId: 'user:A', plan: v1Plan(winners) });
+
+  assert.equal(first.summary.imported, 1);
+  assert.deepEqual(second.summary, { imported: 0, unchanged: 1, skippedOlder: 0, quarantined: 0 });
+  assert.equal(port.srs.get(CARD_A).version, 1, 'version 不該白跳一次');
+});
+
+test('R10：本機那份比較新就不覆蓋（單調）', async () => {
+  const port = v1ImportPort([{
+    workspaceId: 'user:A', cardId: CARD_A, version: 7,
+    state: v1Winner({ grade: 'easy', updatedAt: 9000 }), sourceEventId: 'evt-local',
+  }]);
+  const result = await commitLegacyV1Import({
+    port, workspaceId: 'user:A', plan: v1Plan({ 'L1:one': v1Winner({ updatedAt: 1000 }) }),
+  });
+
+  assert.deepEqual(result.summary, { imported: 0, unchanged: 0, skippedOlder: 1, quarantined: 0 });
+  assert.equal(port.srs.get(CARD_A).version, 7);
+  assert.equal(port.srs.get(CARD_A).state.grade, 'easy', '本機較新的評分不得被舊的雲端列蓋掉');
+  assert.equal(port.srs.get(CARD_A).sourceEventId, 'evt-local');
+});
+
+test('R10：比較新的 v1 winner 覆蓋既有列，version 單調往上', async () => {
+  const port = v1ImportPort([{
+    workspaceId: 'user:A', cardId: CARD_A, version: 4,
+    state: v1Winner({ updatedAt: 500 }), sourceEventId: 'evt-local',
+  }]);
+  const result = await commitLegacyV1Import({
+    port, workspaceId: 'user:A', plan: v1Plan({ 'L1:one': v1Winner({ grade: 'hard', updatedAt: 9000 }) }),
+  });
+
+  assert.equal(result.summary.imported, 1);
+  assert.equal(port.srs.get(CARD_A).version, 5);
+  assert.equal(port.srs.get(CARD_A).state.grade, 'hard');
+  assert.equal(port.srs.get(CARD_A).sourceEventId, null);
+});
+
+test('R10：撞名與不可信 lineage 只 quarantine，不猜 card identity', async () => {
+  const port = v1ImportPort();
+  const collided = await commitLegacyV1Import({
+    port,
+    workspaceId: 'user:A',
+    plan: v1Plan(
+      { 'L1:one': v1Winner() },
+      [{ thai: 'one', card_id: CARD_A }, { thai: 'one', card_id: CARD_B }],
+    ),
+  });
+  assert.deepEqual(collided.summary, {
+    imported: 0, unchanged: 0, skippedOlder: 0, quarantined: 1,
+  });
+  assert.equal(port.srs.size, 0);
+  assert.equal(
+    port.quarantine.get('legacy-v1-import:sha256:catalog-a:L1:one').reason,
+    'current_catalog_collision',
+  );
+
+  const untrusted = planLegacyV1Import({
+    winners: { 'L1:two': v1Winner() },
+    currentCatalog: runtimeCatalog(V1_CATALOG),
+    catalogDigest: 'sha256:catalog-a',
+  });
+  await commitLegacyV1Import({ port, workspaceId: 'user:A', plan: untrusted });
+  assert.equal(port.srs.size, 0, '沒有可信 lineage 就一律不匯入');
+  assert.equal(
+    port.quarantine.get('legacy-v1-import:sha256:catalog-a:L1:two').reason,
+    'incomplete_lineage_evidence',
+  );
+});
+
+test('R10：壞掉的 SRS 形狀 quarantine，重拉不重複塞 quarantine', async () => {
+  const port = v1ImportPort();
+  const winners = { 'L1:one': { grade: 'good', interval: 'bad' } };
+  await commitLegacyV1Import({ port, workspaceId: 'user:A', plan: v1Plan(winners) });
+  const replay = await commitLegacyV1Import({ port, workspaceId: 'user:A', plan: v1Plan(winners) });
+
+  assert.equal(port.quarantine.size, 1);
+  assert.equal(replay.summary.quarantined, 0, '重拉不重複計，quarantineId 綁 alias');
+  assert.equal(replay.status, 'no-op');
+});
+
+test('手刻的 v1 import plan 收不下', async () => {
+  const port = v1ImportPort();
+  const real = v1Plan({ 'L1:one': v1Winner() });
+  await assert.rejects(
+    commitLegacyV1Import({ port, workspaceId: 'user:A', plan: { ...real } }),
+    { code: 'LEGACY_V1_IMPORT_INVALID' },
+  );
+  assert.equal(port.srs.size, 0);
 });
