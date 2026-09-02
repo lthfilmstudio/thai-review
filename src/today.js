@@ -7,7 +7,7 @@ import { ACHIEVEMENT_DEFS, checkAndUnlock, loadUnlocked, achievementLabel, achie
 import { accuracyTrend, averageAccuracy, weakLessons, weakestCards, lessonMasteryStatus } from './stats.js';
 import { pickResweepBatch, resweepProgress } from './resweep.js';
 import { renderActiveGame, homePanelHtml, wireHomePanel, renderWeekChip, SVG_FLAME, SVG_SHIELD } from './home.js';
-import { mergedDays } from './cloud-merge.js';
+import { materializeDay, materializeDays, mergedDays } from './cloud-merge.js';
 import { escapeHtml } from './ui.js';
 
 export const DAILY_KEY = 'thai-review-daily-v1';
@@ -177,7 +177,7 @@ export function saveRemoteDays(days, storage = localStorage) {
    沒登入／沒 remote 資料時等同原本的 log.days。 */
 export function dailyDays(log = undefined, storage = localStorage) {
   const ownLog = log === undefined ? loadDailyLog(storage) : log;
-  return mergedDays(ownLog.days, loadRemoteDays(storage));
+  return mergedDays(materializeDays(ownLog.days), loadRemoteDays(storage));
 }
 
 /* 評分時記一筆。寫入點在 app.js gradeAndAdvance()。
@@ -195,6 +195,35 @@ export function logReview(gradeStr, ts = Date.now(), storage = localStorage) {
   if (grade in day) day[grade] += 1;
   log.days[key] = day;
   saveDailyLog(log, storage);
+}
+
+/* ledger 的每日快照鏡射進本機日誌。刻意用「設定」而不是像 logReview() 那樣 +=1——
+   ledger 是權威來源，重播一次、當掉重開一次都要收斂到同一個數字，累加會愈疊愈多。
+   寫的是 day.ledger 子物件，top-level 那些欄位留給 legacy 貢獻（R7），兩邊分開才
+   能各自重播；要看合起來的數字一律走 materializeDay()。 */
+export function mirrorLedgerDay(dayKey, snapshot, storage = localStorage) {
+  const key = typeof dayKey === 'string' ? dayKey.trim() : '';
+  if (!key) return false;
+  const log = loadDailyLog(storage);
+  const day = { ...(log.days[key] || {}) };
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    if (!Object.hasOwn(day, 'ledger')) return false;
+    delete day.ledger;
+  } else {
+    const ledger = {
+      reviewed: Math.max(0, snapshot.reviewed || 0),
+      again: Math.max(0, snapshot.again || 0),
+      hard: Math.max(0, snapshot.hard || 0),
+      good: Math.max(0, snapshot.good || 0),
+      easy: Math.max(0, snapshot.easy || 0),
+      practice: Math.max(0, snapshot.practice || 0),
+    };
+    if (JSON.stringify(day.ledger || null) === JSON.stringify(ledger)) return false;
+    day.ledger = ledger;
+  }
+  log.days[key] = day;
+  saveDailyLog(log, storage);
+  return true;
 }
 
 /* 日誌變動後要通知同步的 hook。用 hook 而不是直接 import cloud-sync，是因為
@@ -269,8 +298,10 @@ export function initDailyLog(progress, storage = localStorage) {
 
 /* 「今天有來」＝正式複習過、完成過一局遊戲，或這天被安神保護／補救蓋章
    （見設計書 6 節／11.3／6.1）。 */
-function cameOnDay(day) {
-  return !!(day && (day.reviewed > 0 || day.games > 0 || day.bridged));
+function cameOnDay(rawDay) {
+  const day = materializeDay(rawDay);
+  return !!(day
+    && (day.reviewed > 0 || day.games > 0 || day.practice > 0 || day.bridged));
 }
 
 /* 連續複習天數。今天還沒複習不算斷（從昨天起算）；用 Date 遞減避開時制邊界。 */
@@ -322,7 +353,7 @@ export function runStreakSettlement(log, now = Date.now(), remote = null) {
   // 出席判定要看「所有裝置」的合併視圖——在手機上複習過的那天不該算成缺口。
   // 但蓋章一律寫進 days（自己那份），寫進合併視圖的話別台的計數會被當成
   // 自己的推上雲端，加總後爆增。
-  const view = remote ? mergedDays(days, remote) : days;
+  const view = mergedDays(materializeDays(days), remote);
   let protection = log.protection || 0;
   let makeupPending = log.makeupPending || null;
   let event = { type: 'none' };
@@ -464,7 +495,7 @@ export function weekSummary(days, now = Date.now()) {
   let dialoguesCompleted = 0;
   for (let i = 0; i < 7; i++) {
     const key = localDateKey(d.getTime());
-    const day = days[key];
+    const day = materializeDay(days[key]);
     const came = cameOnDay(day);
     const reviewed = day?.reviewed || 0;
     if (came) daysCame++;

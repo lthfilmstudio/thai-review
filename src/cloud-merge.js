@@ -63,16 +63,23 @@ export function mergeProgress(local, remote) {
    取聯集、依時間排序、同一秒同一評分視為同一筆去重，最後保留最近 HISTORY_MAX 筆。
    刻意不做 last-write-wins——歷史是累積的，兩台各評過的都該留下。 */
 export function mergeHistory(local, remote) {
-  const seen = new Set();
+  const seen = new Map();
   const all = [];
   for (const item of [...(local || []), ...(remote || [])]) {
     if (!Array.isArray(item) || item.length < 2) continue;
-    const [code, ts] = item;
+    const [code, ts, eventId] = item;
     if (!Number.isFinite(code) || !Number.isFinite(ts)) continue;
     const sig = `${code}:${ts}`;
-    if (seen.has(sig)) continue;
-    seen.add(sig);
-    all.push([code, ts]);
+    const entry = typeof eventId === 'string' && eventId ? [code, ts, eventId] : [code, ts];
+    const prior = seen.get(sig);
+    if (prior) {
+      // 同一筆評分可能一邊有 eventId（本機 ledger）、一邊沒有（別台同步回來的
+      // 兩欄 tuple）。留資訊多的那筆。
+      if (entry.length > prior.length) all[all.indexOf(prior)] = entry;
+      continue;
+    }
+    seen.set(sig, entry);
+    all.push(entry);
   }
   all.sort((a, b) => a[1] - b[1]);
   return all.slice(-HISTORY_MAX);
@@ -126,6 +133,30 @@ export function mergeRemoteRows(rows, localProgress, localHistory, resetAt = 0, 
    上去，加總後爆增。 */
 
 const DAY_COUNTERS = ['reviewed', 'again', 'hard', 'good', 'easy', 'games', 'seconds'];
+/* ledger 只貢獻正式複習的四檔與 reviewed；games／seconds 永遠只有 legacy 有。 */
+const LEDGER_FORMAL_COUNTERS = ['reviewed', 'again', 'hard', 'good', 'easy'];
+
+/* R7／KTD6：localStorage 那天的 top-level 欄位是 legacy 貢獻，day.ledger 是 ledger
+   貢獻，兩邊分開存才重播得回來。顯示、結算、上傳一律先走這支合起來看，不要各自
+   加一次。輸入不動，回傳新物件；輸出不再帶 ledger，所以重複呼叫不會重複加。 */
+export function materializeDay(day) {
+  if (!day || typeof day !== 'object' || Array.isArray(day)) return day;
+  const ledger = day.ledger;
+  if (!ledger || typeof ledger !== 'object' || Array.isArray(ledger)) return day;
+  const out = { ...day };
+  delete out.ledger;
+  for (const k of LEDGER_FORMAL_COUNTERS) out[k] = (day[k] || 0) + (ledger[k] || 0);
+  // practice 不進 reviewed／accuracy，只用來判「今天有來」。
+  out.practice = (day.practice || 0) + (ledger.practice || 0);
+  return out;
+}
+
+export function materializeDays(days) {
+  if (!days || typeof days !== 'object') return days;
+  const out = {};
+  for (const key of Object.keys(days)) out[key] = materializeDay(days[key]);
+  return out;
+}
 
 /* thai_days 的各列 → 「排除自己那台」的 remote 視圖。
    `excludeDeviceId` 漏掉的話就會自己加自己，當天數字直接翻倍。 */
@@ -171,7 +202,7 @@ export function mergedDays(own, remote) {
 export function ownDaysToRows(days, deviceId) {
   const rows = [];
   for (const date in days || {}) {
-    const d = days[date];
+    const d = materializeDay(days[date]);
     if (!d) continue;
     const hasAny = DAY_COUNTERS.some(k => (d[k] || 0) > 0) || d.bridged || (d.gameIds || []).length;
     if (!hasAny) continue;

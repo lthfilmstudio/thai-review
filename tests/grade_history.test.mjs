@@ -102,3 +102,26 @@ test('improvement moment ignores missing history and grades below good', () => {
   assert.equal(recordGrade('L1:a', 'again', now), false);
   assert.equal(recordGrade('L1:a', 'hard', now), false);
 });
+
+test('ledger 路徑帶 eventId：第三欄寫進 tuple，重播不重複記', () => {
+  stored.clear();
+  assert.equal(recordGrade('L1:a', 'good', 1_700_000_000_000, undefined, 'evt-a'), false);
+  const first = loadGradeHistory().cards['L1:a'];
+  assert.deepEqual(first, [[2, 1_700_000_000, 'evt-a']]);
+
+  // 當掉重開後鏡射同一筆
+  recordGrade('L1:a', 'good', 1_700_000_000_000, undefined, 'evt-a');
+  assert.deepEqual(loadGradeHistory().cards['L1:a'], first, '同一個 event 不重複記');
+
+  recordGrade('L1:a', 'hard', 1_700_000_100_000, undefined, 'evt-b');
+  assert.equal(loadGradeHistory().cards['L1:a'].length, 2);
+});
+
+test('legacy 路徑不帶 eventId 時仍然寫兩欄，行為不變', () => {
+  stored.clear();
+  recordGrade('L1:a', 'good', 1_700_000_000_000);
+  recordGrade('L1:a', 'good', 1_700_000_000_000);
+  const list = loadGradeHistory().cards['L1:a'];
+  assert.equal(list.length, 2, '沒有 eventId 就不做去重，維持原本行為');
+  assert.deepEqual(list[0], [2, 1_700_000_000]);
+});

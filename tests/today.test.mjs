@@ -27,7 +27,7 @@ const {
   logGame, addActiveSeconds, streakDays, weekSummary, buildAchievementCtx,
   runStreakSettlement, settleStreakOnOpen, getProtectionCount, getMakeupPending,
   PROTECTION_MAX, notifyAchievements, renderAchievementsHtml, buildDailyQueue, setLogChangeHook,
-  saveRemoteDays, dailyDays,
+  saveRemoteDays, dailyDays, mirrorLedgerDay,
 } = await import('../src/today.js');
 const { localDateKey } = await import('../src/state.js');
 const { loadResweepState, advanceResweepCursor } = await import('../src/resweep.js');
@@ -566,4 +566,118 @@ test('沒有 remote 資料時 dailyDays 等同原本的 log.days（未登入回�
   localStorage.removeItem('thai-review-remote-days-v1');
   logReview('good', NOON_TAIPEI(2026, 8, 22));
   assert.deepEqual(dailyDays(), loadDailyLog().days);
+});
+
+/* ===== U4：ledger 貢獻進出席與統計 ===== */
+
+test('streakDays 把 practice-only 的一天算成「有來」', () => {
+  const days = {
+    '2026-08-18': { reviewed: 3 },
+    '2026-08-19': { ledger: { practice: 2 } }, // 只掃過，沒有正式複習
+    '2026-08-20': { reviewed: 1 },
+  };
+  assert.equal(streakDays(days, NOON_TAIPEI(2026, 8, 20)), 3);
+});
+
+test('practice 不冒充正式複習：只影響出席，不進 reviewed', () => {
+  const days = { '2026-08-20': { ledger: { practice: 5 } } };
+  assert.equal(streakDays(days, NOON_TAIPEI(2026, 8, 20)), 1, '有來');
+  const summary = weekSummary(days, NOON_TAIPEI(2026, 8, 20));
+  const today = summary.days.find(d => d.key === '2026-08-20');
+  assert.equal(today.came, true);
+  assert.equal(today.reviewed, 0, 'practice 不得被算成複習數');
+  assert.equal(summary.reviewedTotal, 0);
+  assert.equal(summary.daysCame, 1);
+});
+
+test('ledger 的正式複習進 reviewed 與週統計', () => {
+  const days = { '2026-08-20': { reviewed: 1, ledger: { reviewed: 2, good: 2 } } };
+  const summary = weekSummary(days, NOON_TAIPEI(2026, 8, 20));
+  assert.equal(summary.days.find(d => d.key === '2026-08-20').reviewed, 3);
+  assert.equal(summary.reviewedTotal, 3);
+});
+
+test('dailyDays 把自己的 ledger 併進顯示視圖，且不跟 remote 重複計', () => {
+  stored.clear();
+  const log = { days: { '2026-08-20': { reviewed: 1, good: 1, ledger: { reviewed: 2, good: 2 } } } };
+  saveRemoteDays({
+    '2026-08-20': { reviewed: 4, good: 4, again: 0, hard: 0, easy: 0, games: 0, seconds: 0 },
+  });
+  const view = dailyDays(log);
+  assert.equal(view['2026-08-20'].reviewed, 7);
+  assert.equal(view['2026-08-20'].good, 7);
+  assert.equal(Object.hasOwn(view['2026-08-20'], 'ledger'), false, '合併視圖不再帶原始 ledger');
+  assert.equal(log.days['2026-08-20'].ledger.reviewed, 2, '傳進去的 log 不得被改');
+});
+
+test('結算的缺口判定看得到 ledger 出席，蓋章仍只寫進自己那份', () => {
+  const now = NOON_TAIPEI(2026, 8, 20);
+  const log = {
+    days: {
+      '2026-08-18': { reviewed: 2 },
+      '2026-08-19': { ledger: { practice: 1 } }, // 昨天只掃過
+    },
+    protection: 2,
+    protectionRefillCheckpoint: 0,
+  };
+  const { log: settled, event } = runStreakSettlement(log, now);
+  assert.equal(event.type, 'none', '昨天有來就沒有缺口，不該花保護');
+  assert.equal(settled.protection, 2);
+  assert.deepEqual(settled.days['2026-08-19'], { ledger: { practice: 1 } },
+    '自己那份維持原樣，legacy 與 ledger 仍然分開存');
+});
+
+test('R14：完全沒有 ledger 的日誌，結算行為跟以前一模一樣', () => {
+  const now = NOON_TAIPEI(2026, 8, 20);
+  const log = {
+    days: { '2026-08-17': { reviewed: 2 } },
+    protection: 2,
+    protectionRefillCheckpoint: 0,
+  };
+  const { log: settled, event } = runStreakSettlement(log, now);
+  assert.equal(event.type, 'protected');
+  assert.equal(event.spent, 2, '8/18 與 8/19 兩天缺口，兩個保護剛好補完');
+  assert.equal(settled.protection, 0);
+  assert.equal(settled.days['2026-08-18'].bridged, true);
+  assert.equal(settled.days['2026-08-19'].bridged, true);
+});
+
+test('mirrorLedgerDay 是設定不是累加：同一份快照鏡射兩次數字不變', () => {
+  stored.clear();
+  const snapshot = { reviewed: 2, good: 2, practice: 1 };
+  assert.equal(mirrorLedgerDay('2026-08-20', snapshot), true);
+  assert.equal(mirrorLedgerDay('2026-08-20', snapshot), false, '沒變就不重寫');
+  const log = loadDailyLog();
+  assert.deepEqual(log.days['2026-08-20'].ledger, {
+    reviewed: 2, again: 0, hard: 0, good: 2, easy: 0, practice: 1,
+  });
+  assert.equal(log.days['2026-08-20'].reviewed, undefined, 'legacy 那層不被寫進去');
+});
+
+test('mirrorLedgerDay 修復落後的鏡射：直接收斂到權威快照', () => {
+  stored.clear();
+  mirrorLedgerDay('2026-08-20', { reviewed: 1, good: 1 });
+  // commit 完、鏡射前當掉，重開拿到的是比較新的權威快照
+  assert.equal(mirrorLedgerDay('2026-08-20', { reviewed: 3, good: 2, easy: 1, practice: 2 }), true);
+  const day = loadDailyLog().days['2026-08-20'];
+  assert.deepEqual(day.ledger, {
+    reviewed: 3, again: 0, hard: 0, good: 2, easy: 1, practice: 2,
+  });
+});
+
+test('mirrorLedgerDay 不動 legacy 貢獻，materialize 之後才是合起來的數字', () => {
+  stored.clear();
+  logReview('good', NOON_TAIPEI(2026, 8, 20));
+  logReview('hard', NOON_TAIPEI(2026, 8, 20));
+  mirrorLedgerDay('2026-08-20', { reviewed: 2, easy: 2, practice: 1 });
+
+  const own = loadDailyLog().days['2026-08-20'];
+  assert.equal(own.reviewed, 2, 'legacy 那兩筆原樣留著');
+  assert.equal(own.ledger.reviewed, 2);
+  const view = dailyDays();
+  assert.equal(view['2026-08-20'].reviewed, 4);
+  assert.equal(view['2026-08-20'].good, 1);
+  assert.equal(view['2026-08-20'].hard, 1);
+  assert.equal(view['2026-08-20'].easy, 2);
+  assert.equal(view['2026-08-20'].practice, 1);
 });

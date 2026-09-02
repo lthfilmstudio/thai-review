@@ -43,19 +43,26 @@ export function writeMergedHistory(merged, storage = localStorage) {
   return true;
 }
 
-/* 記一筆評分。gradeStr 不是四檔之一就略過（例如清掉評分時 setGrade 傳 undefined）。 */
-export function recordGrade(cardKey, gradeStr, ts = Date.now(), storage = localStorage) {
+/* 記一筆評分。gradeStr 不是四檔之一就略過（例如清掉評分時 setGrade 傳 undefined）。
+   ledger 路徑會多帶一個 eventId：那條路可能在當掉重開後重播，靠 eventId 認出
+   同一筆評分才不會愈記愈多（R8）。legacy 路徑不帶，行為完全不變。 */
+export function recordGrade(
+  cardKey, gradeStr, ts = Date.now(), storage = localStorage, eventId = null,
+) {
   const code = GRADE_CODE[gradeStr];
   if (code === undefined || !cardKey) return false;
   const h = load(storage);
   const list = h.cards[cardKey] || [];
+  if (eventId && list.some(entry => Array.isArray(entry) && entry[2] === eventId)) return false;
   const [previousGrade, previousTs] = list[list.length - 1] || [];
   const nowSeconds = Math.round(ts / 1000);
   const improvementMoment = (gradeStr === 'good' || gradeStr === 'easy')
     && previousGrade === GRADE_CODE.again
     && Number.isFinite(previousTs)
     && nowSeconds - previousTs >= IMPROVEMENT_AGE_SECONDS;
-  list.push([code, Math.round(ts / 1000)]);
+  list.push(eventId
+    ? [code, Math.round(ts / 1000), eventId]
+    : [code, Math.round(ts / 1000)]);
   while (list.length > MAX_PER_CARD) list.shift();
   h.cards[cardKey] = list;
   save(h, storage);
