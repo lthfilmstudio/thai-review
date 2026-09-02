@@ -2648,3 +2648,56 @@ a.home-sentence-zh:focus-visible {
   opacity: 0;
   pointer-events: none;
 }
+
+/* ===== Ledger 評分狀態 =====
+   存檔中／失敗時的說明列。失敗一定要給得出下一步，不能只把按鈕鎖起來。 */
+.ledger-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 8px 4px 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: var(--surface-soft);
+  color: var(--text-soft);
+}
+
+.ledger-status[data-state='save-failed'] {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.ledger-status[data-state='projection-repair'] {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.ledger-status-action {
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ledger-status-action:hover:not(:disabled) { background: var(--surface-hover); }
+.ledger-status-action:disabled { opacity: 0.5; cursor: default; }
+
+/* 存檔中：評分與前後張都按不動，但保留可讀性（不是「壞掉」而是「正在做事」）。 */
+body[data-ledger-saving] .pill[disabled],
+body[data-ledger-saving] .nav-side-btn[disabled] {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 360px) {
+  .ledger-status { font-size: 11px; padding: 7px 8px; }
+}

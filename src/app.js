@@ -225,14 +225,46 @@ function nextCard(storage) {
    - SRS active：剛評的那張 nextReviewAt > now → 從 due 列表消失，cardIndex 不變但 list 變短，
      直接 rerender 自然指到下一張；clamp 防越界
    - 一般 mode：cards 不變，往下一張前進 */
-/* saving 期間鎖住評分區與導覽（AE7）。狀態由 controller 推過來。 */
+/* controller 的狀態 → 畫面。saving 期間鎖住評分與導覽（AE7）；失敗時一定要給得出
+   下一步，不能讓人卡在一個鎖住又沒說明的畫面上。 */
+const LEDGER_STATUS_TEXT = Object.freeze({
+  saving: { text: '存檔中…', action: null },
+  'save-failed': { text: '這筆沒存成功，進度還沒記下來。', action: '再試一次' },
+  'projection-repair': { text: '進度已經記下來了，畫面數字還沒更新。', action: '重新整理數字' },
+});
+
 function renderLedgerSavingState(status) {
   const busy = status !== 'idle';
   document.body.dataset.ledgerSaving = busy ? status : '';
-  for (const el of document.querySelectorAll('[data-grade], .nav-prev, .nav-next')) {
+  for (const el of document.querySelectorAll('[data-grade], #cardPrev, #cardNext')) {
     el.toggleAttribute('disabled', busy);
     el.setAttribute('aria-disabled', busy ? 'true' : 'false');
   }
+
+  const region = document.querySelector('[data-ledger-status]');
+  if (!region) return;
+  const copy = LEDGER_STATUS_TEXT[status];
+  region.toggleAttribute('hidden', !copy);
+  region.dataset.state = status;
+  region.querySelector('[data-ledger-status-text]').textContent = copy ? copy.text : '';
+  const action = region.querySelector('[data-ledger-retry]');
+  action.toggleAttribute('hidden', !copy?.action);
+  if (copy?.action) {
+    action.textContent = copy.action;
+    action.disabled = false;
+    // 失敗時把焦點帶到唯一的出路，鍵盤使用者不用自己找。
+    if (status !== 'saving') action.focus();
+  }
+}
+
+async function retryLedgerAction() {
+  if (!ledgerSession) return;
+  const status = ledgerSession.controller.getStatus();
+  const action = document.querySelector('[data-ledger-retry]');
+  if (action) action.disabled = true;
+  if (status === 'save-failed') await ledgerSession.controller.retry();
+  else if (status === 'projection-repair') await ledgerSession.controller.repairProjection();
+  else if (action) action.disabled = false;
 }
 
 /* 評分之後的畫面收尾。legacy 與 ledger 兩條路都走這裡，前進行為才會一致。 */
@@ -1234,6 +1266,9 @@ async function init() {
       e.preventDefault();
       state.flipped = !state.flipped;
       document.getElementById('cardStage')?.classList.toggle('flipped', state.flipped);
+    } else if (ledgerSession?.controller.isLocked()) {
+      // saving／失敗期間鍵盤也一律不放行（跟滑鼠同一道鎖）。
+      return;
     } else if (e.key === '1') { gradeAndAdvance('again', storage); }
     else if (e.key === '2') { gradeAndAdvance('hard', storage); }
     else if (e.key === '3') { gradeAndAdvance('good', storage); }
@@ -1328,6 +1363,13 @@ async function init() {
       renderContent(() => rerender(storage), storage);
       return;
     }
+    if (e.target.closest('[data-ledger-retry]')) {
+      e.stopPropagation();
+      void retryLedgerAction();
+      return;
+    }
+    // saving／失敗期間所有人為的 context 變動都要擋掉（AE7）。
+    if (ledgerSession?.controller.isLocked()) { e.stopPropagation(); return; }
     if (e.target.closest('#cardPrev')) { e.stopPropagation(); prevCard(storage); return; }
     if (e.target.closest('#cardNext')) { e.stopPropagation(); nextCard(storage); return; }
     const grade = e.target.closest('.pill[data-grade]');

@@ -65,3 +65,66 @@ test('新的 runtime 模組進了 Service Worker 的 offline shell', () => {
   assert.ok(swSource.includes("'./src/practice-ledger-runtime.js'"));
   assert.ok(swSource.includes("'./src/ledger-mirror.js'"));
 });
+
+const cardSource = await readFile(new URL('../src/card.js', import.meta.url), 'utf8');
+const cssSource = await readFile(new URL('../styles/components.css', import.meta.url), 'utf8');
+
+test('Today 走 controller，其他課程維持 legacy 同步路徑（R1）', () => {
+  const start = appSource.indexOf('function gradeAndAdvance(');
+  const end = appSource.indexOf('function prevCard(', start);
+  const block = appSource.slice(start, end);
+
+  assert.match(block, /ledgerGradeEligible\(practiceLedger, state\.currentLessonId\)/);
+  assert.match(block, /ledgerSession\.controller\.submitGrade\(g\)/);
+  // legacy 那條原本的三個寫入一個都不能少
+  assert.match(block, /setGrade\(state\.cardIndex, g, runtimeStorage\)/);
+  assert.match(block, /recordGrade\(gradedCardKey, g/);
+  assert.match(block, /logReview\(g, Date\.now\(\), runtimeStorage\)/);
+});
+
+test('KTD11：ledger 路徑鏡射交易算好的 after-state，不自己重算', () => {
+  const start = appSource.indexOf('advance: result => {');
+  const end = appSource.indexOf('onStateChange:', start);
+  const block = appSource.slice(start, end);
+
+  assert.match(block, /setGradeFromLedger\(card, result\.srs, storage\)/);
+  assert.doesNotMatch(block, /setGrade\(/, 'setGrade 會再算一次 nextReview');
+  assert.doesNotMatch(block, /nextReview\(/);
+  assert.doesNotMatch(block, /logReview\(/, 'daily 由投影鏡射負責，不能再累加一次');
+  assert.doesNotMatch(block, /recordGrade\(/, 'history 同理');
+});
+
+test('AE7：滑鼠與鍵盤共用同一道 saving 鎖', () => {
+  assert.match(appSource, /if \(ledgerSession\?\.controller\.isLocked\(\)\) \{ e\.stopPropagation\(\); return; \}/);
+  assert.match(appSource, /\} else if \(ledgerSession\?\.controller\.isLocked\(\)\) \{/);
+  // retry 按鈕本身不能被那道鎖擋掉，否則失敗後就出不去了
+  const clickStart = appSource.indexOf("if (e.target.closest('[data-ledger-retry]'))");
+  const lockStart = appSource.indexOf('if (ledgerSession?.controller.isLocked()) { e.stopPropagation(); return; }');
+  assert.ok(clickStart > 0 && clickStart < lockStart, 'retry 要排在鎖前面');
+});
+
+test('失敗狀態一定給得出下一步，而且是可讀的 a11y 區域', () => {
+  assert.match(cardSource, /data-ledger-status/);
+  assert.match(cardSource, /role="status"/);
+  assert.match(cardSource, /aria-live="polite"/);
+  assert.match(appSource, /'save-failed': \{ text: '[^']+', action: '[^']+' \}/);
+  assert.match(appSource, /'projection-repair': \{ text: '[^']+', action: '[^']+' \}/);
+  assert.match(appSource, /action\.focus\(\)/, '鍵盤使用者不用自己找出路');
+  // repair 只重跑鏡射，絕不重送交易
+  const retryStart = appSource.indexOf('async function retryLedgerAction()');
+  const retryEnd = appSource.indexOf('\n}', retryStart);
+  const block = appSource.slice(retryStart, retryEnd);
+  assert.match(block, /controller\.retry\(\)/);
+  assert.match(block, /controller\.repairProjection\(\)/);
+  assert.doesNotMatch(block, /submitGrade/);
+});
+
+test('狀態列在窄螢幕與淺色主題下都有樣式', () => {
+  assert.match(cssSource, /\.ledger-status \{/);
+  assert.match(cssSource, /\.ledger-status\[data-state='save-failed'\]/);
+  assert.match(cssSource, /@media \(max-width: 360px\)[\s\S]*\.ledger-status/);
+  // 只用既有 token，不寫死顏色
+  const start = cssSource.indexOf('/* ===== Ledger 評分狀態');
+  const block = cssSource.slice(start);
+  assert.doesNotMatch(block, /#[0-9a-fA-F]{3,6}\b/, '顏色要走 theme token');
+});

@@ -165,6 +165,10 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
         很熟<span class="pill-meta">晚點再出現</span><span class="pill-time">${escapeHtml(previewEasy)}</span>
       </button>
     </div>
+    <div class="ledger-status" data-ledger-status hidden role="status" aria-live="polite">
+      <span data-ledger-status-text></span>
+      <button type="button" class="ledger-status-action" data-ledger-retry hidden></button>
+    </div>
     <div class="card-nav-row">
       <button class="nav-side-btn" id="cardPrev" aria-label="上一張">${SVG_CHEV_L}<span>上一張</span></button>
       <button class="fav-btn${isFavorite(card) ? ' on' : ''}" id="favBtn" aria-label="收藏">
