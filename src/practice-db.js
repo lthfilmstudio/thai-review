@@ -442,6 +442,27 @@ export function createPracticeTransactionPort(connection, {
           }), { constraintAsFalse: true });
           return result === false ? false : true;
         },
+        async getAllSrs(_workspaceId) {
+          active();
+          assertWorkspaceArgument(workspace, _workspaceId);
+          const rows = await requestPromise(store('srsV2').index('by_workspace').getAll(workspace));
+          for (const row of rows) assertEnvelope(workspace, row);
+          return structuredClone(rows);
+        },
+        async deleteSrs(_workspaceId, cardId) {
+          active();
+          assertWorkspaceArgument(workspace, _workspaceId);
+          await requestPromise(store('srsV2').delete([
+            workspace, requiredRowKey(cardId, 'SRS card'),
+          ]));
+        },
+        async deleteWorkspaceMeta(_workspaceId, metaKey) {
+          active();
+          assertWorkspaceArgument(workspace, _workspaceId);
+          await requestPromise(store('workspaceMeta').delete([
+            workspace, requiredRowKey(metaKey, 'workspace meta key'),
+          ]));
+        },
         async addQuarantine(_workspaceId, row) {
           active();
           assertWorkspaceArgument(workspace, _workspaceId);

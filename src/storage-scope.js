@@ -1547,6 +1547,44 @@ export async function ensureRuntimeLedgerContext({
   });
 }
 
+/* R11：遠端重置 epoch 生效後清掉 IDB 這邊的權威 SRS。
+
+   順序是「先清 IDB，再清本機鏡射」，不能反過來：先清本機的話，清完到清 IDB 之間
+   當掉，下次開機 reconcileLedgerMirror() 會從 IDB 把資料原樣鏡射回來，等於重置沒
+   發生過。
+
+   刻意保留三樣東西：
+   - append-only 的 practice events 與已提交的 projections（R11 明列）。重置清的是
+     排程進度，不是「做過什麼」的紀錄；現行 legacy 重置也只清 state.progress，沒有
+     動每日日誌或評分歷史。
+   - baseline 的 seededAliases 紀錄。那份紀錄正是「重置掉的進度不准被 legacy
+     progress 救回來」的依據（見 commitRuntimeSrsBaseline）；把它清掉的話，下次開機
+     baseline 會從還沒被同步清乾淨的 legacy progress 重新 seed 一次，重置就白做了。
+     只清 runtime-context，強迫下次開機重新 audit。 */
+export async function resetRuntimeLedgerAuthority({
+  port,
+  workspaceId,
+} = {}) {
+  const workspace = requiredIdentity(workspaceId);
+  if (!port || typeof port.transaction !== 'function') {
+    throw codedError('STORAGE_UNAVAILABLE', 'runtime reset transaction port is unavailable');
+  }
+  return port.transaction(['srsV2', 'workspaceMeta'], 'readwrite', async tx => {
+    for (const method of ['getAllSrs', 'deleteSrs', 'deleteWorkspaceMeta']) {
+      requiredContextMethod(tx, method);
+    }
+    const rows = await tx.getAllSrs(workspace);
+    let cleared = 0;
+    for (const row of rows) {
+      if (typeof row?.cardId !== 'string' || !row.cardId) continue;
+      await tx.deleteSrs(workspace, row.cardId);
+      cleared += 1;
+    }
+    await tx.deleteWorkspaceMeta(workspace, RUNTIME_CONTEXT_META_KEY);
+    return { clearedSrs: cleared };
+  });
+}
+
 export function planLegacyMigration({
   legacySnapshot,
   lineageEvidence = null,

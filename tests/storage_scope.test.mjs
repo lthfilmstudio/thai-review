@@ -16,6 +16,7 @@ import {
   commitRuntimeSrsBaseline,
   ensureRuntimeLedgerContext,
   planRuntimeSrsBaseline,
+  resetRuntimeLedgerAuthority,
   resolveWorkspaceId,
   runLegacyLearningBootGate,
   runWorkspaceBoot,
@@ -1122,4 +1123,102 @@ test('未知 schemaVersion 的 runtime context 當成失效，重新 audit', asy
   assert.equal(audits, 1);
   assert.equal(result.audited, true);
   assert.equal(port.meta.get('runtime-context').schemaVersion, 1);
+});
+
+function resetPort(srsRows = [], metaRows = {}) {
+  const srs = new Map(srsRows.map(row => [row.cardId, structuredClone(row)]));
+  const meta = new Map(Object.entries(structuredClone(metaRows)));
+  return {
+    srs,
+    meta,
+    async transaction(names, mode, work) {
+      assert.deepEqual(names, ['srsV2', 'workspaceMeta']);
+      assert.equal(mode, 'readwrite');
+      return work({
+        getAllSrs: () => [...srs.values()].map(row => structuredClone(row)),
+        deleteSrs: (_w, cardId) => { srs.delete(cardId); },
+        deleteWorkspaceMeta: (_w, key) => { meta.delete(key); },
+      });
+    },
+  };
+}
+
+test('R11：重置清掉 IDB 的權威 SRS 與 runtime-context', async () => {
+  const port = resetPort(
+    [
+      { workspaceId: 'user:A', cardId: CARD_A, version: 3, state: { grade: 'good' } },
+      { workspaceId: 'user:A', cardId: CARD_B, version: 1, state: { grade: 'hard' } },
+    ],
+    {
+      'runtime-context': { key: 'runtime-context', catalogDigest: 'sha256:a' },
+      'runtime-srs-baseline-v1': { key: 'runtime-srs-baseline-v1', seededAliases: ['L1:one'] },
+    },
+  );
+
+  const result = await resetRuntimeLedgerAuthority({ port, workspaceId: 'user:A' });
+
+  assert.deepEqual(result, { clearedSrs: 2 });
+  assert.equal(port.srs.size, 0);
+  assert.equal(port.meta.has('runtime-context'), false, 'context 清掉，下次開機重新 audit');
+});
+
+test('R11：重置保留 baseline 的 seededAliases——它就是「不准復活」的依據', async () => {
+  const port = resetPort(
+    [{ workspaceId: 'user:A', cardId: CARD_A, version: 2, state: { grade: 'good' } }],
+    {
+      'runtime-context': { key: 'runtime-context' },
+      'runtime-srs-baseline-v1': {
+        key: 'runtime-srs-baseline-v1', seededAliases: ['L1:one', 'L1:two'],
+      },
+    },
+  );
+
+  await resetRuntimeLedgerAuthority({ port, workspaceId: 'user:A' });
+
+  // 清掉的話，下次開機 baseline 會從還沒被同步清乾淨的 legacy progress 重新 seed，
+  // 重置就白做了。
+  assert.deepEqual(
+    port.meta.get('runtime-srs-baseline-v1').seededAliases,
+    ['L1:one', 'L1:two'],
+  );
+});
+
+test('R11：重置後再跑一次 baseline，被重置掉的卡不會復活', async () => {
+  // 端到端：seed → 重置 → 同一份 legacy progress 再 commit 一次
+  const baselinePort = runtimeBaselinePort();
+  const plan = planRuntimeSrsBaseline({
+    progress: { 'L1:one': { grade: 'good', interval: 3 } },
+    currentCatalog: runtimeCatalog([{ thai: 'one', card_id: CARD_A }]),
+    catalogDigest: 'sha256:catalog-a',
+    ...completeLineage([['r1', { 'L1:one': [CARD_A] }], ['r2', { 'L1:one': [CARD_A] }]]),
+  });
+  await commitRuntimeSrsBaseline({ port: baselinePort, workspaceId: 'user:A', plan });
+  assert.equal(baselinePort.srs.size, 1);
+
+  // 重置：清 SRS，保留 baseline 帳
+  baselinePort.srs.clear();
+  baselinePort.meta.delete('runtime-context');
+
+  const replay = await commitRuntimeSrsBaseline({ port: baselinePort, workspaceId: 'user:A', plan });
+  assert.deepEqual(replay.summary, { seeded: 0, existing: 0, quarantined: 0, skipped: 1 });
+  assert.equal(baselinePort.srs.size, 0, '重置掉的進度不得被 legacy progress 救回來');
+});
+
+test('沒有 SRS 可清時是安全的 no-op', async () => {
+  const port = resetPort([], {});
+  assert.deepEqual(await resetRuntimeLedgerAuthority({ port, workspaceId: 'user:A' }), {
+    clearedSrs: 0,
+  });
+});
+
+test('重置需要完整的 adapter，缺方法就整筆不動', async () => {
+  const port = {
+    async transaction(names, mode, work) {
+      return work({ getAllSrs: () => [] }); // 缺 deleteSrs／deleteWorkspaceMeta
+    },
+  };
+  await assert.rejects(
+    resetRuntimeLedgerAuthority({ port, workspaceId: 'user:A' }),
+    { code: 'PRACTICE_ADAPTER_INCOMPLETE' },
+  );
 });
