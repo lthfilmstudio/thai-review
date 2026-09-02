@@ -6,6 +6,12 @@
 const KEY = 'thai-review-grade-history-v1';
 const MAX_PER_CARD = 5;
 const GRADE_CODE = { again: 0, hard: 1, good: 2, easy: 3 };
+const GRADE_BY_CODE = Object.freeze(['again', 'hard', 'good', 'easy']);
+
+/* ledger 的 history 投影存的是 code，鏡射回本機時要換回四檔名稱。 */
+export function gradeFromCode(code) {
+  return GRADE_BY_CODE[code] ?? null;
+}
 const IMPROVEMENT_AGE_SECONDS = 14 * 24 * 60 * 60;
 
 function load(storage = localStorage) {
