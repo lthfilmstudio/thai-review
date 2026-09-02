@@ -1,7 +1,7 @@
 # Thai Review runtime 評分接入 IndexedDB 帳本設計
 
 日期：2026-09-01（Asia/Taipei）  
-狀態：待 Nalin 書面確認後進入 implementation plan  
+狀態：Nalin 已於 2026-09-01 書面批准，進入 implementation
 權威分支：`codex/hybrid-mastery-release`（設計起點 `585481a`）
 
 ## 1. 目標
@@ -45,7 +45,7 @@
 
 現有使用者的長期 SRS 多數仍只存在 scoped localStorage `state.progress`。若直接讓 `commitPracticeAttempt()` 在空的 `srsV2` 上計算，第一次 Due 會把舊卡當新卡，重設 reps、interval 與 ease factor。因此 runtime ledger 啟用前必須先做一次 add-only baseline：
 
-1. 用完整 catalog 建立唯一的 runtime `lessonId:sourceThai` → stable `card_id` 對照。
+1. 用完整 catalog 與既有 trusted production lineage evidence 共同建立 runtime `lessonId:sourceThai` → stable `card_id` 對照。只看目前 catalog 唯一並不足夠：若歷史 production snapshot 曾出現 alias collision，仍必須沿用既有 resolved／quarantined 判定，不能把舊 collision 重新物化成可寫 baseline。
 2. 只接受能唯一對應一張卡、且通過既有 SRS snapshot validator 的 progress entry。
 3. 在同一 workspace transaction 把尚無 `srsV2` row 的 entry 寫成 version 0 baseline；已存在的 IndexedDB row 永遠勝出，不覆蓋、不降版。
 4. runtime key 缺失、同 lesson 同 Thai 碰撞、stable ID 重複或 SRS shape 無效時，不猜 card identity；留下 diagnostics／quarantine，該卡暫不啟用 ledger grade。
@@ -142,7 +142,7 @@ lane 只由該卡當天第一筆已保存 event 決定，後續即使從別的�
 
 - Today Due first transaction 成功後，event、daily-card claim、formal-due claim、SRS v2、每日 ledger projection、outbox 同時存在，畫面才前進。
 - 既有 localStorage SRS 先以 version 0 baseline 無損 seed；第一筆 Due 延續舊 reps／interval／ease，不當成新卡。
-- 已存在的 IndexedDB SRS 永遠勝過 localStorage baseline；runtime key 碰撞不猜 stable ID，也不產生半套 seed。
+- 已存在的 IndexedDB SRS 永遠勝過 localStorage baseline；runtime key 碰撞或缺少 trusted lineage 證據時不猜 stable ID，也不產生半套 seed。
 - Today Sweep／Weak 與 All 非 Due 只寫 event／outbox／attendance，不改 SRS、reviewed 或 accuracy。
 - All cards 的到期卡仍走 Due first，與 Today Due 使用同一 daily-card uniqueness。
 - 同日同卡第二、第三次分別是 retry-1／retry-2；第四次不灌 event 或統計。
