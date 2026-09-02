@@ -102,8 +102,12 @@ test('service worker refreshes mutable Thai audio indexes before using cache', (
   }
 });
 
-test('service worker cache version invalidates the stale v94 bundle', () => {
-  assert.ok(sw.includes("const CACHE = 'thai-review-v95';"));
+test('service worker cache version invalidates the stale v95 bundle', () => {
+  assert.ok(sw.includes("const CACHE = 'thai-review-v96';"));
+  assert.ok(sw.includes("'./src/ledger-mirror.js'"),
+    'ledger mirror must be available in the offline shell');
+  assert.ok(sw.includes("'./src/practice-ledger-runtime.js'"),
+    'practice ledger boot must be available in the offline shell');
   assert.ok(sw.includes("'./src/storage-scope.js'"),
     'app boot dependency must be available in the offline shell');
   assert.ok(sw.includes("'./src/practice-db.js'"),

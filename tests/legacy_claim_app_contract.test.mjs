@@ -10,7 +10,7 @@ test('App 在 runWorkspaceBoot migrate 內接 production legacy claim flow', () 
   const migrate = appSource.indexOf('migrate: async', boot);
   const readyGate = appSource.indexOf("if (bootResult.status !== 'ready')", boot);
 
-  assert.match(appSource, /import \{ createLegacyClaimFlow \} from '\.\/legacy-claim-flow\.js';/);
+  assert.match(appSource, /import \{[^}]*\bcreateLegacyClaimFlow\b[^}]*\} from '\.\/legacy-claim-flow\.js';/);
   assert.ok(boot > initStart && migrate > boot && readyGate > migrate);
   assert.match(appSource.slice(migrate, readyGate), /\{ workspaceId, session, migrationStorage \}/);
   assert.match(appSource.slice(migrate, readyGate), /rootStorage: localStorage/);

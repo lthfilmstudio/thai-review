@@ -38,10 +38,17 @@ export function reconcileLedgerMirror({
   const summary = {
     days: 0, resweep: 0, historyCards: 0, historyEntries: 0, skipped: [],
   };
-  if (!plainRow(projections)) return summary;
+  // hydrateWorkspaceSnapshot() 給的是排序過的陣列，別處拿到的是 { name: row }。
+  // 兩種都收，名稱一律以 row.name 為準。
+  const byName = Array.isArray(projections)
+    ? Object.fromEntries(projections
+      .filter(row => plainRow(row) && typeof row.name === 'string' && row.name)
+      .map(row => [row.name, row]))
+    : projections;
+  if (!plainRow(byName)) return summary;
 
-  for (const name of Object.keys(projections).sort()) {
-    const row = projections[name];
+  for (const name of Object.keys(byName).sort()) {
+    const row = byName[name];
     if (!plainRow(row) || row.schemaVersion !== 1) {
       summary.skipped.push(name);
       continue;

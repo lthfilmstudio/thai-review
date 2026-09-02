@@ -1515,6 +1515,38 @@ export async function commitRuntimeSrsBaseline({
    RUNTIME_BASELINE_CHANGED 就是這樣炸的）。回 blocked 讓 App 照舊走 legacy，
    ledger 評分維持關著。audit 完成、context 還沒寫就當掉的話下次開機會重跑一次
    ——baseline 是 add-only 而且冪等，重跑安全。 */
+/* baseline 的帳：哪些 alias 已經處理過。seeded 的永遠算數；quarantined 的只在同一份
+   catalog 下算數（換版可能解掉當初的撞名）。呼叫端用它判斷這次開機還有沒有沒補的
+   alias——digest 沒變不代表沒有新東西要補，cloud-sync 會在開機後把別台的進度併進
+   legacy progress。 */
+export async function readRuntimeBaselineState({ port, workspaceId } = {}) {
+  const workspace = requiredIdentity(workspaceId);
+  if (!port || typeof port.transaction !== 'function') {
+    throw codedError('STORAGE_UNAVAILABLE', 'runtime baseline transaction port is unavailable');
+  }
+  const row = await port.transaction(['workspaceMeta'], 'readonly', async tx => {
+    requiredContextMethod(tx, 'getWorkspaceMeta');
+    return tx.getWorkspaceMeta(workspace, RUNTIME_BASELINE_META_KEY);
+  });
+  if (!row || row.schemaVersion !== RUNTIME_BASELINE_META_VERSION) {
+    return { catalogDigest: null, seededAliases: [], quarantinedAliases: [] };
+  }
+  return {
+    catalogDigest: row.catalogDigest ?? null,
+    seededAliases: Array.isArray(row.seededAliases) ? [...row.seededAliases] : [],
+    quarantinedAliases: Array.isArray(row.quarantinedAliases) ? [...row.quarantinedAliases] : [],
+  };
+}
+
+/* 這次開機還有哪些 legacy alias 沒被 baseline 處理過。 */
+export function pendingBaselineAliases(progress, baselineState, catalogDigest) {
+  const known = new Set(baselineState?.seededAliases || []);
+  if (baselineState?.catalogDigest === catalogDigest) {
+    for (const alias of baselineState.quarantinedAliases || []) known.add(alias);
+  }
+  return Object.keys(progress || {}).filter(alias => !known.has(alias)).sort();
+}
+
 export async function ensureRuntimeLedgerContext({
   port,
   workspaceId,

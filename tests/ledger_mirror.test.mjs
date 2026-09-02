@@ -126,3 +126,17 @@ test('沒有投影時是安全的 no-op', () => {
   });
   assert.deepEqual(reconcileLedgerMirror({ projections: null }).days, 0);
 });
+
+test('hydration 給的陣列形式也收，名稱以 row.name 為準', () => {
+  stored.clear();
+  const summary = reconcileLedgerMirror({
+    projections: [
+      daily('2026-08-24', { reviewed: 2, good: 2 }),
+      { workspaceId: 'user:A', schemaVersion: 1, reviewed: 9 }, // 沒有 name，跳過
+      daily('2026-08-25', { practice: 1 }),
+    ],
+  });
+  assert.equal(summary.days, 2);
+  assert.equal(loadDailyLog().days['2026-08-24'].ledger.reviewed, 2);
+  assert.equal(loadDailyLog().days['2026-08-25'].ledger.practice, 1);
+});

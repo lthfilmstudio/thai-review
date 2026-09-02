@@ -30,7 +30,9 @@ import {
 } from './storage-scope.js';
 import { getDeviceId } from './srs.js';
 import { hydrateWorkspaceSnapshot, openPracticeDatabase } from './practice-db.js';
-import { createLegacyClaimFlow } from './legacy-claim-flow.js';
+import { createLegacyClaimFlow, fetchProductionLineageEvidence } from './legacy-claim-flow.js';
+import { startPracticeLedgerRuntime } from './practice-ledger-runtime.js';
+import { TRUSTED_PRODUCTION_LINEAGE } from './production-lineage-trust.js';
 import {
   renderSidebar, renderTopbarTitle, renderStats, renderContent,
   openDrawer, closeDrawer, openModal, closeModal, applyTheme,
@@ -38,6 +40,9 @@ import {
 } from './ui.js';
 
 let workspaceStorage = null;
+/* ledger runtime handle。status 不是 'ready' 就代表這次開機不開放 ledger 評分，
+   評分照舊走 legacy 路徑（見 gradeAndAdvance）。 */
+let practiceLedger = null;
 
 function requireWorkspaceStorage(storage = workspaceStorage) {
   return assertWorkspaceStorage(storage);
@@ -788,6 +793,29 @@ async function init() {
     showToast(`昨天沒開，用掉 ${settleEvent.spent} 個安神保護幫你保住連續天數`);
   }
   state.lessons = bootResult.catalog.lessons;
+
+  // ledger 這一側：確認 catalog fence、把 IDB 投影鏡射回本機。整段 fail-open——
+  // 失敗只代表這次開機不開放 ledger 評分，畫面與 legacy 評分完全不受影響（R14）。
+  practiceLedger = await startPracticeLedgerRuntime({
+    connection: practiceConnection,
+    workspaceId: bootResult.workspaceId,
+    catalog: bootResult.catalog,
+    projections: bootResult.hydration?.snapshot?.projections || null,
+    storage,
+    legacyProgress: state.progress,
+    loadLineageEvidence: async () => {
+      const lineageEvidence = await fetchProductionLineageEvidence();
+      return { lineageEvidence, trustedRevisionManifest: TRUSTED_PRODUCTION_LINEAGE };
+    },
+    assertActive: id => {
+      const current = workspaceBoot.snapshot();
+      if (current.workspaceId !== id) {
+        throw Object.assign(new Error('practice ledger workspace is stale'), {
+          code: 'WORKSPACE_INVALIDATED',
+        });
+      }
+    },
+  });
 
   const deepLink = parseDeepLinkParam();
   const today = localDateKey();
