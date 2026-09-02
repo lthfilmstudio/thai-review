@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  PRACTICE_DB_VERSION,
   PRACTICE_DB_STORES,
   createLegacyMigrationTransactionPort,
   createPracticeTransactionPort,
@@ -40,6 +41,10 @@ test('schema creates every workspace-prefixed store and required query indexes',
   ]);
   assert.deepEqual(db.stores.get('daily_lane_claims').options.keyPath, [
     'workspaceId', 'cardId', 'dayKey', 'lane',
+  ]);
+  assert.equal(PRACTICE_DB_VERSION, 3);
+  assert.deepEqual(db.stores.get('daily_card_claims').options.keyPath, [
+    'workspaceId', 'dayKey', 'cardId',
   ]);
   assert.deepEqual(db.stores.get('attempt_phase_claims').options.keyPath, [
     'workspaceId', 'attemptId', 'phase',
@@ -163,7 +168,9 @@ test('migration port requires both boot and local eligibility capabilities', () 
 });
 
 test('offer inspection and transaction recheck share one composite eligibility producer', async () => {
-  const idbCounts = { legacyImports: 1, quarantine: 1, claimJournals: 1 };
+  const idbCounts = {
+    legacyImports: 1, quarantine: 1, claimJournals: 1, dailyCardClaims: 1,
+  };
   let localRevision = 'local-empty-1';
   const port = createLegacyMigrationTransactionPort({
     database: transactionDatabase(idbCounts),
@@ -178,7 +185,11 @@ test('offer inspection and transaction recheck share one composite eligibility p
   const offered = await port.inspectClaimEligibility();
   const rechecked = await port.transaction(tx => tx.getClaimEligibility('user:A'));
   assert.deepEqual(rechecked, offered);
-  assert.equal(offered.counts.events, 3, 'prior import, quarantine and journal all make target non-empty');
+  assert.equal(
+    offered.counts.events,
+    4,
+    'daily-card claim, prior import, quarantine and journal all make target non-empty',
+  );
 
   localRevision = 'local-empty-2';
   const changed = await port.inspectClaimEligibility();

@@ -8,9 +8,11 @@ import {
 import { commitPracticeAttempt } from '../../src/practice-commit.js';
 import { buildPracticeAttemptEvent } from '../../src/practice-events.js';
 import {
+  commitRuntimeSrsBaseline,
   commitLegacyMigration,
   evaluateLegacyClaim,
   planLegacyMigration,
+  planRuntimeSrsBaseline,
 } from '../../src/storage-scope.js';
 import { projectHydratedWorkspaceState } from '../../src/state.js';
 
@@ -106,6 +108,40 @@ function openHigherVersion(version) {
   });
 }
 
+function openVersionTwoFixture() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 2);
+    request.onerror = () => reject(request.error);
+    request.onupgradeneeded = () => {
+      const store = request.result.createObjectStore('srs_v2', {
+        keyPath: ['workspaceId', 'cardId'],
+      });
+      store.createIndex('by_workspace', 'workspaceId');
+      store.createIndex('by_due', ['workspaceId', 'nextReviewAt', 'cardId']);
+      store.add({
+        workspaceId: 'user:upgrade',
+        cardId: '10101010-1010-4010-8010-101010101010',
+        version: 7,
+        nextReviewAt: 99,
+        state: { grade: 'easy', interval: 21 },
+        sourceEventId: 'pre-v3-event',
+      });
+      const projections = request.result.createObjectStore('projections', {
+        keyPath: ['workspaceId', 'name'],
+      });
+      projections.createIndex('by_workspace', 'workspaceId');
+      projections.add({
+        workspaceId: 'user:upgrade',
+        name: 'daily',
+        schemaVersion: 1,
+        projectorVersion: 'pre-v3-fixture',
+        facts: [{ preserved: true }],
+      });
+    };
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
 function migrationResolvedRecordId(workspaceId, snapshotId, row, index) {
   return [
     'workspace', encodeURIComponent(workspaceId),
@@ -150,13 +186,109 @@ function commitInput(port, eventId, formalGrade, attemptId = IDS.attemptId) {
 
 async function run() {
   await deleteDatabase();
+  const versionTwo = await openVersionTwoFixture();
+  versionTwo.close();
   const connection = trackConnection(await openPracticeDatabase({ name: DB_NAME }));
+  const preservedVersionTwoRow = await rawGet(
+    connection.database,
+    'srs_v2',
+    ['user:upgrade', '10101010-1010-4010-8010-101010101010'],
+  );
+  const preservedVersionTwoProjection = await rawGet(
+    connection.database,
+    'projections',
+    ['user:upgrade', 'daily'],
+  );
+  if (connection.database.version !== PRACTICE_DB_VERSION
+      || !connection.database.objectStoreNames.contains('daily_card_claims')
+      || preservedVersionTwoRow?.version !== 7
+      || preservedVersionTwoProjection?.facts?.[0]?.preserved !== true) {
+    throw new Error('v2 to v3 additive upgrade did not preserve existing rows');
+  }
   const portA = createPracticeTransactionPort(connection, {
     workspaceId: 'user:A',
     assertActive: workspaceId => {
       if (workspaceId !== 'user:A') throw new Error('browser workspace is stale');
     },
   });
+
+  const dailyClaim = {
+    workspaceId: 'user:A',
+    dayKey: '2026-08-24',
+    cardId: IDS.cardId,
+    attemptId: IDS.attemptId,
+    lane: 'due',
+    roundId: IDS.roundId,
+    cycleId: IDS.cycleId,
+  };
+  const dailyCardFirst = await portA.transaction(
+    ['dailyCardClaims'],
+    'readwrite',
+    tx => tx.addDailyCardClaim('user:A', dailyClaim),
+  );
+  const dailyCardSecond = await portA.transaction(
+    ['dailyCardClaims'],
+    'readwrite',
+    async tx => ({
+      added: await tx.addDailyCardClaim('user:A', { ...dailyClaim, lane: 'sweep' }),
+      existing: await tx.getDailyCardClaim('user:A', dailyClaim.dayKey, dailyClaim.cardId),
+    }),
+  );
+  if (dailyCardFirst !== true
+      || dailyCardSecond.added !== false
+      || dailyCardSecond.existing?.lane !== 'due') {
+    throw new Error('daily-card claim did not enforce cross-lane uniqueness');
+  }
+
+  const baselineWorkspace = 'user:runtime-baseline';
+  const baselinePort = createPracticeTransactionPort(connection, {
+    workspaceId: baselineWorkspace,
+    assertActive: workspaceId => {
+      if (workspaceId !== baselineWorkspace) throw new Error('baseline workspace is stale');
+    },
+  });
+  const baselineLineage = {
+    lineageEvidence: {
+      kind: 'production-lineage-evidence-v1',
+      evidenceId: 'browser-runtime-baseline:r1+r2',
+      completeness: 'complete',
+      expectedRevisions: ['r1', 'r2'],
+      snapshots: ['r1', 'r2'].map(revision => ({
+        revision,
+        complete: true,
+        aliases: { 'L1:seed': ['30303030-3030-4030-8030-303030303030'] },
+      })),
+    },
+    trustedRevisionManifest: {
+      kind: 'trusted-lineage-revision-manifest-v1',
+      revisions: ['r1', 'r2'],
+      allowHistoricalSnapshotEvidence: true,
+    },
+  };
+  const baselinePlan = planRuntimeSrsBaseline({
+    progress: { 'L1:seed': { grade: 'hard', interval: 3, reps: 2 } },
+    currentCatalog: {
+      lessons: [{
+        id: 'L1',
+        cards: [{ thai: 'seed', card_id: '30303030-3030-4030-8030-303030303030' }],
+      }],
+    },
+    catalogDigest: 'sha256:browser-catalog-a',
+    ...baselineLineage,
+  });
+  const baselineFirst = await commitRuntimeSrsBaseline({
+    port: baselinePort, workspaceId: baselineWorkspace, plan: baselinePlan,
+  });
+  const baselineSecond = await commitRuntimeSrsBaseline({
+    port: baselinePort, workspaceId: baselineWorkspace, plan: baselinePlan,
+  });
+  if (baselineFirst.status !== 'applied'
+      || baselineFirst.summary.seeded !== 1
+      || baselineSecond.status !== 'no-op'
+      || baselineSecond.summary.seeded !== 0
+      || baselineSecond.summary.skipped !== baselineFirst.summary.seeded) {
+    throw new Error('runtime baseline was not add-only and idempotent');
+  }
 
   const [first, second] = await Promise.all([
     commitPracticeAttempt(commitInput(
@@ -214,7 +346,7 @@ async function run() {
   );
   const counts = {
     events: await rawCount(reopened.database, 'practice_events'),
-    srs: await rawCount(reopened.database, 'srs_v2'),
+    srs: await rawIndexCount(reopened.database, 'srs_v2', 'by_workspace', 'user:A'),
     claims: await rawCount(reopened.database, 'formal_due_claims'),
     outbox: await rawCount(reopened.database, 'outbox'),
   };
@@ -615,6 +747,24 @@ async function run() {
 
   const output = {
     status: 'passed',
+    additiveUpgrade: {
+      from: 2,
+      to: PRACTICE_DB_VERSION,
+      preservedSrsVersion: preservedVersionTwoRow?.version ?? null,
+      preservedProjection: preservedVersionTwoProjection?.facts?.[0]?.preserved === true,
+      dailyCardStore: connection.database.objectStoreNames.contains('daily_card_claims'),
+    },
+    dailyCardClaim: {
+      first: dailyCardFirst,
+      second: dailyCardSecond.added,
+      lane: dailyCardSecond.existing?.lane || null,
+    },
+    runtimeBaseline: {
+      firstStatus: baselineFirst.status,
+      secondStatus: baselineSecond.status,
+      seeded: baselineFirst.summary.seeded,
+      replaySkipped: baselineSecond.summary.skipped,
+    },
     abortObserved,
     parallelDueStatuses: statuses,
     dueAtomicRollback: {
@@ -670,7 +820,17 @@ async function run() {
       stalePortError,
     },
   };
-  if (output.reloadReadBack.eventId !== winner.event.eventId
+  if (output.additiveUpgrade.preservedSrsVersion !== 7
+      || output.additiveUpgrade.preservedProjection !== true
+      || output.additiveUpgrade.dailyCardStore !== true
+      || output.dailyCardClaim.first !== true
+      || output.dailyCardClaim.second !== false
+      || output.dailyCardClaim.lane !== 'due'
+      || output.runtimeBaseline.firstStatus !== 'applied'
+      || output.runtimeBaseline.secondStatus !== 'no-op'
+      || output.runtimeBaseline.seeded !== 1
+      || output.runtimeBaseline.replaySkipped !== 1
+      || output.reloadReadBack.eventId !== winner.event.eventId
       || output.reloadReadBack.srsVersion !== 1
       || output.reloadReadBack.sourceEventId !== winner.event.eventId
       || output.reloadReadBack.claimEventId !== winner.event.eventId

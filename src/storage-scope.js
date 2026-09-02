@@ -3,7 +3,11 @@
    Callers supply those adapters so boot and migration can fail closed before any
    learning read/write reaches a store. */
 
-import { isStableCardId } from './card-identity.js';
+import {
+  indexLegacyAliases,
+  isStableCardId,
+  resolveLegacyAlias,
+} from './card-identity.js';
 import { isSrsStateSnapshot } from './srs.js';
 
 const BOOT_SCREENS = Object.freeze({
@@ -1209,6 +1213,264 @@ function migrationPlanCore(plan) {
 
 function migrationPlanSignature(plan) {
   return stableSerialize(migrationPlanCore(plan));
+}
+
+function runtimeCatalogCards(currentCatalog) {
+  if (!Array.isArray(currentCatalog?.lessons)) {
+    throw codedError('RUNTIME_BASELINE_INVALID', 'runtime baseline requires a complete catalog');
+  }
+  const cards = [];
+  for (const lesson of currentCatalog.lessons) {
+    const lessonId = typeof lesson?.id === 'string' ? lesson.id.trim() : '';
+    if (!lessonId || !Array.isArray(lesson.cards)) {
+      throw codedError('RUNTIME_BASELINE_INVALID', 'runtime catalog lesson is incomplete');
+    }
+    for (const card of lesson.cards) cards.push({ ...card, _lessonId: lessonId });
+  }
+  return cards;
+}
+
+function runtimeBaselineCore(plan) {
+  return {
+    kind: plan?.kind,
+    schemaVersion: plan?.schemaVersion,
+    catalogDigest: plan?.catalogDigest,
+    lineageProvenance: plan?.lineageProvenance,
+    seeds: plan?.seeds,
+    quarantined: plan?.quarantined,
+    summary: plan?.summary,
+  };
+}
+
+function runtimeBaselineSignature(plan) {
+  return stableSerialize(runtimeBaselineCore(plan));
+}
+
+/* planSignature 只擋得住「拿到 plan 之後又去動它」，擋不住「自己照 stableSerialize
+   刻一份出來」——那兩個函式都在出貨的 bundle 裡。真正的閘門是這個 WeakSet：要進得來
+   就一定得走 planRuntimeSrsBaseline，也就一定過了 lineage 檢查。 */
+const RUNTIME_BASELINE_PLANS = new WeakSet();
+
+/* baseline 是 add-only 的補寫，不是一次定生死：legacy progress 會被 cloud-sync
+   在開機後改（多裝置合併、reset epoch 清除），所以「plan 跟上次不一樣」是正常狀態，
+   帳要記在 alias 層級而不是整份 plan 層級。 */
+const RUNTIME_BASELINE_META_KEY = 'runtime-srs-baseline-v1';
+const RUNTIME_BASELINE_META_VERSION = 1;
+
+/* Runtime cutover is deliberately stricter than current-catalog resolution.
+   An alias must resolve uniquely in today's catalog and in trusted production
+   lineage, and both sources must name the same stable card. */
+export function planRuntimeSrsBaseline({
+  progress,
+  currentCatalog,
+  catalogDigest,
+  lineageEvidence = null,
+  trustedRevisionManifest = null,
+} = {}) {
+  if (!plainRecord(progress)) {
+    throw codedError('RUNTIME_BASELINE_INVALID', 'runtime progress must be an object');
+  }
+  const digest = requiredIdentity(catalogDigest);
+  // digest 是冪等鍵。跟它描述的 catalog 對不起來的話，整份 baseline 會被記在錯的
+  // 鍵底下，之後就靜默不再執行。
+  if (typeof currentCatalog?.digest === 'string' && currentCatalog.digest !== digest) {
+    throw codedError('RUNTIME_BASELINE_INVALID', 'catalogDigest does not match the given catalog');
+  }
+  const catalogIndex = indexLegacyAliases(runtimeCatalogCards(currentCatalog));
+  const lineage = normalizeLineageEvidence(lineageEvidence, trustedRevisionManifest);
+  const seeds = [];
+  const quarantined = [];
+
+  for (const legacyAlias of Object.keys(progress).sort()) {
+    const state = structuredClone(progress[legacyAlias]);
+    let reason = null;
+    let cardId = null;
+    if (!isSrsStateSnapshot(state)) {
+      reason = 'invalid_srs_snapshot';
+    } else {
+      const current = resolveLegacyAlias(legacyAlias, catalogIndex);
+      if (current.status !== 'resolved') {
+        reason = current.reason === 'ambiguous_legacy_alias'
+          ? 'current_catalog_collision'
+          : current.reason;
+      } else if (!lineage.complete) {
+        reason = 'incomplete_lineage_evidence';
+      } else {
+        const historical = lineage.resolveAlias(legacyAlias);
+        if (historical.status !== 'resolved') {
+          reason = historical.reason;
+        } else if (historical.cardId !== current.cardId
+            || !lineage.canonicalCardIdProven(current.cardId)) {
+          reason = 'current_lineage_mismatch';
+        } else {
+          cardId = current.cardId;
+        }
+      }
+    }
+
+    if (cardId) seeds.push({ cardId, legacyAlias, state });
+    else quarantined.push({ legacyAlias, reason, state });
+  }
+
+  const core = {
+    kind: 'runtime-srs-baseline-plan-v1',
+    schemaVersion: 1,
+    catalogDigest: digest,
+    lineageProvenance: structuredClone(lineage.lineageProvenance || {
+      evidenceId: null, digest: null, revisionManifest: null,
+    }),
+    seeds,
+    quarantined,
+    summary: {
+      original: Object.keys(progress).length,
+      seedable: seeds.length,
+      quarantined: quarantined.length,
+    },
+  };
+  const planSignature = runtimeBaselineSignature(core);
+  const plan = Object.freeze({
+    ...core,
+    planId: `runtime-baseline-${smallStableHash(planSignature)}`,
+    planSignature,
+  });
+  RUNTIME_BASELINE_PLANS.add(plan);
+  return plan;
+}
+
+export async function commitRuntimeSrsBaseline({
+  port,
+  workspaceId,
+  plan,
+} = {}) {
+  const workspace = requiredIdentity(workspaceId);
+  if (!workspace.startsWith('anon:') && !workspace.startsWith('user:')) {
+    throw codedError('WORKSPACE_ID_MISSING', 'runtime baseline requires a workspace');
+  }
+  if (!port || typeof port.transaction !== 'function') {
+    throw codedError('STORAGE_UNAVAILABLE', 'runtime baseline transaction port is unavailable');
+  }
+  if (!RUNTIME_BASELINE_PLANS.has(plan)) {
+    throw codedError('RUNTIME_BASELINE_INVALID', 'runtime baseline plan did not come from planRuntimeSrsBaseline');
+  }
+  if (plan.kind !== 'runtime-srs-baseline-plan-v1'
+      || plan.schemaVersion !== 1
+      || plan.planSignature !== runtimeBaselineSignature(plan)
+      || !Array.isArray(plan.seeds)
+      || !Array.isArray(plan.quarantined)
+      || plan.summary?.seedable !== plan.seeds.length
+      || plan.summary?.quarantined !== plan.quarantined.length
+      || plan.summary?.original !== plan.seeds.length + plan.quarantined.length) {
+    throw codedError('RUNTIME_BASELINE_INVALID', 'runtime baseline plan is invalid');
+  }
+  const snapshot = structuredClone(plan);
+
+  return port.transaction(
+    ['srsV2', 'quarantine', 'workspaceMeta'],
+    'readwrite',
+    async tx => {
+      for (const method of [
+        'getSrs', 'addSrsBaseline', 'addQuarantine',
+        'getWorkspaceMeta', 'putWorkspaceMeta',
+      ]) {
+        if (typeof tx?.[method] !== 'function') {
+          throw codedError('PRACTICE_ADAPTER_INCOMPLETE', `runtime baseline transaction.${method} is required`);
+        }
+      }
+      const prior = await tx.getWorkspaceMeta(workspace, RUNTIME_BASELINE_META_KEY);
+      // 未來版本寫過的帳就別碰：舊 code 不知道新語意，硬補只會補壞。
+      if (prior && prior.schemaVersion !== RUNTIME_BASELINE_META_VERSION) {
+        return { status: 'skipped', reason: 'unknown_meta_schema', summary: null };
+      }
+      // seeded 過的 alias 永遠不再看：使用者之後把 SRS 重置掉，legacy progress
+      // 不能把它救回來。quarantine 過的只在同一份 catalog 下算數——catalog 換了
+      // 有機會解掉當初的 collision，就再判一次。
+      const seededAliases = new Set(
+        Array.isArray(prior?.seededAliases) ? prior.seededAliases : [],
+      );
+      const sameCatalog = prior?.catalogDigest === snapshot.catalogDigest;
+      const quarantinedAliases = new Set(
+        sameCatalog && Array.isArray(prior?.quarantinedAliases) ? prior.quarantinedAliases : [],
+      );
+
+      let seeded = 0;
+      let existing = 0;
+      let quarantined = 0;
+      let skipped = 0;
+
+      for (const row of snapshot.seeds) {
+        if (seededAliases.has(row.legacyAlias)) {
+          skipped += 1;
+          continue;
+        }
+        const current = await tx.getSrs(workspace, row.cardId);
+        if (current) {
+          existing += 1;
+          seededAliases.add(row.legacyAlias);
+          continue;
+        }
+        const added = await tx.addSrsBaseline(workspace, row.cardId, {
+          workspaceId: workspace,
+          cardId: row.cardId,
+          version: 0,
+          state: structuredClone(row.state),
+          sourceEventId: null,
+          baseline: {
+            kind: 'runtime-progress-v1',
+            catalogDigest: snapshot.catalogDigest,
+            legacyAlias: row.legacyAlias,
+            lineageProvenance: structuredClone(snapshot.lineageProvenance),
+          },
+        });
+        if (added) seeded += 1;
+        else existing += 1;
+        seededAliases.add(row.legacyAlias);
+      }
+
+      for (const row of snapshot.quarantined) {
+        if (quarantinedAliases.has(row.legacyAlias) || seededAliases.has(row.legacyAlias)) {
+          skipped += 1;
+          continue;
+        }
+        // alias 在一份 plan 裡本來就唯一，不需要雜湊；雜湊只會多一條撞號靜默漏寫
+        // 的路，也跟既有 quarantineId 用原字串的作法不一致。
+        const added = await tx.addQuarantine(workspace, {
+          workspaceId: workspace,
+          quarantineId: `runtime-baseline:${snapshot.catalogDigest}:${row.legacyAlias}`,
+          snapshotId: snapshot.planId,
+          reason: row.reason,
+          legacyAlias: row.legacyAlias,
+          value: structuredClone(row.state),
+          source: 'runtime-srs-baseline-v1',
+        });
+        // 數真的寫進去的，不是數打算寫幾筆。
+        if (added) quarantined += 1;
+        quarantinedAliases.add(row.legacyAlias);
+      }
+
+      const summary = { seeded, existing, quarantined, skipped };
+      const totals = {
+        seeded: (prior?.totals?.seeded || 0) + seeded,
+        existing: (prior?.totals?.existing || 0) + existing,
+        quarantined: (prior?.totals?.quarantined || 0) + quarantined,
+      };
+      await tx.putWorkspaceMeta(workspace, RUNTIME_BASELINE_META_KEY, {
+        workspaceId: workspace,
+        key: RUNTIME_BASELINE_META_KEY,
+        schemaVersion: RUNTIME_BASELINE_META_VERSION,
+        catalogDigest: snapshot.catalogDigest,
+        lastPlanId: snapshot.planId,
+        lineageProvenance: structuredClone(snapshot.lineageProvenance),
+        seededAliases: [...seededAliases].sort(),
+        quarantinedAliases: [...quarantinedAliases].sort(),
+        totals,
+      });
+      return {
+        status: seeded || quarantined ? 'applied' : 'no-op',
+        summary,
+        totals,
+      };
+    },
+  );
 }
 
 export function planLegacyMigration({

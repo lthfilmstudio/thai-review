@@ -13,10 +13,34 @@ import {
   requireWorkspaceStorage,
   inspectStorageDurability,
   logoutToAnonymous,
+  commitRuntimeSrsBaseline,
+  planRuntimeSrsBaseline,
   resolveWorkspaceId,
   runLegacyLearningBootGate,
   runWorkspaceBoot,
 } from '../src/storage-scope.js';
+
+const CARD_A = '550e8400-e29b-41d4-a716-446655440000';
+const CARD_B = '550e8400-e29b-41d4-a716-446655440001';
+const CARD_C = '550e8400-e29b-41d4-a716-446655440002';
+
+function completeLineage(entries) {
+  const revisions = entries.map(([revision]) => revision);
+  return {
+    lineageEvidence: {
+      kind: 'production-lineage-evidence-v1',
+      evidenceId: `storage-scope:${revisions.join('+')}`,
+      completeness: 'complete',
+      expectedRevisions: revisions,
+      snapshots: entries.map(([revision, aliases]) => ({ revision, aliases, complete: true })),
+    },
+    trustedRevisionManifest: {
+      kind: 'trusted-lineage-revision-manifest-v1',
+      revisions,
+      allowHistoricalSnapshotEvidence: true,
+    },
+  };
+}
 
 function memoryStorage() {
   const values = new Map();
@@ -605,4 +629,374 @@ test('remote installation ID 每個 workspace 各自建立，且不等於裝置�
   assert.equal(getOrCreateWorkspaceInstallationId(a, createId), 'install-A');
   assert.equal(getOrCreateWorkspaceInstallationId(b, createId), 'install-B');
   assert.notEqual(a.getItem(LEARNING_STORE_KEYS.installation), 'device-global-id');
+});
+
+function runtimeCatalog(cards, digest = 'sha256:catalog-a') {
+  return {
+    digest,
+    lessons: [{ id: 'L1', cards }],
+  };
+}
+
+function runtimeBaselinePort(existing = [], expectedWorkspace = 'user:A') {
+  const srs = new Map(existing.map(row => [row.cardId, structuredClone(row)]));
+  const quarantine = new Map();
+  const meta = new Map();
+  return {
+    srs, quarantine, meta,
+    async transaction(names, mode, work) {
+      assert.deepEqual(names, ['srsV2', 'quarantine', 'workspaceMeta']);
+      assert.equal(mode, 'readwrite');
+      const stagedSrs = new Map([...srs].map(([key, value]) => [key, structuredClone(value)]));
+      const stagedQuarantine = new Map([...quarantine].map(([key, value]) => [key, structuredClone(value)]));
+      const stagedMeta = new Map([...meta].map(([key, value]) => [key, structuredClone(value)]));
+      // 真的 port 每個方法都會 assertWorkspaceArgument，假的也要擋，不然 workspace
+      // fence 這條在單元測試裡等於沒驗。
+      const fence = workspaceId => {
+        assert.equal(workspaceId, expectedWorkspace, 'runtime baseline crossed workspaces');
+      };
+      const result = await work({
+        getSrs(workspaceId, cardId) {
+          fence(workspaceId);
+          return structuredClone(stagedSrs.get(cardId) || null);
+        },
+        async addSrsBaseline(workspaceId, cardId, row) {
+          fence(workspaceId);
+          if (stagedSrs.has(cardId)) return false;
+          stagedSrs.set(cardId, structuredClone(row));
+          return true;
+        },
+        getWorkspaceMeta(workspaceId, key) {
+          fence(workspaceId);
+          return structuredClone(stagedMeta.get(key) || null);
+        },
+        putWorkspaceMeta(workspaceId, key, row) {
+          fence(workspaceId);
+          stagedMeta.set(key, structuredClone(row));
+        },
+        async addQuarantine(workspaceId, row) {
+          fence(workspaceId);
+          if (stagedQuarantine.has(row.quarantineId)) return false;
+          stagedQuarantine.set(row.quarantineId, structuredClone(row));
+          return true;
+        },
+      });
+      srs.clear();
+      quarantine.clear();
+      meta.clear();
+      for (const [key, value] of stagedSrs) srs.set(key, value);
+      for (const [key, value] of stagedQuarantine) quarantine.set(key, value);
+      for (const [key, value] of stagedMeta) meta.set(key, value);
+      return result;
+    },
+  };
+}
+
+test('runtime baseline 同時要求 current catalog 與 trusted lineage，合法 SRS 才排入 version 0 seed', () => {
+  const progress = {
+    'L1:one': {
+      grade: 'good', reviewedAt: 10, nextReviewAt: 20,
+      interval: 3, easeFactor: 2.5, reps: 2, updatedAt: 10,
+    },
+  };
+  const lineage = completeLineage([
+    ['r1', { 'L1:one': [CARD_A] }],
+    ['r2', { 'L1:one': [CARD_A] }],
+  ]);
+  const plan = planRuntimeSrsBaseline({
+    progress,
+    currentCatalog: runtimeCatalog([{ thai: 'one', card_id: CARD_A }]),
+    catalogDigest: 'sha256:catalog-a',
+    ...lineage,
+  });
+
+  assert.equal(plan.kind, 'runtime-srs-baseline-plan-v1');
+  assert.equal(plan.summary.seedable, 1);
+  assert.equal(plan.summary.quarantined, 0);
+  assert.deepEqual(plan.seeds[0], {
+    cardId: CARD_A,
+    legacyAlias: 'L1:one',
+    state: progress['L1:one'],
+  });
+  assert.equal(typeof plan.lineageProvenance.digest, 'string');
+});
+
+test('runtime baseline 不把 current-only 唯一誤當可信：歷史 collision、證據不完整、重複 ID、壞 SRS 全 quarantine', () => {
+  const valid = { grade: 'good', interval: 3 };
+  const historicalCollision = planRuntimeSrsBaseline({
+    progress: { 'L1:one': valid },
+    currentCatalog: runtimeCatalog([{ thai: 'one', card_id: CARD_A }]),
+    catalogDigest: 'sha256:catalog-a',
+    ...completeLineage([
+      ['r1', { 'L1:one': [CARD_A, CARD_B] }],
+      ['r2', { 'L1:one': [CARD_A] }],
+    ]),
+  });
+  assert.equal(historicalCollision.quarantined[0].reason, 'historical_collision');
+
+  const incomplete = planRuntimeSrsBaseline({
+    progress: { 'L1:one': valid },
+    currentCatalog: runtimeCatalog([{ thai: 'one', card_id: CARD_A }]),
+    catalogDigest: 'sha256:catalog-a',
+    lineageEvidence: null,
+    trustedRevisionManifest: null,
+  });
+  assert.equal(incomplete.quarantined[0].reason, 'incomplete_lineage_evidence');
+
+  const duplicateId = planRuntimeSrsBaseline({
+    progress: { 'L1:one': valid },
+    currentCatalog: runtimeCatalog([
+      { thai: 'one', card_id: CARD_A },
+      { thai: 'two', card_id: CARD_A },
+    ]),
+    catalogDigest: 'sha256:catalog-a',
+    ...completeLineage([
+      ['r1', { 'L1:one': [CARD_A], 'L1:two': [CARD_A] }],
+      ['r2', { 'L1:one': [CARD_A], 'L1:two': [CARD_A] }],
+    ]),
+  });
+  assert.equal(duplicateId.quarantined[0].reason, 'duplicate_stable_card_id');
+
+  const invalidShape = planRuntimeSrsBaseline({
+    progress: { 'L1:one': { grade: 'good', interval: '3' } },
+    currentCatalog: runtimeCatalog([{ thai: 'one', card_id: CARD_A }]),
+    catalogDigest: 'sha256:catalog-a',
+    ...completeLineage([
+      ['r1', { 'L1:one': [CARD_A] }],
+      ['r2', { 'L1:one': [CARD_A] }],
+    ]),
+  });
+  assert.equal(invalidShape.quarantined[0].reason, 'invalid_srs_snapshot');
+});
+
+test('runtime baseline add-only：既有 IDB 勝出、合法 row 補 version 0、重跑冪等', async () => {
+  const existing = {
+    workspaceId: 'user:A', cardId: CARD_A, version: 4,
+    state: { grade: 'easy', interval: 21 }, sourceEventId: 'event-newer',
+  };
+  const port = runtimeBaselinePort([existing]);
+  const plan = planRuntimeSrsBaseline({
+    progress: {
+      'L1:one': { grade: 'good', interval: 3 },
+      'L1:two': { grade: 'hard', interval: 1 },
+      'L1:bad': { grade: 'good', interval: 'bad' },
+    },
+    currentCatalog: runtimeCatalog([
+      { thai: 'one', card_id: CARD_A },
+      { thai: 'two', card_id: CARD_B },
+      { thai: 'bad', card_id: CARD_C },
+    ]),
+    catalogDigest: 'sha256:catalog-a',
+    ...completeLineage([
+      ['r1', { 'L1:one': [CARD_A], 'L1:two': [CARD_B], 'L1:bad': [CARD_C] }],
+      ['r2', { 'L1:one': [CARD_A], 'L1:two': [CARD_B], 'L1:bad': [CARD_C] }],
+    ]),
+  });
+
+  const first = await commitRuntimeSrsBaseline({
+    port, workspaceId: 'user:A', plan,
+  });
+  const second = await commitRuntimeSrsBaseline({
+    port, workspaceId: 'user:A', plan,
+  });
+
+  assert.equal(first.status, 'applied');
+  assert.deepEqual(first.summary, { seeded: 1, existing: 1, quarantined: 1, skipped: 0 });
+  assert.equal(second.status, 'no-op');
+  assert.deepEqual(second.summary, { seeded: 0, existing: 0, quarantined: 0, skipped: 3 });
+  assert.deepEqual(port.srs.get(CARD_A), existing);
+  assert.equal(port.srs.get(CARD_B).version, 0);
+  assert.deepEqual(port.srs.get(CARD_B).state, { grade: 'hard', interval: 1 });
+  assert.equal(port.quarantine.size, 1);
+  assert.equal(port.meta.size, 1);
+});
+
+test('runtime baseline transaction abort 不留下半套 seed、quarantine 或完成標記', async () => {
+  const port = runtimeBaselinePort();
+  const transact = port.transaction.bind(port);
+  port.transaction = (names, mode, work) => transact(names, mode, tx => work({
+    ...tx,
+    async addSrsBaseline(...args) {
+      await tx.addSrsBaseline(...args);
+      throw Object.assign(new Error('workspace invalidated during baseline'), {
+        code: 'WORKSPACE_INVALIDATED',
+      });
+    },
+  }));
+  const plan = planRuntimeSrsBaseline({
+    progress: {
+      'L1:one': { grade: 'good', interval: 3 },
+      'L1:bad': { grade: 'hard', interval: 'bad' },
+    },
+    currentCatalog: runtimeCatalog([
+      { thai: 'one', card_id: CARD_A },
+      { thai: 'bad', card_id: CARD_B },
+    ]),
+    catalogDigest: 'sha256:catalog-a',
+    ...completeLineage([
+      ['r1', { 'L1:one': [CARD_A], 'L1:bad': [CARD_B] }],
+      ['r2', { 'L1:one': [CARD_A], 'L1:bad': [CARD_B] }],
+    ]),
+  });
+
+  await assert.rejects(
+    commitRuntimeSrsBaseline({ port, workspaceId: 'user:A', plan }),
+    { code: 'WORKSPACE_INVALIDATED' },
+  );
+  assert.equal(port.srs.size, 0);
+  assert.equal(port.quarantine.size, 0);
+  assert.equal(port.meta.size, 0);
+});
+
+test('legacy progress 在開機後變動（cloud-sync 合併）不擋開機，新 alias add-only 補上', async () => {
+  // cloud-sync.js 會在開機後把別台裝置的進度併進 state.progress，所以「plan 跟上次
+  // 不一樣」是多裝置的日常。舊版把這個當成 RUNTIME_BASELINE_CHANGED 丟出來，等於
+  // 一台裝置同步回來就把開機炸掉，而且那張卡永遠補不進 SRS。
+  const port = runtimeBaselinePort();
+  const lineage = completeLineage([
+    ['r1', { 'L1:one': [CARD_A], 'L1:two': [CARD_B] }],
+    ['r2', { 'L1:one': [CARD_A], 'L1:two': [CARD_B] }],
+  ]);
+  const catalog = runtimeCatalog([
+    { thai: 'one', card_id: CARD_A },
+    { thai: 'two', card_id: CARD_B },
+  ]);
+  const planFor = progress => planRuntimeSrsBaseline({
+    progress, currentCatalog: catalog, catalogDigest: 'sha256:catalog-a', ...lineage,
+  });
+
+  const first = await commitRuntimeSrsBaseline({
+    port, workspaceId: 'user:A', plan: planFor({ 'L1:one': { grade: 'good', interval: 3 } }),
+  });
+  const second = await commitRuntimeSrsBaseline({
+    port,
+    workspaceId: 'user:A',
+    plan: planFor({
+      'L1:one': { grade: 'good', interval: 3 },
+      'L1:two': { grade: 'hard', interval: 1 },
+    }),
+  });
+
+  assert.deepEqual(first.summary, { seeded: 1, existing: 0, quarantined: 0, skipped: 0 });
+  assert.deepEqual(second.summary, { seeded: 1, existing: 0, quarantined: 0, skipped: 1 });
+  assert.equal(port.srs.get(CARD_B).version, 0, '後來同步回來的 alias 也要補得到 seed');
+  assert.deepEqual(port.srs.get(CARD_B).state, { grade: 'hard', interval: 1 });
+  assert.deepEqual(second.totals, { seeded: 2, existing: 0, quarantined: 0 });
+});
+
+test('seed 過的 alias 不會因為 SRS row 被刪掉就被 legacy progress 救回來', async () => {
+  const port = runtimeBaselinePort();
+  const plan = planRuntimeSrsBaseline({
+    progress: { 'L1:one': { grade: 'good', interval: 3 } },
+    currentCatalog: runtimeCatalog([{ thai: 'one', card_id: CARD_A }]),
+    catalogDigest: 'sha256:catalog-a',
+    ...completeLineage([['r1', { 'L1:one': [CARD_A] }], ['r2', { 'L1:one': [CARD_A] }]]),
+  });
+
+  await commitRuntimeSrsBaseline({ port, workspaceId: 'user:A', plan });
+  port.srs.delete(CARD_A); // 使用者重置進度
+  const replay = await commitRuntimeSrsBaseline({ port, workspaceId: 'user:A', plan });
+
+  assert.deepEqual(replay.summary, { seeded: 0, existing: 0, quarantined: 0, skipped: 1 });
+  assert.equal(port.srs.size, 0, '重置掉的進度不能被 legacy progress 復活');
+});
+
+test('catalog 換版後重新判定當初被 quarantine 的 alias', async () => {
+  const port = runtimeBaselinePort();
+  const progress = { 'L1:one': { grade: 'good', interval: 3 } };
+  const collided = planRuntimeSrsBaseline({
+    progress,
+    // 同一個 alias 在 current catalog 撞到兩張卡 → quarantine
+    currentCatalog: runtimeCatalog([
+      { thai: 'one', card_id: CARD_A },
+      { thai: 'one', card_id: CARD_B },
+    ]),
+    catalogDigest: 'sha256:catalog-a',
+    ...completeLineage([['r1', { 'L1:one': [CARD_A] }], ['r2', { 'L1:one': [CARD_A] }]]),
+  });
+  const fixed = planRuntimeSrsBaseline({
+    progress,
+    currentCatalog: runtimeCatalog([{ thai: 'one', card_id: CARD_A }], 'sha256:catalog-b'),
+    catalogDigest: 'sha256:catalog-b',
+    ...completeLineage([['r1', { 'L1:one': [CARD_A] }], ['r2', { 'L1:one': [CARD_A] }]]),
+  });
+
+  const before = await commitRuntimeSrsBaseline({ port, workspaceId: 'user:A', plan: collided });
+  const same = await commitRuntimeSrsBaseline({ port, workspaceId: 'user:A', plan: collided });
+  const after = await commitRuntimeSrsBaseline({ port, workspaceId: 'user:A', plan: fixed });
+
+  assert.deepEqual(before.summary, { seeded: 0, existing: 0, quarantined: 1, skipped: 0 });
+  assert.deepEqual(same.summary, { seeded: 0, existing: 0, quarantined: 0, skipped: 1 },
+    '同一份 catalog 下不重複寫 quarantine');
+  assert.deepEqual(after.summary, { seeded: 1, existing: 0, quarantined: 0, skipped: 0 },
+    'catalog 換版解掉 collision 後要補得回來');
+  assert.equal(port.srs.get(CARD_A).version, 0);
+});
+
+test('quarantineId 直接用 alias，不留雜湊撞號靜默漏寫的空間', async () => {
+  const port = runtimeBaselinePort();
+  const plan = planRuntimeSrsBaseline({
+    progress: {
+      'L1:one': { grade: 'good', interval: 'bad' },
+      'L1:two': { grade: 'good', interval: 'bad' },
+    },
+    currentCatalog: runtimeCatalog([
+      { thai: 'one', card_id: CARD_A },
+      { thai: 'two', card_id: CARD_B },
+    ]),
+    catalogDigest: 'sha256:catalog-a',
+    ...completeLineage([
+      ['r1', { 'L1:one': [CARD_A], 'L1:two': [CARD_B] }],
+      ['r2', { 'L1:one': [CARD_A], 'L1:two': [CARD_B] }],
+    ]),
+  });
+  const result = await commitRuntimeSrsBaseline({ port, workspaceId: 'user:A', plan });
+
+  assert.equal(result.summary.quarantined, 2, 'summary 要數真的寫進去幾筆');
+  assert.deepEqual([...port.quarantine.keys()].sort(), [
+    'runtime-baseline:sha256:catalog-a:L1:one',
+    'runtime-baseline:sha256:catalog-a:L1:two',
+  ]);
+});
+
+test('手刻的 plan 收不下：planSignature 只防手滑，WeakSet 才是閘門', async () => {
+  // stableSerialize / smallStableHash 都在出貨的 bundle 裡，任何 caller 都算得出
+  // 一個對得起來的簽章，所以簽章本身不是來源證明。
+  const port = runtimeBaselinePort();
+  const real = planRuntimeSrsBaseline({
+    progress: { 'L1:one': { grade: 'good', interval: 3 } },
+    currentCatalog: runtimeCatalog([{ thai: 'one', card_id: CARD_A }]),
+    catalogDigest: 'sha256:catalog-a',
+    ...completeLineage([['r1', { 'L1:one': [CARD_A] }], ['r2', { 'L1:one': [CARD_A] }]]),
+  });
+  // 原封不動複製一份：欄位、簽章全對，就是沒走過 planRuntimeSrsBaseline
+  const copied = { ...real, seeds: structuredClone(real.seeds) };
+
+  await assert.rejects(
+    commitRuntimeSrsBaseline({ port, workspaceId: 'user:A', plan: copied }),
+    { code: 'RUNTIME_BASELINE_INVALID' },
+  );
+  assert.equal(port.srs.size, 0);
+  assert.equal(port.meta.size, 0);
+});
+
+test('catalogDigest 跟它描述的 catalog 對不起來就不出 plan', () => {
+  assert.throws(() => planRuntimeSrsBaseline({
+    progress: { 'L1:one': { grade: 'good', interval: 3 } },
+    currentCatalog: runtimeCatalog([{ thai: 'one', card_id: CARD_A }]), // digest: sha256:catalog-a
+    catalogDigest: 'sha256:some-other-catalog',
+    ...completeLineage([['r1', { 'L1:one': [CARD_A] }], ['r2', { 'L1:one': [CARD_A] }]]),
+  }), { code: 'RUNTIME_BASELINE_INVALID' });
+});
+
+test('runtime baseline 不跨 workspace 寫入', async () => {
+  const port = runtimeBaselinePort([], 'user:A');
+  const plan = planRuntimeSrsBaseline({
+    progress: { 'L1:one': { grade: 'good', interval: 3 } },
+    currentCatalog: runtimeCatalog([{ thai: 'one', card_id: CARD_A }]),
+    catalogDigest: 'sha256:catalog-a',
+    ...completeLineage([['r1', { 'L1:one': [CARD_A] }], ['r2', { 'L1:one': [CARD_A] }]]),
+  });
+  await assert.rejects(commitRuntimeSrsBaseline({ port, workspaceId: 'user:B', plan }));
+  assert.equal(port.srs.size, 0);
 });

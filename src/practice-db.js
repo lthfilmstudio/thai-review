@@ -3,7 +3,7 @@
    workspace and may be invalidated by boot/logout/versionchange. */
 
 export const PRACTICE_DB_NAME = 'thai-review-practice-v2';
-export const PRACTICE_DB_VERSION = 2;
+export const PRACTICE_DB_VERSION = 3;
 
 export const PRACTICE_DB_STORES = Object.freeze({
   workspaceMeta: 'workspace_meta',
@@ -12,6 +12,7 @@ export const PRACTICE_DB_STORES = Object.freeze({
   eventDispositions: 'event_dispositions',
   formalDueClaims: 'formal_due_claims',
   dailyLaneClaims: 'daily_lane_claims',
+  dailyCardClaims: 'daily_card_claims',
   attemptPhaseClaims: 'attempt_phase_claims',
   outbox: 'outbox',
   syncCursors: 'sync_cursors',
@@ -55,6 +56,10 @@ const STORE_DEFINITIONS = Object.freeze({
   },
   dailyLaneClaims: {
     keyPath: ['workspaceId', 'cardId', 'dayKey', 'lane'],
+    indexes: [['by_workspace', 'workspaceId']],
+  },
+  dailyCardClaims: {
+    keyPath: ['workspaceId', 'dayKey', 'cardId'],
     indexes: [['by_workspace', 'workspaceId']],
   },
   attemptPhaseClaims: {
@@ -239,6 +244,12 @@ function assertWorkspaceArgument(expected, actual) {
   }
 }
 
+function requiredRowKey(value, label) {
+  const key = typeof value === 'string' ? value.trim() : '';
+  if (!key) throw codedError('PRACTICE_ROW_INVALID', `${label} is required`);
+  return key;
+}
+
 export function createPracticeTransactionPort(connection, {
   workspaceId,
   assertActive,
@@ -333,6 +344,27 @@ export function createPracticeTransactionPort(connection, {
           });
           return result === false ? false : true;
         },
+        async getDailyCardClaim(_workspaceId, dayKey, cardId) {
+          active();
+          assertWorkspaceArgument(workspace, _workspaceId);
+          const row = await requestPromise(store('dailyCardClaims').get([
+            workspace,
+            requiredRowKey(dayKey, 'daily-card claim day'),
+            requiredRowKey(cardId, 'daily-card claim card'),
+          ]));
+          return row ? structuredClone(row) : null;
+        },
+        async addDailyCardClaim(_workspaceId, row) {
+          active();
+          assertWorkspaceArgument(workspace, _workspaceId);
+          assertEnvelope(workspace, row);
+          requiredRowKey(row.dayKey, 'daily-card claim day');
+          requiredRowKey(row.cardId, 'daily-card claim card');
+          const result = await requestPromise(store('dailyCardClaims').add(structuredClone(row)), {
+            constraintAsFalse: true,
+          });
+          return result === false ? false : true;
+        },
         async getAttemptPhaseClaim(_workspaceId, attemptId, phase) {
           active();
           assertWorkspaceArgument(workspace, _workspaceId);
@@ -359,6 +391,48 @@ export function createPracticeTransactionPort(connection, {
             nextAttemptAt: 0,
             ...structuredClone(row),
           }));
+        },
+        async getWorkspaceMeta(_workspaceId, metaKey) {
+          active();
+          assertWorkspaceArgument(workspace, _workspaceId);
+          const row = await requestPromise(store('workspaceMeta').get([
+            workspace, requiredRowKey(metaKey, 'workspace meta key'),
+          ]));
+          return row ? structuredClone(row) : null;
+        },
+        async putWorkspaceMeta(_workspaceId, metaKey, row) {
+          active();
+          assertWorkspaceArgument(workspace, _workspaceId);
+          assertEnvelope(workspace, row);
+          const keyName = requiredRowKey(metaKey, 'workspace meta key');
+          if (row.key !== keyName) {
+            throw codedError('PRACTICE_ROW_INVALID', 'workspace meta identity mismatch');
+          }
+          await requestPromise(store('workspaceMeta').put(structuredClone(row)));
+        },
+        async addSrsBaseline(_workspaceId, cardId, row) {
+          active();
+          assertWorkspaceArgument(workspace, _workspaceId);
+          assertEnvelope(workspace, row);
+          const stableCardId = requiredRowKey(cardId, 'SRS card');
+          if (row.cardId !== stableCardId || row.version !== 0) {
+            throw codedError('PRACTICE_ROW_INVALID', 'baseline SRS identity or version is invalid');
+          }
+          const result = await requestPromise(store('srsV2').add({
+            ...structuredClone(row),
+            nextReviewAt: row.state?.nextReviewAt ?? 0,
+          }), { constraintAsFalse: true });
+          return result === false ? false : true;
+        },
+        async addQuarantine(_workspaceId, row) {
+          active();
+          assertWorkspaceArgument(workspace, _workspaceId);
+          assertEnvelope(workspace, row);
+          requiredRowKey(row.quarantineId, 'quarantine ID');
+          const result = await requestPromise(store('quarantine').add(structuredClone(row)), {
+            constraintAsFalse: true,
+          });
+          return result === false ? false : true;
         },
       };
 
@@ -480,7 +554,7 @@ export function createLegacyMigrationTransactionPort(connection, {
       store('projections').index('by_workspace').getAllKeys(workspace),
     );
     const [
-      srs, events, dispositions, formalClaims, laneClaims, attemptClaims, outbox,
+      srs, events, dispositions, formalClaims, laneClaims, dailyCardClaims, attemptClaims, outbox,
       cursors, projections, legacyImports, quarantine, claimJournals,
     ] = await Promise.all([
       countWorkspace('srsV2'),
@@ -488,6 +562,7 @@ export function createLegacyMigrationTransactionPort(connection, {
       countWorkspace('eventDispositions'),
       countWorkspace('formalDueClaims'),
       countWorkspace('dailyLaneClaims'),
+      countWorkspace('dailyCardClaims'),
       countWorkspace('attemptPhaseClaims'),
       countWorkspace('outbox'),
       countWorkspace('syncCursors'),
@@ -512,7 +587,7 @@ export function createLegacyMigrationTransactionPort(connection, {
       daily: projectionCounts.daily,
       history: projectionCounts.history,
       achievements: projectionCounts.achievements,
-      events: events + dispositions + formalClaims + laneClaims + attemptClaims
+      events: events + dispositions + formalClaims + laneClaims + dailyCardClaims + attemptClaims
         + legacyImports + quarantine + claimJournals,
       outbox,
       cycle: projectionCounts.cycle,
