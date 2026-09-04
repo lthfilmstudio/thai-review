@@ -301,6 +301,72 @@ async function run() {
     throw new Error('runtime baseline was not add-only and idempotent');
   }
 
+  /* 規模探針。lineage 規則放寬之後，開機第一次 seed 從 94 列變成 12324 列，而 seeding
+     是「每列兩個 sequential await」跑在同一個 IDB readwrite transaction 裡。IDB 的交易
+     會在事件迴圈回到 task 時自動 commit，列數一多就可能中途 TransactionInactiveError；
+     就算撐住了，這段是擋在第一次 render 前面的。所以在真的瀏覽器裡量一次。 */
+  const scaleCount = 12324;
+  const scaleWorkspace = 'user:runtime-baseline-scale';
+  const scalePort = createPracticeTransactionPort(connection, {
+    workspaceId: scaleWorkspace,
+    assertActive: workspaceId => {
+      if (workspaceId !== scaleWorkspace) throw new Error('scale workspace is stale');
+    },
+  });
+  const scaleId = index => `${index.toString(16).padStart(8, '0')}-0000-4000-8000-000000000000`;
+  const scaleProgress = {};
+  const scaleAliases = {};
+  const scaleCards = [];
+  for (let index = 0; index < scaleCount; index += 1) {
+    const alias = `L9:card-${index}`;
+    const cardId = scaleId(index);
+    scaleProgress[alias] = { grade: 'good', interval: 3, reps: 2 };
+    scaleAliases[alias] = [cardId];
+    scaleCards.push({ thai: `card-${index}`, card_id: cardId });
+  }
+  const scalePlan = planRuntimeSrsBaseline({
+    progress: scaleProgress,
+    currentCatalog: { lessons: [{ id: 'L9', cards: scaleCards }] },
+    catalogDigest: 'sha256:browser-catalog-scale',
+    lineageEvidence: {
+      kind: 'production-lineage-evidence-v1',
+      evidenceId: 'browser-runtime-baseline-scale:r1+r2',
+      completeness: 'complete',
+      expectedRevisions: ['r1', 'r2'],
+      snapshots: ['r1', 'r2'].map(revision => ({ revision, complete: true, aliases: scaleAliases })),
+    },
+    trustedRevisionManifest: {
+      kind: 'trusted-lineage-revision-manifest-v1',
+      revisions: ['r1', 'r2'],
+      allowHistoricalSnapshotEvidence: true,
+    },
+  });
+  if (scalePlan.summary.seedable !== scaleCount) {
+    throw new Error(`scale plan seedable ${scalePlan.summary.seedable} != ${scaleCount}`);
+  }
+  const scaleStartedAt = performance.now();
+  const scaleResult = await commitRuntimeSrsBaseline({
+    port: scalePort, workspaceId: scaleWorkspace, plan: scalePlan,
+  });
+  const scaleMs = Math.round(performance.now() - scaleStartedAt);
+  if (scaleResult.status !== 'applied' || scaleResult.summary.seeded !== scaleCount) {
+    throw new Error(`scale seed failed: ${JSON.stringify(scaleResult)}`);
+  }
+  const scaleRows = await rawIndexCount(connection.database, 'srs_v2', 'by_workspace', scaleWorkspace);
+  if (scaleRows !== scaleCount) {
+    throw new Error(`scale seed wrote ${scaleRows} rows, expected ${scaleCount}`);
+  }
+  // 第二次才是常態成本：不再寫 srs_v2，但仍要讀寫 12324 筆的 seededAliases 帳
+  const replayStartedAt = performance.now();
+  const scaleReplay = await commitRuntimeSrsBaseline({
+    port: scalePort, workspaceId: scaleWorkspace, plan: scalePlan,
+  });
+  const replayMs = Math.round(performance.now() - replayStartedAt);
+  if (scaleReplay.status !== 'no-op' || scaleReplay.summary.skipped !== scaleCount) {
+    throw new Error(`scale replay was not a no-op: ${JSON.stringify(scaleReplay)}`);
+  }
+  console.log(`[scale] seed ${scaleCount} rows: first ${scaleMs}ms, replay ${replayMs}ms`);
+
   const [first, second] = await Promise.all([
     commitPracticeAttempt(commitInput(
       portA, '11111111-1111-4111-8111-111111111111', 'good',

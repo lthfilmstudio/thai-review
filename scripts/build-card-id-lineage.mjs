@@ -173,34 +173,50 @@ export function buildLineageEvidence({ deploymentManifest, catalogs, gateManifes
     if (cardIds.length > 1) collisionAliasSet.add(alias);
   }
 
+  /* 認領規則：忽略「證據不存在」，絕不忽略「證據互相矛盾」。
+
+     一個 revision 認不出某個 alias，有兩種完全不同的意思：
+
+     - 沒有證據：那次部署還沒有這張卡（後來才加的課），或卡在、但內容指紋對不上。
+       後者在這份 catalog 是常態——2026-08-18 那次部署把整份 karaoke 改制
+       （sawatdee kha → saˇ watˇ dhī kaˋ），而 karaoke 在內容指紋裡，所以 08-18
+       之前的每一份 snapshot 對每一張卡都會指紋不合。這不是「身分變了」的證據。
+     - 證據矛盾：這份 revision 明確指出這個 alias 是「另一張」卡——歷史 card_id 屬於
+       別的 alias（lineage_changed）、在該 snapshot 不唯一（duplicate_stable_card_id）、
+       不是我們認得的 ID（invalid_lineage_identity），或 alias 在同一份裡出現多次
+       （historical_collision）。這些一律 fail closed。
+
+     舊規則把兩者都當失敗，於是 12968 個 alias 只認得出 94 個（0.7%）。分開之後是
+     12324 個（95.0%），而且跨 79 個 production revision（20 份不同 catalog，
+     2026-05-16 → 08-23）**沒有任何一個 alias 指到過第二個 card_id**——放寬並沒有
+     繞過任何一筆真實的反證，只是不再把「查不到」當成「查出問題」。 */
   for (const alias of [...current.idsByAlias.keys()].sort()) {
     let reason = collisionAliasSet.has(alias) ? 'historical_collision' : null;
-    const ids = [];
+    const ids = new Set();
     for (const snapshot of historical) {
       const rows = snapshot.get(alias);
-      if (!rows || rows.length === 0) {
-        if (!reason) reason = 'missing_historical_evidence';
-        continue;
-      }
+      if (!rows || rows.length === 0) continue;
       if (rows.length !== 1) {
         reason = 'historical_collision';
         continue;
       }
-      if (rows[0].failureReason) {
-        if (!reason) reason = rows[0].failureReason;
+      const [row] = rows;
+      if (row.failureReason) {
+        if (row.failureReason !== 'missing_historical_evidence') reason = row.failureReason;
         continue;
       }
-      if (rows[0].candidates.length !== 1) {
+      if (row.candidates.length !== 1) {
         reason = 'historical_collision';
         continue;
       }
-      ids.push(rows[0].candidates[0]);
+      ids.add(row.candidates[0]);
     }
-    if (!reason && new Set(ids).size !== 1) reason = 'lineage_changed';
+    if (!reason && ids.size > 1) reason = 'lineage_changed';
+    if (!reason && ids.size === 0) reason = 'missing_historical_evidence';
     if (reason) {
       unresolvedReasons[alias] = reason;
     } else {
-      resolvedAliases[alias] = ids[0];
+      resolvedAliases[alias] = [...ids][0];
     }
   }
 
@@ -320,8 +336,83 @@ function gitCatalog(revision) {
   return requireCatalog(JSON.parse(raw.toString('utf8')), revision);
 }
 
+function emitEvidence({ evidence, deploymentManifest, args, extra = {} }) {
+  const lineageOutput = resolve(args['lineage-output']);
+  mkdirSync(dirname(lineageOutput), { recursive: true });
+  const evidenceBytes = jsonBytes(evidence);
+  writeFileSync(lineageOutput, evidenceBytes);
+  const trust = {
+    kind: 'trusted-lineage-revision-manifest-v1',
+    projectName: deploymentManifest.projectName,
+    environment: deploymentManifest.environment,
+    sourceManifestSha256: deploymentManifest.manifestSha256,
+    evidenceId: evidence.evidenceId,
+    // evidenceId 是 32-bit FNV，只防意外損壞。真正的完整性綁定是這支 SHA-256：
+    // runtime 對「實際取回的 bytes」比對，格式降級與雜湊碰撞都過不了。
+    evidenceSha256: sha256(evidenceBytes),
+    revisions: deploymentManifest.trustedRevisionManifest.revisions,
+  };
+  const trustOutput = resolve(args['trust-output']);
+  mkdirSync(dirname(trustOutput), { recursive: true });
+  writeFileSync(trustOutput, trustModuleBytes(trust));
+  console.log(JSON.stringify({ ...extra, ...evidence.summary, lineageOutput, trustOutput }));
+}
+
+/* 離線重建：不打 Cloudflare API，改用已記錄的 deployment manifest 加 git 裡的 data.json。
+   每一份重建出來的 catalog 都要對得上 manifest 記的 catalogSha256——那是離線模式唯一的
+   完整性依據，對不上就中止。用在「trusted revision 清單沒變、只是重跑認領規則」的場合；
+   要納入新的 production 部署仍然得走線上模式。 */
+function offlineCatalogs(deploymentManifest) {
+  const revisions = deploymentManifest?.trustedRevisionManifest?.revisions;
+  const deployments = deploymentManifest?.deployments;
+  if (!Array.isArray(revisions) || !Array.isArray(deployments) || revisions.length !== deployments.length) {
+    throw new Error('offline deployment manifest 不完整');
+  }
+  const { manifestSha256, ...core } = deploymentManifest;
+  if (sha256(jsonBytes(core)) !== manifestSha256) {
+    throw new Error('offline deployment manifest 的 manifestSha256 對不上內容');
+  }
+  const cache = new Map();
+  return deployments.map((row, index) => {
+    if (row.revisionId !== revisions[index]) throw new Error(`revision 順序不一致：${row.revisionId}`);
+    const commit = row.matchingCatalogCommit;
+    if (!/^[0-9a-f]{40}$/.test(commit || '')) throw new Error(`${row.revisionId} 缺少 catalog commit`);
+    if (!cache.has(commit)) cache.set(commit, gitCatalog(commit));
+    const data = cache.get(commit);
+    const digest = sha256(stableSerialize({ lessons: data.lessons, dialogues: data.dialogues || [] }));
+    if (digest !== row.catalogSha256) {
+      throw new Error(`${row.revisionId} 的 git snapshot 與記錄的 catalogSha256 不符`);
+    }
+    return { revisionId: row.revisionId, data };
+  });
+}
+
+function runOffline(args) {
+  const required = [
+    'offline-deployment-manifest', 'gate-manifest', 'lineage-output', 'trust-output', 'generated-at',
+  ];
+  for (const name of required) if (!args[name]) throw new Error(`missing --${name}`);
+  const deploymentManifest = JSON.parse(readFileSync(resolve(args['offline-deployment-manifest']), 'utf8'));
+  const gateBytes = readFileSync(resolve(args['gate-manifest']));
+  const catalogs = offlineCatalogs(deploymentManifest);
+  const evidence = buildLineageEvidence({
+    deploymentManifest,
+    catalogs,
+    gateManifest: JSON.parse(gateBytes.toString('utf8')),
+    gateManifestSha256: sha256(gateBytes),
+    generatedAt: args['generated-at'],
+  });
+  emitEvidence({
+    evidence,
+    deploymentManifest,
+    args,
+    extra: { mode: 'offline', distinctCatalogCount: new Set(catalogs.map(row => row.data)).size },
+  });
+}
+
 async function run() {
   const args = parseArgs(process.argv.slice(2));
+  if (args['offline-deployment-manifest']) return runOffline(args);
   const required = [
     'account-id', 'project-name', 'wrangler-config', 'gate-manifest',
     'deployment-output', 'lineage-output', 'trust-output', 'generated-at',
@@ -408,32 +499,16 @@ async function run() {
     gateManifestSha256: sha256(gateBytes),
     generatedAt: args['generated-at'],
   });
-  const lineageOutput = resolve(args['lineage-output']);
-  mkdirSync(dirname(lineageOutput), { recursive: true });
-  const evidenceBytes = jsonBytes(evidence);
-  writeFileSync(lineageOutput, evidenceBytes);
-  const trust = {
-    kind: 'trusted-lineage-revision-manifest-v1',
-    projectName: deploymentManifest.projectName,
-    environment: deploymentManifest.environment,
-    sourceManifestSha256: deploymentManifest.manifestSha256,
-    evidenceId: evidence.evidenceId,
-    // evidenceId 是 32-bit FNV，只防意外損壞。真正的完整性綁定是這支 SHA-256：
-    // runtime 對「實際取回的 bytes」比對，格式降級與雜湊碰撞都過不了。
-    evidenceSha256: sha256(evidenceBytes),
-    revisions: deploymentManifest.trustedRevisionManifest.revisions,
-  };
-  const trustOutput = resolve(args['trust-output']);
-  mkdirSync(dirname(trustOutput), { recursive: true });
-  writeFileSync(trustOutput, trustModuleBytes(trust));
-  console.log(JSON.stringify({
-    deploymentCount: deployments.length,
-    sourceMismatchCount: deployments.filter(row => !row.sourceCommitMatchesCatalog).length,
-    ...evidence.summary,
-    deploymentOutput,
-    lineageOutput,
-    trustOutput,
-  }));
+  emitEvidence({
+    evidence,
+    deploymentManifest,
+    args,
+    extra: {
+      mode: 'online',
+      sourceMismatchCount: deployments.filter(row => !row.sourceCommitMatchesCatalog).length,
+      deploymentOutput,
+    },
+  });
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {

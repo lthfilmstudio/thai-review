@@ -16,6 +16,48 @@ U1–U7 的本機部分都完成了。**production 還沒動過**，線上跑的
 | U5 | 開機鏡射、catalog fence、重置、v1 匯入 | 邏輯完成，cloud-sync 接線見下 |
 | U6 | ledger-first 評分 controller、Today 接線、失敗 UI | 完成（`__ALL__` 未接） |
 | U7 | SW／release gate／read-back | 本機部分完成，部署未執行 |
+| — | lineage 認領規則放寬（見下） | 完成 |
+
+## lineage 認領規則放寬（2026-09-04）
+
+原本 12968 個 legacy alias 只認得出 **94** 個（0.7%），帳本形同空轉。原因不是規則太嚴，
+是內容指紋含 `karaoke`：2026-08-18 那次部署把整份 catalog 的 karaoke 改制
+（`sawatdee kha` → `saˇ watˇ dhī kaˋ`），於是 08-18 之前的 14 份 snapshot 對每一張卡
+的指紋都對不上，被當成「認領失敗」。
+
+改法是把「沒有證據」跟「證據互相矛盾」分開：某份 revision 沒有這張卡、或指紋對不上，
+只代表那份認不出來，跳過；只有那份明確指出這個 alias 是**另一張**卡（`lineage_changed`／
+`duplicate_stable_card_id`／`invalid_lineage_identity`／collision）才 fail closed。
+
+- 認領 **94 → 12324**（12968 個 alias 的 95.0%）
+- 剩下 644 筆全是真碰撞：618 筆是 Sheet 裡同一課有重複泰文（legacy 本來就共用一筆進度），
+  26 筆歷史碰撞
+- 跨 79 個 production revision（20 份不同 catalog，2026-05-16 → 08-23）
+  **沒有任何一個 alias 指到過第二個 card_id**——放寬沒有繞過任何一筆真實反證
+- 走 runtime 真實路徑（`planRuntimeSrsBaseline`）驗過：seedable 94 → 12324，
+  quarantine 750（618 current collision + 26 historical + 106 是 Gate B 之後新加的卡）
+
+evidence schema、reason 詞彙、runtime validator 都沒動，所以 `src/storage-scope.js`
+一行都沒改；只換 `data/card-id-lineage.json` 與 `src/production-lineage-trust.js`。
+
+**規模副作用（已實測）**：第一次開機要 seed 的列數從 94 變 12324，而 seeding 是每列兩個
+sequential await 包在同一個 IDB 交易裡。Chromium 桌機實測 **首次 1470ms、之後每次
+28ms**，交易撐得住、列數正確（`tests/browser/practice-db-browser.mjs` 的 scale 探針）。
+手機會更慢，但只有換 catalog 後的第一次。
+
+### 重新產生 lineage（離線，不打 Cloudflare API）
+
+```bash
+node scripts/build-card-id-lineage.mjs \
+  --offline-deployment-manifest data/production-deployments.json \
+  --gate-manifest <Gate B manifest 路徑> \
+  --lineage-output data/card-id-lineage.json \
+  --trust-output src/production-lineage-trust.js \
+  --generated-at "$(TZ=Asia/Taipei date '+%Y-%m-%dT%H:%M:%S%z')"
+```
+
+離線模式用 manifest 記的 `matchingCatalogCommit` 從 git 重建每一份歷史 catalog，逐份比對
+`catalogSha256`，對不上就中止。要**納入新的 production 部署**仍然得走原本的線上模式。
 
 ## 三個要知道的偏離
 
@@ -96,5 +138,7 @@ top-level 的舊版仍然看得到那些日子有複習，不會把它們判成�
 - U5c 的 cloud-sync 接線（上面第 2 點）
 - `__ALL__` 的 ledger 路徑（上面第 3 點）
 - practice outbox 沒有上傳路徑——本輪範圍就不含新的 Supabase schema
+- Gate B manifest 停在 2026-08-24，之後 `data.json` 又多了 106 張卡，那些 alias 認領不到
+  （quarantine 成 `missing_historical_evidence`）。要涵蓋就得重跑一次 Gate B。
 - v1 `thai_days` 沒有 `practice` 欄位，所以 practice-only 的出席只保證本機連續性，
   不宣稱跨裝置同步
