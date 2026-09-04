@@ -14,7 +14,6 @@ import { operationStillCurrent } from './practice-runtime.js';
 
 const CLAIM_BLOCKED = Object.freeze(new Set([
   'daily-card-already-claimed',
-  'formal-due-already-claimed',
   'daily-lane-already-claimed',
 ]));
 const COMMITTED = Object.freeze(new Set(['committed', 'already-committed']));

@@ -10,7 +10,7 @@ U1–U7 的本機部分都完成了。**production 還沒動過**，線上跑的
 | 單元 | 內容 | 狀態 |
 |---|---|---|
 | U1 | runtime 分類器／operation token | 已有（Codex） |
-| U2 | IDB v3、add-only runtime baseline | 完成 |
+| U2 | add-only runtime baseline（IDB 維持 v2，見「回滾」） | 完成 |
 | U3 | daily-card claim、daily／history／resweep 投影 | 完成 |
 | U4 | legacy + ledger 共用 materializer | 完成 |
 | U5 | 開機鏡射、catalog fence、重置、v1 匯入 | 邏輯完成，cloud-sync 接線見下 |
@@ -117,7 +117,8 @@ per-deployment URL（`<hash>.thai-review.pages.dev`）不在 Cloudflare Access �
    `thai-review-v98`；Network 確認 `src/practice-grade-session.js` 拿到的是
    `text/javascript` 不是 `text/html`。
 2. **Today Due**：評一張，畫面正常前進；Application → IndexedDB →
-   `thai-review-practice-v2` 應該多一筆 `practice_events`、一筆 `daily_card_claims`。
+   `thai-review-practice-v2` 應該多一筆 `practice_events`、一筆 `formal_due_claims`
+   （daily-card claim 的實體 store 就是它）。
 3. **連點**：同一顆按鈕連點三次，`practice_events` 只能多一筆。
 4. **離線**：關網路重開，App 要照常開得起來（SHELL 完整）。
 5. **既有進度**：用真的有 legacy progress 的裝置開一次，確認 `srs_v2` 有 seed 到、
@@ -125,9 +126,23 @@ per-deployment URL（`<hash>.thai-review.pages.dev`）不在 Cloudflare Access �
 
 ## 回滾
 
+**bundle 回滾是安全的，IndexedDB 不會擋。**
+
+`PRACTICE_DB_NAME` 與 `PRACTICE_DB_VERSION` 都跟線上（`codex/hybrid-mastery-design`）
+一模一樣：`thai-review-practice-v2`、version **2**。新版需要的 13 個實體 store，線上那份
+v2 早就全部建好了（機械比對過，集合完全一致），所以部署時不會觸發 `onupgradeneeded`，
+回滾時舊版 `indexedDB.open(name, 2)` 也照樣開得起來。
+
+> 這件事一度是壞的。原本 `daily_card_claims` 是新開的 store，逼著把版本升到 3；一旦升上去，
+> 開過新版之後回滾，舊版會拿到 `VersionError` → `storage-unavailable`，**App 完全開不起來**，
+> 而且只能進 DevTools 砍掉 IndexedDB 才救得回來。真瀏覽器實測過：停在 v2 舊版開得起來，
+> 升到 v3 舊版就是 `VersionError`。現在 daily-card claim 借用 v2 就存在的
+> `formal_due_claims`（keyPath 三個欄位一模一樣，只是順序不同，而且那個 store 從來沒有
+> 任何 reader、線上也是空的——線上沒有人 import `practice-commit.js`）。
+
 鏡射把帳本的數字加進 `day` 的 top-level 欄位（`reviewed`／四檔／`practice`），
-`day.ledger` 只留「帳本貢獻了多少」給下次算差額用。所以 bundle 回滾之後，只讀
-top-level 的舊版仍然看得到那些日子有複習，不會把它們判成缺口去燒安神保護。
+`day.ledger` 只留「帳本貢獻了多少」給下次算差額用。所以回滾之後，只讀 top-level 的舊版
+仍然看得到那些日子有複習，不會把它們判成缺口去燒安神保護。
 
 殘留限制：**practice-only 的日子回滾後仍會被判成沒來過**。舊版的 `cameOnDay()` 只看
 `reviewed`／`games`／`bridged`，沒有任何欄位能表達「只掃過沒正式複習」。這種日子在

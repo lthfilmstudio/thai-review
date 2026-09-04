@@ -117,11 +117,31 @@ function openHigherVersion(version) {
   });
 }
 
+/* 模擬線上（codex/hybrid-mastery-design）真正建出來的 v2：13 個實體 store 全在。
+   新版跟它同名同版本，所以開起來不該觸發任何 onupgradeneeded。 */
+const PRODUCTION_V2_STORES = Object.freeze({
+  workspace_meta: ['workspaceId', 'key'],
+  practice_events: ['workspaceId', 'eventId'],
+  event_dispositions: ['workspaceId', 'eventId'],
+  formal_due_claims: ['workspaceId', 'cardId', 'dayKey'],
+  daily_lane_claims: ['workspaceId', 'cardId', 'dayKey', 'lane'],
+  attempt_phase_claims: ['workspaceId', 'attemptId', 'phase'],
+  outbox: ['workspaceId', 'eventId'],
+  sync_cursors: ['workspaceId', 'name'],
+  legacy_imports: ['workspaceId', 'snapshotId', 'recordId'],
+  quarantine: ['workspaceId', 'quarantineId'],
+  claim_journals: ['workspaceId', 'snapshotId'],
+});
+
 function openVersionTwoFixture() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 2);
     request.onerror = () => reject(request.error);
     request.onupgradeneeded = () => {
+      for (const [name, keyPath] of Object.entries(PRODUCTION_V2_STORES)) {
+        request.result.createObjectStore(name, { keyPath })
+          .createIndex('by_workspace', 'workspaceId');
+      }
       const store = request.result.createObjectStore('srs_v2', {
         keyPath: ['workspaceId', 'cardId'],
       });
@@ -208,11 +228,12 @@ async function run() {
     'projections',
     ['user:upgrade', 'daily'],
   );
-  if (connection.database.version !== PRACTICE_DB_VERSION
-      || !connection.database.objectStoreNames.contains('daily_card_claims')
+  if (connection.database.version !== 2
+      || connection.database.objectStoreNames.contains('daily_card_claims')
+      || !connection.database.objectStoreNames.contains('formal_due_claims')
       || preservedVersionTwoRow?.version !== 7
       || preservedVersionTwoProjection?.facts?.[0]?.preserved !== true) {
-    throw new Error('v2 to v3 additive upgrade did not preserve existing rows');
+    throw new Error('開既有的 production v2 不該升版，也不該多開 store');
   }
   const portA = createPracticeTransactionPort(connection, {
     workspaceId: 'user:A',
@@ -445,7 +466,11 @@ async function run() {
   const counts = {
     events: await rawCount(reopened.database, 'practice_events'),
     srs: await rawIndexCount(reopened.database, 'srs_v2', 'by_workspace', 'user:A'),
-    claims: await rawCount(reopened.database, 'formal_due_claims'),
+    /* formal_due_claims 現在就是 daily-card claim 的實體 store，前面那個獨立的
+       跨 lane 測試也在裡面留了一列（不同卡），所以只數這次 commit 那張卡。 */
+    claims: await rawGet(
+      reopened.database, 'formal_due_claims', ['user:A', IDS.cardId, '2026-08-24'],
+    ) ? 1 : 0,
     outbox: await rawCount(reopened.database, 'outbox'),
   };
   const dueRollbackIds = {
@@ -850,12 +875,13 @@ async function run() {
 
   const output = {
     status: 'passed',
-    additiveUpgrade: {
-      from: 2,
-      to: PRACTICE_DB_VERSION,
+    // 回滾能不能活，就看這裡：版本沒動、沒開新 store、舊資料還在
+    rollbackSafe: {
+      openedVersion: connection.database.version,
+      expectedVersion: PRACTICE_DB_VERSION,
+      newStoreCreated: connection.database.objectStoreNames.contains('daily_card_claims'),
       preservedSrsVersion: preservedVersionTwoRow?.version ?? null,
       preservedProjection: preservedVersionTwoProjection?.facts?.[0]?.preserved === true,
-      dailyCardStore: connection.database.objectStoreNames.contains('daily_card_claims'),
     },
     dailyCardClaim: {
       first: dailyCardFirst,
@@ -932,9 +958,11 @@ async function run() {
       stalePortError,
     },
   };
-  if (output.additiveUpgrade.preservedSrsVersion !== 7
-      || output.additiveUpgrade.preservedProjection !== true
-      || output.additiveUpgrade.dailyCardStore !== true
+  if (output.rollbackSafe.preservedSrsVersion !== 7
+      || output.rollbackSafe.preservedProjection !== true
+      || output.rollbackSafe.openedVersion !== 2
+      || output.rollbackSafe.expectedVersion !== 2
+      || output.rollbackSafe.newStoreCreated !== false
       || output.dailyCardClaim.first !== true
       || output.dailyCardClaim.second !== false
       || output.dailyCardClaim.lane !== 'due'

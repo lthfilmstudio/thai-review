@@ -36,15 +36,18 @@ test('schema creates every workspace-prefixed store and required query indexes',
   upgradePracticeSchema(db);
   assert.deepEqual([...db.stores.keys()], Object.values(PRACTICE_DB_STORES));
   assert.deepEqual(db.stores.get('srs_v2').options.keyPath, ['workspaceId', 'cardId']);
-  assert.deepEqual(db.stores.get('formal_due_claims').options.keyPath, [
-    'workspaceId', 'cardId', 'dayKey',
-  ]);
   assert.deepEqual(db.stores.get('daily_lane_claims').options.keyPath, [
     'workspaceId', 'cardId', 'dayKey', 'lane',
   ]);
-  assert.equal(PRACTICE_DB_VERSION, 3);
-  assert.deepEqual(db.stores.get('daily_card_claims').options.keyPath, [
-    'workspaceId', 'dayKey', 'cardId',
+  /* 版本必須停在 2。線上（codex/hybrid-mastery-design）跑的是 v2，一旦升到 3，
+     回滾時舊版 indexedDB.open(name, 2) 會拿到 VersionError → storage-unavailable，
+     App 直接開不起來，而且只能進 DevTools 砍 IndexedDB 才救得回來。 */
+  assert.equal(PRACTICE_DB_VERSION, 2);
+  assert.equal(db.stores.has('daily_card_claims'), false,
+    'daily-card claim 借用 v2 就存在的 formal_due_claims，不開新 store');
+  assert.equal(PRACTICE_DB_STORES.dailyCardClaims, 'formal_due_claims');
+  assert.deepEqual(db.stores.get('formal_due_claims').options.keyPath, [
+    'workspaceId', 'cardId', 'dayKey',
   ]);
   assert.deepEqual(db.stores.get('attempt_phase_claims').options.keyPath, [
     'workspaceId', 'attemptId', 'phase',

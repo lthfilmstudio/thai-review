@@ -3,16 +3,20 @@
    workspace and may be invalidated by boot/logout/versionchange. */
 
 export const PRACTICE_DB_NAME = 'thai-review-practice-v2';
-export const PRACTICE_DB_VERSION = 3;
+export const PRACTICE_DB_VERSION = 2;
 
 export const PRACTICE_DB_STORES = Object.freeze({
   workspaceMeta: 'workspace_meta',
   srsV2: 'srs_v2',
   practiceEvents: 'practice_events',
   eventDispositions: 'event_dispositions',
-  formalDueClaims: 'formal_due_claims',
   dailyLaneClaims: 'daily_lane_claims',
-  dailyCardClaims: 'daily_card_claims',
+  /* 借用 v2 就存在的 formal_due_claims 實體 store。keyPath 的三個欄位跟
+     daily-card claim 一模一樣（只是順序不同），而那個 store 從頭到尾只被 add、
+     沒有任何 reader，線上（design 分支沒有人 import practice-commit.js）也是空的。
+     借用它才不用動 PRACTICE_DB_VERSION——一旦動了，回滾時舊版 open(name, 2) 會拿到
+     VersionError，整個 App 直接開不起來。 */
+  dailyCardClaims: 'formal_due_claims',
   attemptPhaseClaims: 'attempt_phase_claims',
   outbox: 'outbox',
   syncCursors: 'sync_cursors',
@@ -50,16 +54,13 @@ const STORE_DEFINITIONS = Object.freeze({
     keyPath: ['workspaceId', 'eventId'],
     indexes: [['by_workspace', 'workspaceId']],
   },
-  formalDueClaims: {
-    keyPath: ['workspaceId', 'cardId', 'dayKey'],
-    indexes: [['by_workspace', 'workspaceId']],
-  },
   dailyLaneClaims: {
     keyPath: ['workspaceId', 'cardId', 'dayKey', 'lane'],
     indexes: [['by_workspace', 'workspaceId']],
   },
   dailyCardClaims: {
-    keyPath: ['workspaceId', 'dayKey', 'cardId'],
+    // 實體 store 是 formal_due_claims，keyPath 沿用它 v2 就定好的欄位順序
+    keyPath: ['workspaceId', 'cardId', 'dayKey'],
     indexes: [['by_workspace', 'workspaceId']],
   },
   attemptPhaseClaims: {
@@ -326,15 +327,6 @@ export function createPracticeTransactionPort(connection, {
             nextReviewAt: row.state?.nextReviewAt ?? 0,
           }));
         },
-        async addFormalDueClaim(_workspaceId, row) {
-          active();
-          assertWorkspaceArgument(workspace, _workspaceId);
-          assertEnvelope(workspace, row);
-          const result = await requestPromise(store('formalDueClaims').add(structuredClone(row)), {
-            constraintAsFalse: true,
-          });
-          return result === false ? false : true;
-        },
         async addDailyLaneClaim(_workspaceId, row) {
           active();
           assertWorkspaceArgument(workspace, _workspaceId);
@@ -347,10 +339,11 @@ export function createPracticeTransactionPort(connection, {
         async getDailyCardClaim(_workspaceId, dayKey, cardId) {
           active();
           assertWorkspaceArgument(workspace, _workspaceId);
+          // keyPath 是 [workspaceId, cardId, dayKey]，順序跟參數不同，別對調
           const row = await requestPromise(store('dailyCardClaims').get([
             workspace,
-            requiredRowKey(dayKey, 'daily-card claim day'),
             requiredRowKey(cardId, 'daily-card claim card'),
+            requiredRowKey(dayKey, 'daily-card claim day'),
           ]));
           return row ? structuredClone(row) : null;
         },
@@ -593,13 +586,12 @@ export function createLegacyMigrationTransactionPort(connection, {
       store('projections').index('by_workspace').getAllKeys(workspace),
     );
     const [
-      srs, events, dispositions, formalClaims, laneClaims, dailyCardClaims, attemptClaims, outbox,
+      srs, events, dispositions, laneClaims, dailyCardClaims, attemptClaims, outbox,
       cursors, projections, legacyImports, quarantine, claimJournals,
     ] = await Promise.all([
       countWorkspace('srsV2'),
       countWorkspace('practiceEvents'),
       countWorkspace('eventDispositions'),
-      countWorkspace('formalDueClaims'),
       countWorkspace('dailyLaneClaims'),
       countWorkspace('dailyCardClaims'),
       countWorkspace('attemptPhaseClaims'),
@@ -626,7 +618,7 @@ export function createLegacyMigrationTransactionPort(connection, {
       daily: projectionCounts.daily,
       history: projectionCounts.history,
       achievements: projectionCounts.achievements,
-      events: events + dispositions + formalClaims + laneClaims + dailyCardClaims + attemptClaims
+      events: events + dispositions + laneClaims + dailyCardClaims + attemptClaims
         + legacyImports + quarantine + claimJournals,
       outbox,
       cycle: projectionCounts.cycle,

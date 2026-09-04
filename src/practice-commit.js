@@ -6,7 +6,7 @@ import { nextReview } from './srs.js';
 import { buildPracticeAttemptEvent, samePracticeEvent } from './practice-events.js';
 
 const PRACTICE_STORES = Object.freeze([
-  'practiceEvents', 'srsV2', 'formalDueClaims', 'dailyLaneClaims',
+  'practiceEvents', 'srsV2', 'dailyLaneClaims',
   'dailyCardClaims', 'attemptPhaseClaims', 'outbox', 'projections',
 ]);
 
@@ -395,7 +395,7 @@ export async function commitPracticeAttempt({
   return port.transaction(PRACTICE_STORES, 'readwrite', async tx => {
     for (const method of [
       'getEvent', 'putEvent', 'putOutbox', 'getSrs', 'putSrs',
-      'addFormalDueClaim', 'addDailyLaneClaim',
+      'addDailyLaneClaim',
       'getDailyCardClaim', 'addDailyCardClaim',
       'getAttemptPhaseClaim', 'addAttemptPhaseClaim',
       'getProjection', 'putProjection',
@@ -493,21 +493,20 @@ export async function commitPracticeAttempt({
           resweep: await readResweepProjection(tx, workspace),
         };
       }
-      const claimRow = {
+      /* 正式 Due 的第二道 claim 拿掉了。它的 key 是 [workspaceId, cardId, dayKey]，
+         跟上面那道 daily-card claim 完全同一組，而 daily-card claim 現在就存在
+         formal_due_claims 這個實體 store 裡——再 add 一次必定撞自己。跨 lane 的
+         唯一性本來就由上面那道保證，正式 Due 只是它的特例。 */
+      const claimed = isFormalDue ? true : await tx.addDailyLaneClaim(workspace, {
         workspaceId: workspace,
         cardId: attemptSnapshot.cardId,
         dayKey: attemptSnapshot.dayKey,
         lane: attemptSnapshot.lane,
         eventId,
-      };
-      const claimed = isFormalDue
-        ? await tx.addFormalDueClaim(workspace, {
-          ...claimRow, claimKind: 'formal-due',
-        })
-        : await tx.addDailyLaneClaim(workspace, claimRow);
+      });
       if (claimed !== true) {
         return {
-          status: isFormalDue ? 'formal-due-already-claimed' : 'daily-lane-already-claimed',
+          status: 'daily-lane-already-claimed',
           event: null,
           srs: null,
           daily: await readDailyProjection(tx, workspace, attemptSnapshot.dayKey),

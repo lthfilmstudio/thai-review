@@ -29,7 +29,8 @@ function attempt(overrides = {}) {
 
 function transactionalPort({ failBeforeCommit = false } = {}) {
   const data = {
-    events: new Map(), srs: new Map(), formalDueClaims: new Map(),
+    events: new Map(), srs: new Map(),
+    // dailyCardClaims 的實體 store 就是 v2 的 formal_due_claims（見 practice-db.js）
     dailyLaneClaims: new Map(), dailyCardClaims: new Map(),
     attemptPhaseClaims: new Map(), outbox: new Map(), projections: new Map(),
   };
@@ -46,7 +47,7 @@ function transactionalPort({ failBeforeCommit = false } = {}) {
         assert.deepEqual(storeNames, mode === 'readonly' ? [
           'dailyCardClaims', 'attemptPhaseClaims',
         ] : storeNames.length === 1 ? ['projections'] : [
-          'practiceEvents', 'srsV2', 'formalDueClaims', 'dailyLaneClaims',
+          'practiceEvents', 'srsV2', 'dailyLaneClaims',
           'dailyCardClaims', 'attemptPhaseClaims', 'outbox', 'projections',
         ]);
         const draft = structuredClone(data);
@@ -61,12 +62,6 @@ function transactionalPort({ failBeforeCommit = false } = {}) {
           getSrs: (workspace, cardId) => draft.srs.get(key(workspace, cardId)) || null,
           putSrs: (workspace, cardId, row) => {
             draft.srs.set(key(workspace, cardId), structuredClone(row));
-          },
-          addFormalDueClaim: (workspace, row) => {
-            const k = key(workspace, `${row.dayKey}:${row.cardId}`);
-            if (draft.formalDueClaims.has(k)) return false;
-            draft.formalDueClaims.set(k, structuredClone(row));
-            return true;
           },
           addDailyLaneClaim: (workspace, row) => {
             const k = key(workspace, `${row.dayKey}:${row.cardId}:${row.lane}`);
@@ -129,7 +124,7 @@ test('Sweep commits event and outbox atomically without touching SRS', async () 
   assert.equal(port.data.events.size, 1);
   assert.equal(port.data.outbox.size, 1);
   assert.equal(port.data.srs.size, 0);
-  assert.equal(port.data.formalDueClaims.size, 0);
+  assert.equal(port.data.dailyCardClaims.size, 1);
   assert.equal(port.data.dailyLaneClaims.size, 1);
   assert.equal(port.data.attemptPhaseClaims.size, 1);
   assert.equal('workspaceId' in result.event, false);
@@ -150,8 +145,8 @@ test('Due first atomically claims the day and advances SRS exactly one version',
   assert.equal(port.data.events.size, 1);
   assert.equal(port.data.outbox.size, 1);
   assert.equal(port.data.srs.size, 1);
-  assert.equal(port.data.formalDueClaims.size, 1);
-  assert.equal(port.data.dailyLaneClaims.size, 0);
+  assert.equal(port.data.dailyCardClaims.size, 1);
+  assert.equal(port.data.dailyLaneClaims.size, 0, '正式 Due 不再寫第二道 lane claim');
   const srsRow = [...port.data.srs.values()][0];
   assert.equal(srsRow.state.deviceId, 'workspace-installation-A');
   const outboxRow = [...port.data.outbox.values()][0];
@@ -229,7 +224,7 @@ test('identity is snapshotted and canonicalized before transaction keys are chos
   assert.equal(result.event.dayKey, '2026-08-24');
   assert.equal(port.data.srs.has(`user:A:${IDs.cardId}`), true);
   assert.equal(
-    port.data.formalDueClaims.has(`user:A:2026-08-24:${IDs.cardId}`),
+    port.data.dailyCardClaims.has(`user:A:2026-08-24:${IDs.cardId}`),
     true,
   );
 });
@@ -371,7 +366,6 @@ test('transaction abort leaves no half-written Due claim, event, SRS, or outbox'
   ), {
     events: 0,
     srs: 0,
-    formalDueClaims: 0,
     dailyLaneClaims: 0,
     dailyCardClaims: 0,
     attemptPhaseClaims: 0,
@@ -525,16 +519,19 @@ test('readPracticeDayContext 從 claim 與已提交的 phase 推出 existingCont
   assert.deepEqual(afterRetry.phases, ['first', 'retry-1']);
 });
 
-test('v2→v3 升級空窗：已有 formal Due claim 但還沒有 daily-card claim 時，內層閘門仍要擋', async () => {
-  // dailyCardClaims 是 v3 才有的 store，升級後是空的。既有的 formalDueClaims 因此
-  // 成為唯一還記得「今天這張卡已經正式複習過」的紀錄，內層閘門不能拿掉。
+test('沿用 v2 的 formal_due_claims：既有的 formal Due 紀錄仍然擋得住同日同卡', async () => {
+  /* daily-card claim 的實體 store 就是 v2 就存在的 formal_due_claims（practice-db.js
+     裡有說明為什麼要借用它——不借就得動 PRACTICE_DB_VERSION，一動回滾就會壞）。
+     所以舊版寫下的 formal Due 紀錄不會變成升級空窗，它直接就是 daily-card claim，
+     由外層那道閘門擋下來。保護沒有消失，只是換成外層在擋。 */
   const port = transactionalPort();
-  port.data.formalDueClaims.set(`user:A:2026-08-24:${IDs.cardId}`, {
+  port.data.dailyCardClaims.set(`user:A:2026-08-24:${IDs.cardId}`, {
     workspaceId: 'user:A',
     cardId: IDs.cardId,
     dayKey: '2026-08-24',
     lane: 'due',
     claimKind: 'formal-due',
+    attemptId: IDs.attemptId,
     eventId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
   });
 
@@ -543,7 +540,7 @@ test('v2→v3 升級空窗：已有 formal Due claim 但還沒有 daily-card cla
     attempt: attempt({ lane: 'due', formalGrade: 'good' }),
   });
 
-  assert.equal(result.status, 'formal-due-already-claimed');
+  assert.equal(result.status, 'daily-card-already-claimed');
   assert.equal(port.data.events.size, 0);
   assert.equal(port.data.srs.size, 0);
 });
