@@ -78,8 +78,9 @@ export function createPracticeGradeController({
     try {
       committed = await runCommit(attempt, operation);
     } catch (error) {
-      // 交易失敗：什麼都沒寫進去，留在原卡用同一個 attempt 重試。
-      pendingRetry = { attempt, error };
+      // 交易失敗：什麼都沒寫進去，留在原卡用同一個 attempt 重試。operation 要一起
+      // 留著——重試時要拿它跟當下的 context 比，不能重新拍一張再跟自己比。
+      pendingRetry = { attempt, operation, error };
       setStatus('save-failed');
       return { status: 'save-failed', error };
     }
@@ -140,12 +141,21 @@ export function createPracticeGradeController({
        每次新產生，擋住重複的是 attemptPhaseClaims，不是 eventId。 */
     async retry() {
       if (status !== 'save-failed' || !pendingRetry) return { status: 'nothing-to-retry' };
-      const { attempt } = pendingRetry;
-      let operation;
+      const { attempt, operation } = pendingRetry;
+      let current;
       try {
-        operation = capture();
+        current = capture();
       } catch (error) {
         return { status: 'context-invalid', error };
+      }
+      /* 失敗期間 UI 有鎖，但手勢／深連結之類的漏網之魚仍可能換掉卡片。這裡拿
+         「當初送出時」那張 operation 跟現在比，不是重新拍一張跟自己比——重拍的話
+         A 卡的 attempt 會配上 B 卡的 token，兩邊都是 B 就永遠比對得過，結果就是
+         把 A 卡的排程寫進 B 卡。交易還沒落地，直接丟掉是安全的。 */
+      if (!operationStillCurrent(operation, current)) {
+        pendingRetry = null;
+        setStatus('idle');
+        return { status: 'stale-operation' };
       }
       setStatus('saving');
       return finish(attempt, operation);

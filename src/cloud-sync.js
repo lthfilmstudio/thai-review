@@ -54,7 +54,14 @@ let syncDeps = { ...defaultSyncDeps };
    ledger 用它 bump context epoch——卡片與課程沒變，但底下的到期狀態變了，
    還在路上的那筆評分不該把結果套到已經換過內容的畫面上（AE7）。 */
 let remoteProgressHook = null;
+let remoteResetHook = null;
 export function setRemoteProgressHook(fn) { remoteProgressHook = fn; }
+
+/* 別台裝置按的重置會以 epoch 傳過來。本機除了刪掉 progress 鍵，還得清掉 IndexedDB
+   的權威 SRS，否則下次評分 getSrs() 會讀到重置前那一列當基準，排程整個跳回去，
+   而且會以新的 updatedAt 通過 epoch 過濾推上雲端——別台的重置等於沒發生。
+   跟 notifyRemoteProgress 不同，這條不吞例外：清不掉就讓整輪 sync 中止重來。 */
+export function setRemoteResetHook(fn) { remoteResetHook = fn; }
 
 function notifyRemoteProgress(reason) {
   try {
@@ -433,6 +440,9 @@ async function runSync(op) {
     const resetAt = meta.reset_at;
     const clearedKeys = keysClearedByReset(state.progress, resetAt);
     if (clearedKeys.length) {
+      // 先清 IDB 的權威 SRS，再清本機鏡射。順序跟手動重置一致，理由見
+      // setRemoteResetHook 上面那段。
+      await remoteResetHook?.();
       for (const k of clearedKeys) delete state.progress[k];
       saveState(op.storage);
       notifyRemoteProgress('reset-epoch');

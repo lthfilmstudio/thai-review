@@ -99,6 +99,42 @@ test('workspace hydration 保留 local-only 評分，IndexedDB 同卡資料優�
   assert.deepEqual(result.edits, { edit: { thai: 'เดิม', updatedAt: 9 } });
 });
 
+/* P0：呼叫端（app.js 的 runtimeProgressFromHydration）已經把 hydration 的 card_id 翻回
+   lessonId:thai，所以兩邊是同一組鍵。IDB 是權威來源不代表它比較新——使用者在單堂課或
+   別台裝置評過的那筆只寫得進 localStorage 鏡射。 */
+const srsAt = (interval, updatedAt) => ({
+  grade: 'good', interval, reps: 5, easeFactor: 2.6,
+  reviewedAt: updatedAt, nextReviewAt: updatedAt, updatedAt,
+});
+
+test('開機合併：帳本比本機舊就不准蓋掉，排程不回捲', () => {
+  const key = 'gid-1:สวัสดี';
+  const result = mergeWorkspaceHydration(
+    { progress: { [key]: srsAt(3, 1_780_000_000_000) }, projections: {} },
+    { progress: { [key]: srsAt(64, 1_790_000_000_000) }, favorites: {}, edits: {} },
+  );
+  assert.equal(result.progress[key].interval, 64, '本機那筆才是最新的，不能被帳本蓋掉');
+});
+
+test('開機合併：帳本比本機新就採用', () => {
+  const key = 'gid-1:สวัสดี';
+  const result = mergeWorkspaceHydration(
+    { progress: { [key]: srsAt(64, 1_790_000_000_000) }, projections: {} },
+    { progress: { [key]: srsAt(3, 1_780_000_000_000) }, favorites: {}, edits: {} },
+  );
+  assert.equal(result.progress[key].interval, 64);
+});
+
+test('開機合併：時間戳平手時由權威那份贏', () => {
+  const key = 'gid-1:สวัสดี';
+  const stamp = 1_780_000_000_000;
+  const result = mergeWorkspaceHydration(
+    { progress: { [key]: srsAt(64, stamp) }, projections: {} },
+    { progress: { [key]: srsAt(3, stamp) }, favorites: {}, edits: {} },
+  );
+  assert.equal(result.progress[key].interval, 64);
+});
+
 test('state keeps device UI global while explicit learning ports stay isolated', () => {
   fallback.values.clear();
   const userA = memoryStorage();

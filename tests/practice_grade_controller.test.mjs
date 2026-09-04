@@ -120,6 +120,66 @@ test('交易失敗：不鏡射、不前進，用同一個 attempt 重試', async
   );
 });
 
+test('P0：失敗期間卡片被換掉，retry 不准把 A 卡的排程寫進 B 卡', async () => {
+  const rig = harness({
+    commit: async () => {
+      throw Object.assign(new Error('quota'), { code: 'PRACTICE_DB_REQUEST_FAILED' });
+    },
+  });
+
+  const failed = await rig.controller.submitGrade('good');
+  assert.equal(failed.status, 'save-failed');
+  assert.equal(rig.calls.commits.length, 1);
+
+  // 手勢／深連結之類的漏網之魚在鎖住期間仍把卡片換掉了
+  rig.setOperation({ cardId: '77777777-7777-4777-8777-777777777777' });
+
+  const retried = await rig.controller.retry();
+  assert.equal(retried.status, 'stale-operation');
+  assert.equal(rig.calls.commits.length, 1, 'A 卡的 attempt 不能在 B 卡的 context 下送出');
+  assert.equal(rig.calls.mirrors.length, 0);
+  assert.equal(rig.calls.advances.length, 0, '更不能拿 A 的結果去前進 B');
+  assert.equal(rig.controller.getStatus(), 'idle');
+  assert.equal(rig.controller.isLocked(), false, '放掉之後 UI 要解鎖，不能卡死');
+});
+
+test('換課、換 catalog 同樣算 context 換掉', async () => {
+  for (const patch of [
+    { currentLessonId: 'gid-123' },
+    { catalogDigest: 'sha256:b' },
+    { workspaceGeneration: 1 },
+    { contextEpoch: 1 },
+  ]) {
+    const rig = harness({
+      commit: async () => {
+        throw Object.assign(new Error('quota'), { code: 'PRACTICE_DB_REQUEST_FAILED' });
+      },
+    });
+    await rig.controller.submitGrade('good');
+    rig.setOperation(patch);
+    const retried = await rig.controller.retry();
+    assert.equal(retried.status, 'stale-operation', JSON.stringify(patch));
+    assert.equal(rig.calls.commits.length, 1, JSON.stringify(patch));
+  }
+});
+
+test('context 沒變的話 retry 照常送出（控制組）', async () => {
+  let attempts = 0;
+  const rig = harness({
+    commit: async input => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw Object.assign(new Error('quota'), { code: 'PRACTICE_DB_REQUEST_FAILED' });
+      }
+      return { status: 'committed', attempt: input.attempt };
+    },
+  });
+  await rig.controller.submitGrade('good');
+  const retried = await rig.controller.retry();
+  assert.equal(retried.status, 'done');
+  assert.equal(rig.calls.commits.length, 2);
+});
+
 test('鏡射失敗進 projection-repair，重試只重跑鏡射不重送交易', async () => {
   let mirrors = 0;
   const rig = harness({

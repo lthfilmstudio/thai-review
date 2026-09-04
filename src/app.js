@@ -18,7 +18,7 @@ import { DAILY_KEY, initDailyLog, logReview, buildAchievementCtx, notifyAchievem
 import { advanceResweepCursor } from './resweep.js';
 import { syncProgressThrottled, syncProgressOnHide } from './progress-sync.js';
 import * as cloudAuth from './cloud-auth.js';
-import { syncNow, syncThrottled, syncSoon, flushOnHide, lastSyncedAt, resetProgressEverywhere, invalidateSync, clearSyncState, setRemoteProgressHook } from './cloud-sync.js';
+import { syncNow, syncThrottled, syncSoon, flushOnHide, lastSyncedAt, resetProgressEverywhere, invalidateSync, clearSyncState, setRemoteProgressHook, setRemoteResetHook } from './cloud-sync.js';
 import { recordGrade } from './grade-history.js';
 import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices, preloadRealAudioAvailability } from './tts.js';
@@ -30,7 +30,9 @@ import {
   getOrCreateWorkspaceInstallationId,
 } from './storage-scope.js';
 import { getDeviceId } from './srs.js';
-import { hydrateWorkspaceSnapshot, openPracticeDatabase } from './practice-db.js';
+import {
+  createPracticeTransactionPort, hydrateWorkspaceSnapshot, openPracticeDatabase,
+} from './practice-db.js';
 import { createLegacyClaimFlow, fetchProductionLineageEvidence } from './legacy-claim-flow.js';
 import { startPracticeLedgerRuntime, catalogCardKeyIndex } from './practice-ledger-runtime.js';
 import { resetRuntimeLedgerAuthority } from './storage-scope.js';
@@ -47,8 +49,25 @@ let workspaceStorage = null;
    評分照舊走 legacy 路徑（見 gradeAndAdvance）。 */
 let practiceLedger = null;
 let practiceLedgerWorkspaceId = null;
+/* 重置要清 IDB 的權威 SRS，而那些列可能是上一輪開機寫進去的——就算這次 ledger
+   runtime 沒起來（catalog fence、lineage 拿不到），它們還在。所以重置不能吃
+   practiceLedger?.port，得有一條不依賴 runtime 狀態的路。 */
+let practiceResetPort = null;
 /* ledger 評分 session。null 代表這次開機沒有帳本路徑可走。 */
 let ledgerSession = null;
+
+/* 手動重置與遠端重置 epoch 共用這一條。清不掉就往上丟，讓呼叫端中止——半清的狀態
+   比沒清更糟：本機沒了、IDB 還在，下次評分就把重置前的排程當基準算回去。 */
+async function resetLedgerAuthorityOrThrow() {
+  if (!practiceResetPort || !practiceLedgerWorkspaceId) {
+    throw new Error('練習資料庫尚未就緒，無法清除帳本');
+  }
+  await resetRuntimeLedgerAuthority({
+    port: practiceResetPort,
+    workspaceId: practiceLedgerWorkspaceId,
+  });
+  ledgerSession?.bumpContextEpoch();
+}
 
 function requireWorkspaceStorage(storage = workspaceStorage) {
   return assertWorkspaceStorage(storage);
@@ -905,6 +924,21 @@ async function init() {
   });
 
   practiceLedgerWorkspaceId = bootResult.workspaceId;
+  practiceResetPort = practiceLedger.port || (practiceConnection
+    ? createPracticeTransactionPort(practiceConnection, {
+      workspaceId: bootResult.workspaceId,
+      assertActive: id => {
+        if (id !== bootResult.workspaceId) {
+          throw Object.assign(new Error('practice reset workspace is stale'), {
+            code: 'WORKSPACE_INVALIDATED',
+          });
+        }
+      },
+    })
+    : null);
+  /* 這一條要接在 status === 'ready' 的判斷外面。別台裝置按的重置會透過 epoch
+     傳過來，而那時本機的 ledger runtime 可能根本沒起來——IDB 裡的權威列還是得清。 */
+  setRemoteResetHook(resetLedgerAuthorityOrThrow);
   if (practiceLedger.status === 'ready') {
     const cardKeyById = catalogCardKeyIndex(bootResult.catalog);
     ledgerSession = createLedgerGradeSession({
@@ -1165,18 +1199,16 @@ async function init() {
     // 先清 IDB 的權威 SRS，再清本機鏡射。順序反過來的話，中途失敗或當掉，下次在
     // Today 評分時 getSrs() 會讀到重置前那列，排程直接跳回重置前，而且會以新的
     // updatedAt 通過 epoch 過濾推上雲端——重置等於沒發生。
-    if (practiceLedger?.port) {
-      try {
-        await resetRuntimeLedgerAuthority({
-          port: practiceLedger.port,
-          workspaceId: practiceLedgerWorkspaceId,
-        });
-      } catch (err) {
-        btn.textContent = '確定重置';
-        btn.disabled = false;
-        alert(`帳本重置失敗，本機也沒有清除（避免兩邊不一致）。\n${err.message}`);
-        return;
-      }
+    /* 清不掉就整個中止。以前這裡守在 ledger runtime 的 port 上，runtime 沒起來就
+       靜默跳過，本機清了、IDB 沒清；下次評分 getSrs() 讀到重置前那列，排程跳回去
+       還會推上雲端，重置等於沒發生。 */
+    try {
+      await resetLedgerAuthorityOrThrow();
+    } catch (err) {
+      btn.textContent = '確定重置';
+      btn.disabled = false;
+      alert(`帳本重置失敗，本機也沒有清除（避免兩邊不一致）。\n${err.message}`);
+      return;
     }
 
     state.progress = {};
@@ -1339,6 +1371,15 @@ async function init() {
 
   // 字卡頁的上一張 / 下一張 + 評分鈕（事件委派，每次 re-render 都有效）
   document.getElementById('content').addEventListener('click', e => {
+    /* 這兩道要排在所有其他 handler 前面。底下有換卡（data-jump-card）、切 mode
+       （data-mode-back-to-card）之類會動 context 的分支，排在鎖後面等於沒鎖：
+       交易還在路上時把卡片換掉，回來的結果就套到別張卡上了（AE7）。 */
+    if (e.target.closest('[data-ledger-retry]')) {
+      e.stopPropagation();
+      void retryLedgerAction();
+      return;
+    }
+    if (ledgerSession?.controller.isLocked()) { e.stopPropagation(); return; }
     if (e.target.closest('[data-lesson-map-jump]')) {
       e.stopPropagation();
       const lessonId = e.target.closest('[data-lesson-map-jump]').dataset.lessonMapJump;
@@ -1416,13 +1457,6 @@ async function init() {
       renderContent(() => rerender(storage), storage);
       return;
     }
-    if (e.target.closest('[data-ledger-retry]')) {
-      e.stopPropagation();
-      void retryLedgerAction();
-      return;
-    }
-    // saving／失敗期間所有人為的 context 變動都要擋掉（AE7）。
-    if (ledgerSession?.controller.isLocked()) { e.stopPropagation(); return; }
     if (e.target.closest('#cardPrev')) { e.stopPropagation(); prevCard(storage); return; }
     if (e.target.closest('#cardNext')) { e.stopPropagation(); nextCard(storage); return; }
     const grade = e.target.closest('.pill[data-grade]');
@@ -1450,6 +1484,10 @@ async function init() {
     tx = t.clientX; ty = t.clientY;
   }, { passive: true });
   contentEl.addEventListener('touchend', e => {
+    /* 手機的主要換卡方式。這裡少一道鎖的話，saving／失敗期間滑一下就換卡，
+       底下那個 state.mode === 'today' 擋不到——帳本跑在 currentLessonId
+       === '__TODAY__'，而那時 mode 是 srs／cards。 */
+    if (ledgerSession?.controller.isLocked()) return;
     const t = e.changedTouches[0];
     const dx = t.clientX - tx;
     const dy = t.clientY - ty;

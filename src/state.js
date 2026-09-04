@@ -5,6 +5,7 @@ import {
   nextReview, countDue, getDueCards, normalizeGrade, isSrsStateSnapshot,
 } from './srs.js';
 import { isStableCardId } from './card-identity.js';
+import { progressStamp } from './cloud-merge.js';
 
 export const STORAGE_KEY = 'thai-review-v1';
 export const DEVICE_STATE_KEY = 'thai-review-device-state-v1';
@@ -308,8 +309,17 @@ export function mergeWorkspaceHydration(projected, auxiliary) {
       || !isPlainRecord(auxiliary?.edits)) {
     throw new TypeError('invalid workspace hydration merge');
   }
+  /* IDB 是權威來源，但「權威」不等於「比較新」。呼叫端已經把 hydration 的 card_id
+     翻回 lessonId:thai，所以兩邊是同一組鍵——無條件展開就是 IDB 蓋掉本機。
+     使用者在單堂課或別台裝置評過的那筆只寫得進 localStorage 鏡射，帳本還沒跟上；
+     被蓋掉的話排程直接回捲，而且會以新的 updatedAt 通過 LWW 推上雲端擴散出去。
+     所以逐卡比 progressStamp，較新的留下；平手才讓權威那份贏。 */
+  const progress = { ...auxiliary.progress };
+  for (const [key, entry] of Object.entries(projected.progress)) {
+    if (progressStamp(entry) >= progressStamp(progress[key])) progress[key] = entry;
+  }
   return {
-    progress: { ...auxiliary.progress, ...projected.progress },
+    progress,
     favorites: auxiliary.favorites,
     edits: auxiliary.edits,
   };

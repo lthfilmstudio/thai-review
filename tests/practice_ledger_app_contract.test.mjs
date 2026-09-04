@@ -49,11 +49,12 @@ test('ledger 起不來不擋開機：整段沒有 throw、沒有 boot 狀態轉�
   const end = appSource.indexOf('const deepLink = parseDeepLinkParam();', start);
   const block = appSource.slice(start, end);
 
-  // 唯一那個 throw 是 assertActive 的 workspace 守衛，會被 startPracticeLedgerRuntime
-  // 自己的 try/catch 收掉變成 status: 'unavailable'，不會往開機路徑上冒。
+  /* 這裡只准有 assertActive 的 workspace 守衛：一個給 ledger runtime 的 port，
+     一個給重置專用的 port。兩個都在 callback 裡，開機路徑上不會被呼叫到。 */
   const throws = block.match(/\bthrow\b/g) || [];
-  assert.equal(throws.length, 1);
+  assert.equal(throws.length, 2);
   assert.match(block, /throw Object\.assign\(new Error\('practice ledger workspace is stale'\)/);
+  assert.match(block, /throw Object\.assign\(new Error\('practice reset workspace is stale'\)/);
   assert.doesNotMatch(block, /moveTo\(\s*'recoverable-failure'/);
   assert.doesNotMatch(block, /renderWorkspaceBoot/);
   assert.doesNotMatch(block, /return;/, 'ledger 失敗不得中斷 init');
@@ -106,6 +107,36 @@ test('AE7：滑鼠與鍵盤共用同一道 saving 鎖，鍵盤那道排在方向
   assert.ok(keyLock > 0, '鍵盤的鎖要緊接在方向鍵之前');
 });
 
+test('AE7：click 的鎖排在所有會動 context 的 handler 之前', () => {
+  const handler = appSource.indexOf("document.getElementById('content').addEventListener('click'");
+  assert.ok(handler > 0);
+  const lock = appSource.indexOf(
+    'if (ledgerSession?.controller.isLocked()) { e.stopPropagation(); return; }', handler,
+  );
+  assert.ok(lock > handler, 'click handler 裡要有鎖');
+  // 排在鎖後面才算被擋住。這幾個都會換卡或換 mode，排錯邊等於沒鎖。
+  for (const selector of [
+    '[data-jump-card]', '[data-mode-back-to-card]', '[data-lesson-map-jump]',
+    '[data-start-review]', '[data-edit-card-key]', '#cardPrev', '#cardNext',
+  ]) {
+    const at = appSource.indexOf(selector, handler);
+    assert.ok(at > lock, `${selector} 必須排在 saving 鎖後面`);
+  }
+});
+
+test('AE7：手機滑動換卡也要過同一道鎖', () => {
+  const start = appSource.indexOf("contentEl.addEventListener('touchend'");
+  assert.ok(start > 0);
+  const block = appSource.slice(start, appSource.indexOf('}, { passive: true });', start));
+  assert.match(block, /if \(ledgerSession\?\.controller\.isLocked\(\)\) return;/);
+  /* 底下那道今日 mode 的 early return 擋不到帳本：帳本跑在 currentLessonId ===
+     '__TODAY__'，而那時 mode 是 srs／cards，所以不能拿它當守門。比對完整那一行，
+     不要比對片段——註解裡也會出現同樣的字。 */
+  const modeGuard = block.indexOf("if (state.mode === 'today') return;");
+  assert.ok(modeGuard > 0);
+  assert.ok(block.indexOf('isLocked()') < modeGuard, 'saving 鎖要排在 mode 判斷之前');
+});
+
 test('AE7：換課與換 mode 也擋在同一道鎖後面', () => {
   for (const fn of ['async function selectLesson(id, storage) {', 'async function selectMode(m, storage) {']) {
     const start = appSource.indexOf(fn);
@@ -129,11 +160,43 @@ test('P0-3：重置要先清 IDB 權威 SRS 再清本機鏡射', () => {
   const start = appSource.indexOf('await resetProgressEverywhere(storage);');
   const end = appSource.indexOf('closeResetModal();', start);
   const block = appSource.slice(start, end);
-  assert.match(block, /resetRuntimeLedgerAuthority\(\{/, '重置必須真的清 IDB');
-  const idbReset = block.indexOf('resetRuntimeLedgerAuthority');
+  assert.match(block, /await resetLedgerAuthorityOrThrow\(\);/, '重置必須真的清 IDB');
+  const idbReset = block.indexOf('resetLedgerAuthorityOrThrow');
   const localReset = block.indexOf('state.progress = {};');
   assert.ok(idbReset > 0 && idbReset < localReset, 'IDB 要清在本機鏡射之前');
   assert.match(block, /return;/, '清 IDB 失敗要中止，不能只清一半');
+  // 以前是 if (practiceLedger?.port)：runtime 沒起來就靜默跳過，本機清了 IDB 沒清
+  assert.doesNotMatch(block, /if \(practiceLedger\?\.port\)/,
+    '清 IDB 不能因為 ledger runtime 沒起來就跳過');
+});
+
+test('P0：別台裝置按的重置也要清得掉本機 IDB，而且不看 ledger 狀態', () => {
+  assert.match(appSource, /setRemoteResetHook\(resetLedgerAuthorityOrThrow\);/);
+  // 要接在 status === 'ready' 判斷外面：那時 ledger runtime 可能沒起來，但 IDB 有列
+  const hook = appSource.indexOf('setRemoteResetHook(resetLedgerAuthorityOrThrow);');
+  const readyBranch = appSource.indexOf("if (practiceLedger.status === 'ready')");
+  assert.ok(hook > 0 && readyBranch > 0 && hook < readyBranch,
+    'reset hook 要在 ready 判斷之前接好');
+  // 清不掉就往上丟，讓 sync 那輪中止
+  const helper = appSource.indexOf('async function resetLedgerAuthorityOrThrow()');
+  const body = appSource.slice(helper, appSource.indexOf('\n}', helper));
+  assert.match(body, /throw new Error/);
+  assert.match(body, /resetRuntimeLedgerAuthority\(\{/);
+  assert.match(body, /bumpContextEpoch\(\)/);
+});
+
+test('cloud-sync 的重置 epoch 分支：先清 IDB 再刪本機鍵，而且不吞例外', async () => {
+  const syncSource = await readFile(new URL('../src/cloud-sync.js', import.meta.url), 'utf8');
+  const start = syncSource.indexOf('const clearedKeys = keysClearedByReset(');
+  const end = syncSource.indexOf('// 1) 拉遠端變動並合併進本機', start);
+  const block = syncSource.slice(start, end);
+  assert.match(block, /await remoteResetHook\?\.\(\);/, '要真的清 IDB');
+  assert.ok(
+    block.indexOf('await remoteResetHook') < block.indexOf('delete state.progress[k]'),
+    'IDB 要清在本機鏡射之前',
+  );
+  // notifyRemoteProgress 是 try/catch 吞掉的，重置不能走那條
+  assert.doesNotMatch(block, /notifyRemoteProgress\('reset-epoch'\);[\s\S]*await remoteResetHook/);
 });
 
 test('失敗狀態一定給得出下一步，而且是可讀的 a11y 區域', () => {
