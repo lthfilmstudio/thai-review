@@ -17,6 +17,19 @@ U1–U7 的本機部分都完成了。**production 還沒動過**，線上跑的
 | U6 | ledger-first 評分 controller、Today 接線、失敗 UI | 完成（`__ALL__` 未接） |
 | U7 | SW／release gate／read-back | 本機部分完成，部署未執行 |
 | — | lineage 認領規則放寬（見下） | 完成 |
+| — | 獨立審查找到的 4 個 P0 | 已修，各自有反證 |
+
+### 兩輪獨立審查找到的 4 個 P0（都已修）
+
+四條的爆炸半徑都隨 lineage 放寬從 94 張變 12324 張，所以先放寬再修。
+
+| # | 缺陷 | 改在哪 |
+|---|---|---|
+| 1 | 開機 hydration 用 IDB 舊值無條件蓋掉本機，排程回捲後還會推上雲端 | `src/state.js` `mergeWorkspaceHydration` 逐卡比 `progressStamp` |
+| 2 | 手動重置守在 ledger runtime 的 port 上，runtime 沒起來就靜默跳過 | `src/app.js` 改用不依賴 runtime 狀態的 `practiceResetPort`，清不掉就中止 |
+| 3 | 別台裝置按的重置完全沒碰本機 IDB（手機重置、筆電每評一張還原一張） | `src/cloud-sync.js` 加 `setRemoteResetHook`，先 IDB 再本機鏡射，不吞例外 |
+| 4 | `retry()` 重拍 operation 再跟自己比，把 A 卡的排程寫進 B 卡 | `src/practice-grade-controller.js` 改用送出當下那張 operation；補上滑動與 click 的 saving 鎖 |
+| 5 | IDB 版本 2→3 讓回滾後 App 開不起來 | 見下面「回滾」 |
 
 ## lineage 認領規則放寬（2026-09-04）
 
