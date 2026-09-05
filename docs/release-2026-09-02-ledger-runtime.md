@@ -125,6 +125,8 @@ git diff --check
 #    src/ 模組（?v= 只擋進入點，整個 import graph 沒有 cache busting）
 python3 -m http.server 8951 --bind 127.0.0.1
 #    開 http://127.0.0.1:8951/tests/browser/practice-db.html，等 status: passed
+#    跑之前先清掉那個 origin 的 IndexedDB：獨立審查遇過一次無法重現的假紅，
+#    origin 上有 v2 釘死之前留下的 version 3 化石資料庫
 
 # 3. dry-run。有付費缺口就會停下來不打 API
 bash scripts/update-audio-deploy.sh
@@ -173,7 +175,8 @@ version **2**。新版需要的 13 個實體 store，線上那份早就全部建
 > 而且只能進 DevTools 砍掉 IndexedDB 才救得回來。真瀏覽器實測過：停在 v2 舊版開得起來，
 > 升到 v3 舊版就是 `VersionError`。現在 daily-card claim 借用 v2 就存在的
 > `formal_due_claims`（keyPath 三個欄位一模一樣，只是順序不同，而且那個 store 從來沒有
-> 任何 reader、線上也是空的——`0726965` 裡沒有任何檔案 import `practice-commit.js`）。
+> 任何 reader、線上也是空的——`0726965` **出貨的 `src/`** 裡沒有任何檔案 import
+> `practice-commit.js`（`tests/` 有，但 `update-audio-deploy.sh` 不把 `tests/` 連進部署目錄）。
 
 鏡射把帳本的數字加進 `day` 的 top-level 欄位（`reviewed`／四檔／`practice`），
 `day.ledger` 只留「帳本貢獻了多少」給下次算差額用。所以回滾之後，只讀 top-level 的舊版
@@ -182,6 +185,15 @@ version **2**。新版需要的 13 個實體 store，線上那份早就全部建
 殘留限制：**practice-only 的日子回滾後仍會被判成沒來過**。舊版的 `cameOnDay()` 只看
 `reviewed`／`games`／`bridged`，沒有任何欄位能表達「只掃過沒正式複習」。這種日子在
 回滾後會消耗一個安神保護。要完全避免的話得等 practice 有 v1 欄位。
+
+## 已知的降級（不擋部署，但要知道）
+
+**別台裝置按重置之後，`stamp > resetAt` 而倖存的那些卡會永久留在 legacy。**
+`resetRuntimeLedgerAuthority` 把 IDB 的 srs 列全刪，但 `keysClearedByReset` 只刪
+本機比 resetAt 舊的鍵，所以那些卡變成「本機有、IDB 沒有」。逐卡閘門會讓它們退回
+legacy（本機那份才是對的，**不會掉資料**），但 `runtime-srs-baseline-v1` 的
+`seededAliases` 是刻意保留的，baseline 不會再補寫回去，所以它們回不了帳本。
+沒有任何 UI 或 log 說得出這件事。
 
 ## 已知還沒做的
 

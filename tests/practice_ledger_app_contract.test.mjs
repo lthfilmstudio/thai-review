@@ -126,37 +126,106 @@ test('AE7：click 的鎖排在所有會動 context 的 handler 之前', () => {
 /* 這條取代「逐一列 selector 比對字串位置」的寫法。舊寫法只能證明「這幾個特定
    selector 排在鎖後面」，證明不了「所有會動 context 的路徑都鎖住」——搜尋那個洞
    就是這樣漏掉的（`/` 快捷鍵排在鍵盤鎖前面、搜尋鈕又不在 #content 裡）。
-   改成掃出所有會改 cardIndex／currentLessonId／mode 的函式，逐一要求有鎖。 */
+
+   第一版有兩個盲點，獨立審查抓到並實測證明過：
+   - 只掃 top-level `function`，而 init() 一支 750+ 行涵蓋全部 43 個 listener，
+     整支豁免等於把檢查關掉——在 init 的 handler 裡新增無守衛的 mutation 照樣全綠。
+   - 只比對 `isLocked()` 這個字串存不存在，把真守衛換成「只提到它的註解」照樣全綠。
+   所以現在：init 不再整支豁免，改成連同它裡面的 listener callback 一起切片；
+   比對前先剝掉註解；而且守衛必須排在第一個 mutation 之前。 */
 const CONTEXT_MUTATION_EXEMPT = Object.freeze(new Map([
   // 評分成功後前進到下一張，本來就該動；鎖在它就永遠停在原卡
   ['afterGradeAdvance', '評分成功後的前進路徑本身'],
   ['nextCard', '所有人為呼叫端（方向鍵／滑動／cardPrev-Next）都已各自守門'],
   ['prevCard', '同上'],
-  // 開機路徑，那時還沒有 ledgerSession
-  ['init', '開機路徑'],
-  // 課程延遲載入。ledger 只跑 __TODAY__，它的卡開機就載好了；而且會動 context 的
-  // 進入點（搜尋、__ALL__）自己都守住了
-  ['replaceRuntimeCatalog', '延遲載入課程；ledger 只跑 __TODAY__，卡片已載入'],
+  // 唯二傳 runtimeStorage 的呼叫端（設定存檔、重新同步）同時傳 force:true，
+  // force 會讓 cached 變 null，所以 loadLessonsSmart 的背景刷新分支走不到；
+  // 那兩個呼叫端本身都已經有 saving 鎖。
+  ['replaceRuntimeCatalog', '只由已守門的兩個設定 handler 同步呼叫；背景刷新分支因 force:true 不可達'],
+  // listener 已經各自切成獨立區塊，init 剩下的 body 就只有開機段（deep link、
+  // 初始課程／mode／cardIndex），那時 ledgerSession 還沒建立
+  ['init', '扣掉 listener 之後只剩開機段'],
 ]));
 
-test('AE7：每一個會動 context 的函式都要有 saving 鎖（豁免要寫理由）', () => {
-  const starts = [...appSource.matchAll(/^(?:async )?function ([A-Za-z0-9_]+)\(/gm)]
-    .map(match => ({ name: match[1], at: match.index }));
-  assert.ok(starts.length > 20, 'function 掃描失效的話這條測試會變成永遠通過');
+function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+}
 
-  const mutates = /state\.(cardIndex|currentLessonId|mode)\s*=/;
+/* 從 openAt 這個 `{` 往後配對，跳過字串／樣板字面值裡的括號。 */
+function matchBrace(source, openAt) {
+  let depth = 0;
+  for (let i = openAt; i < source.length; i += 1) {
+    const char = source[i];
+    if (char === '"' || char === "'" || char === '`') {
+      const quote = char;
+      i += 1;
+      while (i < source.length) {
+        if (source[i] === '\\') { i += 2; continue; }
+        if (source[i] === quote) break;
+        i += 1;
+      }
+      continue;
+    }
+    if (char === '{') depth += 1;
+    else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/* 把 app.js 切成「可以各自守門的區塊」：每個 addEventListener 的 callback body（配對
+   大括號抓真實範圍，不是抓到下一個 listener 為止），加上 top-level function——後者要把
+   已被 listener 認領的區段挖掉，否則 init 會把整個檔案後半吞進去，那正是第一版的盲點。 */
+function guardableBlocks(source) {
+  const blocks = [];
+  const claimed = [];
+  for (const match of source.matchAll(/addEventListener\(\s*'([a-z]+)'/g)) {
+    const open = source.indexOf('{', match.index);
+    if (open < 0) continue;
+    const close = matchBrace(source, open);
+    if (close < 0) continue;
+    blocks.push({ name: `listener:${match[1]}@${match.index}`, body: source.slice(open, close + 1) });
+    claimed.push([open, close]);
+  }
+  const fnStarts = [...source.matchAll(/^(?:async )?function ([A-Za-z0-9_]+)\(/gm)]
+    .map(match => ({ name: match[1], at: match.index }));
+  for (let i = 0; i < fnStarts.length; i += 1) {
+    const to = fnStarts[i + 1]?.at ?? source.length;
+    let body = '';
+    let cursor = fnStarts[i].at;
+    for (const [open, close] of claimed) {
+      if (close < cursor || open >= to) continue;
+      if (open > cursor) body += source.slice(cursor, open);
+      cursor = Math.max(cursor, close + 1);
+    }
+    if (cursor < to) body += source.slice(cursor, to);
+    blocks.push({ name: fnStarts[i].name, body });
+  }
+  return blocks;
+}
+
+test('AE7：每一個會動 context 的區塊都要有 saving 鎖，而且鎖要排在 mutation 之前', () => {
+  const source = stripComments(appSource);
+  const blocks = guardableBlocks(source);
+  assert.ok(blocks.length > 60, `只切出 ${blocks.length} 個區塊，切法可能壞了`);
+
+  const mutation = /state\.(cardIndex|currentLessonId|mode)\s*=/;
   const unguarded = [];
   let checked = 0;
-  for (let i = 0; i < starts.length; i += 1) {
-    const body = appSource.slice(starts[i].at, starts[i + 1]?.at ?? appSource.length);
-    if (!mutates.test(body)) continue;
+  for (const block of blocks) {
+    const at = block.body.search(mutation);
+    if (at < 0) continue;
     checked += 1;
-    if (CONTEXT_MUTATION_EXEMPT.has(starts[i].name)) continue;
-    if (!/isLocked\(\)/.test(body)) unguarded.push(starts[i].name);
+    if (CONTEXT_MUTATION_EXEMPT.has(block.name)) continue;
+    const lock = block.body.indexOf('isLocked()');
+    // 有鎖還不夠：鎖要排在第一個 mutation 前面才擋得住
+    if (lock < 0 || lock > at) unguarded.push(block.name);
   }
-  assert.ok(checked >= 6, `只掃到 ${checked} 個會動 context 的函式，掃描條件可能壞了`);
+  assert.ok(checked >= 10, `只掃到 ${checked} 個會動 context 的區塊，掃描條件可能壞了`);
   assert.deepEqual(unguarded, [],
-    `這些函式會改 cardIndex／currentLessonId／mode 卻沒有 saving 鎖：${unguarded.join(', ')}`);
+    `這些區塊會改 cardIndex／currentLessonId／mode，卻沒有排在前面的 saving 鎖：${unguarded.join(', ')}`);
 });
 
 test('AE7：搜尋的兩條進入點都擋得住（鈕在 topbar、/ 走鍵盤）', () => {

@@ -358,6 +358,11 @@ function gradeAndAdvance(g, storage) {
       && ledgerAcceptsCurrentCard()) {
     void ledgerSession.controller.submitGrade(g).then(result => {
       if (LEDGER_FALLBACK_STATUSES.has(result?.status)) legacyGradeAndAdvance(g, storage);
+    }).catch(error => {
+      // controller 內部已經把已知的失敗轉成 status，這裡是最後一道：沒接的話會變成
+      // unhandled rejection，而畫面可能還鎖著。
+      console.warn('ledger submitGrade rejected:', error?.code || error?.message);
+      renderLedgerSavingState(ledgerSession.controller.getStatus());
     });
     return;
   }
@@ -1133,6 +1138,11 @@ async function init() {
     saveState(storage);
     if (inputChanged) {
       const btn = document.getElementById('btnSaveSettings');
+      /* 這兩支重抓 Sheet 的按鈕都在設定 modal 裡，掛在 topbar 上，#content 的 click
+         鎖與鍵盤鎖都蓋不到，而它們會換掉 state.lessons 與 currentLessonId——`__TODAY__`
+         是虛擬課號、永遠不在 state.lessons 裡，所以那個 fallback if 必定成立。
+         saving 期間讓它跑，交易落地後 operation token 對不上，那筆評分只會留在 IDB。 */
+      if (ledgerSession?.controller.isLocked()) return;
       const originalText = btn.textContent;
       btn.disabled = true;
       btn.textContent = '同步中…';
@@ -1285,6 +1295,11 @@ async function init() {
     if (btn.disabled) return;
     if (!confirm('重新從 Google Sheet 抓最新資料？（進度跟收藏不會動）')) return;
 
+    /* 這兩支重抓 Sheet 的按鈕都在設定 modal 裡，掛在 topbar 上，#content 的 click
+       鎖與鍵盤鎖都蓋不到，而它們會換掉 state.lessons 與 currentLessonId——`__TODAY__`
+       是虛擬課號、永遠不在 state.lessons 裡，所以那個 fallback if 必定成立。
+       saving 期間讓它跑，交易落地後 operation token 對不上，那筆評分只會留在 IDB。 */
+    if (ledgerSession?.controller.isLocked()) return;
     const originalText = btn.textContent;
     btn.disabled = true;
     btn.textContent = '同步中…';
@@ -1483,6 +1498,9 @@ async function init() {
 
   // SRS toggle 切換（card / reverse mode 才會 render 出 #srsToggle）
   document.getElementById('content').addEventListener('change', e => {
+    /* 目前整個 repo 都沒有地方 render 出 #srsToggle，所以這支實際上不會被觸發。
+       還是補上鎖：它會動 cardIndex，哪天元素回來了守衛就已經在對的位置。 */
+    if (ledgerSession?.controller.isLocked()) return;
     if (e.target?.id === 'srsToggle') {
       state.srsToggle = e.target.checked;
       state.cardIndex = 0;

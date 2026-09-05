@@ -92,8 +92,19 @@ export function createPracticeGradeController({
       return { status: result?.status || 'not-committed', result };
     }
 
-    // 交易已經落地。以下任何一步失敗都不准重送交易。
-    if (!operationStillCurrent(operation, capture())) {
+    /* 交易已經落地。以下任何一步失敗都不准重送交易。
+       capture() 這裡要包起來（retry() 那邊本來就有包，兩邊要一致）：背景把 catalog
+       換掉之後目前這張卡可能從 filteredCards() 掉出來，cardId 變空字串，
+       capturePracticeOperation 就丟。讓它往上冒的話狀態永遠停在 saving，而
+       saving 沒有對應的動作按鈕，使用者只能重新整理。拍不到 context 就當 stale——
+       帳本已經有這筆，開機的 reconcileLedgerMirror 會補鏡射。 */
+    let current = null;
+    try {
+      current = capture();
+    } catch {
+      current = null;
+    }
+    if (!operationStillCurrent(operation, current)) {
       pendingRetry = null;
       pendingRepair = null;
       setStatus('idle');
@@ -169,6 +180,10 @@ export function createPracticeGradeController({
         await mirrorResult(result);
       } catch (error) {
         pendingRepair = { result, error };
+        /* 狀態沒變，但一定要再 emit 一次：呼叫端在 await 之前就把按鈕 disabled 了，
+           而按鈕只有 onStateChange 驅動的 render 會重新啟用。setStatus 對相同狀態
+           是 no-op，所以這裡直接 emit，否則重試一次失敗按鈕就永遠灰掉。 */
+        emit({ status, canRetry: !!pendingRetry, canRepair: !!pendingRepair });
         return { status: 'projection-repair', error };
       }
       pendingRepair = null;

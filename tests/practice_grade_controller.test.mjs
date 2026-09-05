@@ -298,3 +298,47 @@ test('沒有 repair／retry 可做時是安全的 no-op', async () => {
 test('缺 adapter 直接拒絕建立 controller', () => {
   assert.throws(() => createPracticeGradeController({}), { code: 'PRACTICE_CONTROLLER_INCOMPLETE' });
 });
+
+/* 兩個「只能重新整理」的死路，獨立審查各自實測抓到的。兩個都不掉資料（交易早就落地，
+   開機的 reconcileLedgerMirror 會補鏡射），但使用者會以為 App 壞了。 */
+
+test('P1：projection-repair 重試又失敗，仍要再 emit 一次狀態', async () => {
+  const rig = harness({ mirror: async () => { throw new Error('QuotaExceededError'); } });
+  const first = await rig.controller.submitGrade('good');
+  assert.equal(first.status, 'projection-repair');
+  const before = rig.calls.states.length;
+
+  const again = await rig.controller.repairProjection();
+
+  assert.equal(again.status, 'projection-repair');
+  assert.ok(rig.calls.states.length > before,
+    '狀態沒變也要 emit：呼叫端在 await 之前就把按鈕 disabled 了，只有 onStateChange 會把它放回來');
+  assert.equal(rig.controller.isLocked(), true, '還是鎖著，但按鈕要能再按');
+});
+
+test('P1：交易落地之後 capture() 丟例外，不能把狀態卡在 saving', async () => {
+  let captures = 0;
+  const rig = harness({});
+  // harness 的 captureOperation 是固定的，這裡另外組一個會在第二次呼叫時丟的
+  const controller = createPracticeGradeController({
+    buildAttempt: () => ({ kind: 'attempt', phase: 'first', lane: 'due', attemptId: OPERATION.attemptId }),
+    captureOperation: () => {
+      captures += 1;
+      // 第一次（送出前）正常；交易落地後那次丟——例如卡片從 filteredCards() 掉出來
+      if (captures > 1) throw Object.assign(new Error('card is gone'), { code: 'PRACTICE_CONTEXT_INVALID' });
+      return { ...OPERATION };
+    },
+    commit: async () => ({ status: 'committed', event: { eventId: 'e1' } }),
+    mirror: async () => {},
+    advance: () => {},
+    onStateChange: () => {},
+  });
+
+  const result = await controller.submitGrade('good');
+
+  assert.equal(result.status, 'stale-operation', '拍不到 context 就當 stale，不能往上丟');
+  assert.equal(controller.getStatus(), 'idle');
+  assert.equal(controller.isLocked(), false,
+    'saving 沒有對應的動作按鈕，卡在那裡等於只能重新整理');
+  assert.equal(rig.calls.advances.length, 0);
+});
