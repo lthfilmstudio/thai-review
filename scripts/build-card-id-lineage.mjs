@@ -187,9 +187,24 @@ export function buildLineageEvidence({ deploymentManifest, catalogs, gateManifes
        （historical_collision）。這些一律 fail closed。
 
      舊規則把兩者都當失敗，於是 12968 個 alias 只認得出 94 個（0.7%）。分開之後是
-     12324 個（95.0%），而且跨 79 個 production revision（20 份不同 catalog，
-     2026-05-16 → 08-23）**沒有任何一個 alias 指到過第二個 card_id**——放寬並沒有
-     繞過任何一筆真實的反證，只是不再把「查不到」當成「查出問題」。 */
+     12324 個（95.0%）。
+
+     ⚠️ 這條規則實際擔保什麼，要講清楚：
+
+     20 份歷史 catalog 的 246,718 筆卡片列裡，**帶 card_id 的是 0 筆**（card_id 是
+     2026-08-24 Gate B backfill 之後才有的欄位）。所以上面那三個「證據矛盾」的理由
+     全都掛在 historicalId 非空那條分支上，在現有資料上**一次都觸發不了**。
+     「跨 79 個 revision 沒有任何 alias 指到過第二個 card_id」這句話是真的，但它為真
+     只是因為整個歷史語料裡一個 card_id 觀測值都沒有——它證明不了身分穩定性。
+
+     真正擋住「把進度接到錯的卡」的不是歷史，是這件事：alias 在**現行 catalog**
+     解析到恰好一張卡時，根本沒有第二張卡可以認錯——candidates 只從以 alias 為鍵的
+     索引取，而 alias 在現行 catalog 不唯一就會先進 collisionAliasSet。這套機制只能
+     「拒絕」，不能「改指向」。644 筆未認領正好就是有第二個候選的那些。
+
+     歷史 snapshot 剩下的作用是內容穩定性：這個 alias 至少在一份 production 部署裡
+     以完全相同的內容出現過。那三個矛盾理由留著是為了未來 catalog 帶 card_id 之後
+     能生效，現在是死的。 */
   for (const alias of [...current.idsByAlias.keys()].sort()) {
     let reason = collisionAliasSet.has(alias) ? 'historical_collision' : null;
     const ids = new Set();

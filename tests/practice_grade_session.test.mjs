@@ -255,3 +255,35 @@ test('commit 成功後權威快取跟著更新，下次仍然收得下', async (
   // 同一個值，所以下一輪仍然 eligible
   assert.equal(rig.handle.acceptsCard(CARD_A, srs(10, OLD_STAMP)), true);
 });
+
+/* 遠端重置的不對稱：IDB 無條件全刪，但 keysClearedByReset 只刪 stamp <= resetAt 的
+   本機鍵。重置之後才評的那張卡因此「本機還在、IDB 沒了」。如果記憶體裡的權威快取
+   沒跟著清，逐卡閘門會拿那份被刪掉的舊值放行，帳本讀 IDB 讀到空的、拿空狀態重算，
+   interval 從幾十天塌成 1 天，再鏡射回本機推上雲端擴散。 */
+test('P0：重置後要清掉記憶體裡的權威快取，否則排程會從空狀態重算', () => {
+  const rig = session({
+    session: {
+      authoritativeSrsRows: [{ cardId: CARD_A, version: 3, state: srs(30, NEW_STAMP) }],
+    },
+  });
+  const survivingLocal = srs(30, NEW_STAMP);
+
+  assert.equal(rig.handle.acceptsCard(CARD_A, survivingLocal), true, '重置前：帳本掌握這張卡');
+  assert.equal(rig.handle.authoritativeCardCount(), 1);
+
+  rig.handle.clearAuthoritative();
+
+  assert.equal(rig.handle.authoritativeCardCount(), 0);
+  assert.equal(
+    rig.handle.acceptsCard(CARD_A, survivingLocal), false,
+    'IDB 已經被清空，這張卡必須退回 legacy，不能讓帳本拿空狀態當基準',
+  );
+});
+
+test('清空之後全新的卡仍然收得下（控制組）', () => {
+  const rig = session({
+    session: { authoritativeSrsRows: [{ cardId: CARD_A, version: 3, state: srs(30, NEW_STAMP) }] },
+  });
+  rig.handle.clearAuthoritative();
+  assert.equal(rig.handle.acceptsCard(CARD_A, null), true, '本機也沒進度的卡，空狀態本來就是對的起點');
+});

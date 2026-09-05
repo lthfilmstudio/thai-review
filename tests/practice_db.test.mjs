@@ -39,7 +39,7 @@ test('schema creates every workspace-prefixed store and required query indexes',
   assert.deepEqual(db.stores.get('daily_lane_claims').options.keyPath, [
     'workspaceId', 'cardId', 'dayKey', 'lane',
   ]);
-  /* 版本必須停在 2。線上（codex/hybrid-mastery-design）跑的是 v2，一旦升到 3，
+  /* 版本必須停在 2。線上跑的是 codex/hybrid-mastery-release 的 0726965（v2），一旦升到 3，
      回滾時舊版 indexedDB.open(name, 2) 會拿到 VersionError → storage-unavailable，
      App 直接開不起來，而且只能進 DevTools 砍 IndexedDB 才救得回來。 */
   assert.equal(PRACTICE_DB_VERSION, 2);
@@ -288,4 +288,65 @@ test('hydration 只讀指定 workspace，回傳與 IndexedDB rows 隔離的 clon
   snapshot.srs[0].state.grade = 'again';
   assert.equal(rows.srsV2[0].state.grade, 'good');
   assert.equal(snapshot.srs.some(row => row.workspaceId === 'user:B'), false);
+});
+
+/* daily-card claim 借用 v2 的 formal_due_claims 實體 store，而那個 store 的 keyPath
+   是 [workspaceId, cardId, dayKey]——跟 getDailyCardClaim(ws, dayKey, cardId) 的參數
+   順序**相反**。把兩者對調不會有任何既有的 node 測試變紅（假 port 用字串當鍵，重現不了），
+   只有真瀏覽器抓得到，而瀏覽器測試不在 CI 裡。所以在這裡直接驗 adapter 組出來的 key。
+   期望值從 schema 推導，不寫死，keyPath 之後改了這條仍然成立。 */
+function keyRecordingDatabase(record) {
+  return {
+    transaction() {
+      const transaction = {
+        error: null,
+        abort() {},
+        objectStore(physicalName) {
+          return {
+            get(key) {
+              record.push({ op: 'get', physicalName, key });
+              return successfulRequest(null);
+            },
+            add(row) {
+              record.push({ op: 'add', physicalName, row });
+              return successfulRequest(1);
+            },
+          };
+        },
+      };
+      setImmediate(() => transaction.oncomplete?.());
+      return transaction;
+    },
+  };
+}
+
+test('daily-card claim 的讀取 key 要照實體 store 的 keyPath 順序組', async () => {
+  const schema = schemaDouble();
+  upgradePracticeSchema(schema);
+  const physical = PRACTICE_DB_STORES.dailyCardClaims;
+  const keyPath = schema.stores.get(physical).options.keyPath;
+  assert.equal(physical, 'formal_due_claims', '借用的是 v2 就存在的 store');
+
+  const record = [];
+  const port = createPracticeTransactionPort(
+    { database: keyRecordingDatabase(record), assertOpen() {} },
+    { workspaceId: 'user:A', assertActive() {} },
+  );
+  const row = {
+    workspaceId: 'user:A',
+    dayKey: '2026-08-24',
+    cardId: '44444444-4444-4444-8444-444444444444',
+    lane: 'due',
+  };
+  await port.transaction(['dailyCardClaims'], 'readonly', tx => (
+    tx.getDailyCardClaim('user:A', row.dayKey, row.cardId)
+  ));
+
+  const [call] = record;
+  assert.equal(call.physicalName, physical);
+  assert.deepEqual(
+    call.key,
+    keyPath.map(field => row[field]),
+    `get() 的 key 必須是 [${keyPath.join(', ')}]，參數順序跟它相反，別對調`,
+  );
 });

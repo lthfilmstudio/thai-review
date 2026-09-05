@@ -102,9 +102,8 @@ test('AE7：滑鼠與鍵盤共用同一道 saving 鎖，鍵盤那道排在方向
   const clickLock = appSource.indexOf('if (ledgerSession?.controller.isLocked()) { e.stopPropagation(); return; }');
   assert.ok(clickStart > 0 && clickStart < clickLock, 'retry 要排在鎖前面');
 
-  // 方向鍵也是 context mutation：換了卡片，交易回來就會因為 token 對不上被丟掉。
-  const keyLock = appSource.indexOf('if (ledgerSession?.controller.isLocked()) return;\n\n    if (e.key === \'ArrowLeft\')');
-  assert.ok(keyLock > 0, '鍵盤的鎖要緊接在方向鍵之前');
+  // 鍵盤那道現在蓋住整個 handler（含 listen mode 與 / 開搜尋），
+  // 順序由「搜尋的兩條進入點都擋得住」那條測試釘死。
 });
 
 test('AE7：click 的鎖排在所有會動 context 的 handler 之前', () => {
@@ -122,6 +121,57 @@ test('AE7：click 的鎖排在所有會動 context 的 handler 之前', () => {
     const at = appSource.indexOf(selector, handler);
     assert.ok(at > lock, `${selector} 必須排在 saving 鎖後面`);
   }
+});
+
+/* 這條取代「逐一列 selector 比對字串位置」的寫法。舊寫法只能證明「這幾個特定
+   selector 排在鎖後面」，證明不了「所有會動 context 的路徑都鎖住」——搜尋那個洞
+   就是這樣漏掉的（`/` 快捷鍵排在鍵盤鎖前面、搜尋鈕又不在 #content 裡）。
+   改成掃出所有會改 cardIndex／currentLessonId／mode 的函式，逐一要求有鎖。 */
+const CONTEXT_MUTATION_EXEMPT = Object.freeze(new Map([
+  // 評分成功後前進到下一張，本來就該動；鎖在它就永遠停在原卡
+  ['afterGradeAdvance', '評分成功後的前進路徑本身'],
+  ['nextCard', '所有人為呼叫端（方向鍵／滑動／cardPrev-Next）都已各自守門'],
+  ['prevCard', '同上'],
+  // 開機路徑，那時還沒有 ledgerSession
+  ['init', '開機路徑'],
+  // 課程延遲載入。ledger 只跑 __TODAY__，它的卡開機就載好了；而且會動 context 的
+  // 進入點（搜尋、__ALL__）自己都守住了
+  ['replaceRuntimeCatalog', '延遲載入課程；ledger 只跑 __TODAY__，卡片已載入'],
+]));
+
+test('AE7：每一個會動 context 的函式都要有 saving 鎖（豁免要寫理由）', () => {
+  const starts = [...appSource.matchAll(/^(?:async )?function ([A-Za-z0-9_]+)\(/gm)]
+    .map(match => ({ name: match[1], at: match.index }));
+  assert.ok(starts.length > 20, 'function 掃描失效的話這條測試會變成永遠通過');
+
+  const mutates = /state\.(cardIndex|currentLessonId|mode)\s*=/;
+  const unguarded = [];
+  let checked = 0;
+  for (let i = 0; i < starts.length; i += 1) {
+    const body = appSource.slice(starts[i].at, starts[i + 1]?.at ?? appSource.length);
+    if (!mutates.test(body)) continue;
+    checked += 1;
+    if (CONTEXT_MUTATION_EXEMPT.has(starts[i].name)) continue;
+    if (!/isLocked\(\)/.test(body)) unguarded.push(starts[i].name);
+  }
+  assert.ok(checked >= 6, `只掃到 ${checked} 個會動 context 的函式，掃描條件可能壞了`);
+  assert.deepEqual(unguarded, [],
+    `這些函式會改 cardIndex／currentLessonId／mode 卻沒有 saving 鎖：${unguarded.join(', ')}`);
+});
+
+test('AE7：搜尋的兩條進入點都擋得住（鈕在 topbar、/ 走鍵盤）', () => {
+  // 進入點一：`/` 快捷鍵。鎖要排在它之前，否則按下去就開了搜尋面板
+  const handler = appSource.indexOf("document.addEventListener('keydown'");
+  const lock = appSource.indexOf('if (ledgerSession?.controller.isLocked()) return;', handler);
+  const slash = appSource.indexOf("if (e.key === '/')", handler);
+  assert.ok(lock > handler && slash > lock, '鍵盤鎖要排在 / 開搜尋之前');
+  // 而且要蓋住整個 handler，listen mode 的方向鍵也在鎖後面
+  const listen = appSource.indexOf("if (state.mode === 'listen') {", handler);
+  assert.ok(listen > lock, 'listen mode 的方向鍵也要在鎖後面');
+  // 進入點二：搜尋結果點下去。btnSearch 在 topbar，#content 的 click 鎖蓋不到
+  const pick = appSource.indexOf('function onSearchPick(');
+  const pickBody = appSource.slice(pick, appSource.indexOf('\n}', pick));
+  assert.match(pickBody, /if \(ledgerSession\?\.controller\.isLocked\(\)\) return;/);
 });
 
 test('AE7：手機滑動換卡也要過同一道鎖', () => {
@@ -180,9 +230,19 @@ test('P0：別台裝置按的重置也要清得掉本機 IDB，而且不看 ledg
   // 清不掉就往上丟，讓 sync 那輪中止
   const helper = appSource.indexOf('async function resetLedgerAuthorityOrThrow()');
   const body = appSource.slice(helper, appSource.indexOf('\n}', helper));
-  assert.match(body, /throw new Error/);
   assert.match(body, /resetRuntimeLedgerAuthority\(\{/);
+  /* 記憶體裡的權威快取也要清。不清的話逐卡閘門會拿被刪掉的舊值放行評分，
+     帳本讀 IDB 讀到空的、拿空狀態重算，interval 直接塌成 1。 */
+  assert.match(body, /clearAuthoritative\(\)/);
+  assert.ok(
+    body.indexOf('resetRuntimeLedgerAuthority') < body.indexOf('clearAuthoritative'),
+    '先清 IDB 再清記憶體快取',
+  );
   assert.match(body, /bumpContextEpoch\(\)/);
+  /* 連線沒開時不能丟：這條的呼叫端在 runSync 裡，例外會讓 watermark 不前進，
+     整條雲端同步永久停擺。 */
+  assert.doesNotMatch(body, /throw new Error/);
+  assert.match(body, /console\.warn/);
 });
 
 test('cloud-sync 的重置 epoch 分支：先清 IDB 再刪本機鍵，而且不吞例外', async () => {

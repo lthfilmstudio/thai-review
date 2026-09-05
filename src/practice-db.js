@@ -13,7 +13,8 @@ export const PRACTICE_DB_STORES = Object.freeze({
   dailyLaneClaims: 'daily_lane_claims',
   /* 借用 v2 就存在的 formal_due_claims 實體 store。keyPath 的三個欄位跟
      daily-card claim 一模一樣（只是順序不同），而那個 store 從頭到尾只被 add、
-     沒有任何 reader，線上（design 分支沒有人 import practice-commit.js）也是空的。
+     沒有任何 reader，線上也是空的——線上跑的 0726965 裡沒有任何檔案 import
+     practice-commit.js，所以 commitPracticeAttempt 一次都沒被呼叫過。
      借用它才不用動 PRACTICE_DB_VERSION——一旦動了，回滾時舊版 open(name, 2) 會拿到
      VersionError，整個 App 直接開不起來。 */
   dailyCardClaims: 'formal_due_claims',

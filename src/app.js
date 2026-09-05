@@ -59,13 +59,21 @@ let ledgerSession = null;
 /* 手動重置與遠端重置 epoch 共用這一條。清不掉就往上丟，讓呼叫端中止——半清的狀態
    比沒清更糟：本機沒了、IDB 還在，下次評分就把重置前的排程當基準算回去。 */
 async function resetLedgerAuthorityOrThrow() {
+  /* 連線根本沒開＝這個 session 沒碰過 IDB，沒有權威列要清。這裡不能丟：遠端重置
+     epoch 的呼叫端在 runSync 裡，例外會被外層 catch 成 warn 而且 watermark 不前進，
+     整條雲端同步就永久停擺。注意這跟「runtime 沒起來但連線在」是兩件事——那種
+     情況 practiceResetPort 會有 fallback port，照樣清得掉。 */
   if (!practiceResetPort || !practiceLedgerWorkspaceId) {
-    throw new Error('練習資料庫尚未就緒，無法清除帳本');
+    console.warn('practice ledger authority reset skipped: database was never opened');
+    return;
   }
   await resetRuntimeLedgerAuthority({
     port: practiceResetPort,
     workspaceId: practiceLedgerWorkspaceId,
   });
+  /* 順序：先清 IDB，再清記憶體裡的權威快取。快取沒清的話逐卡閘門會拿被刪掉的
+     那份舊值放行評分，帳本從空狀態重算，排程塌成 1 天。 */
+  ledgerSession?.clearAuthoritative();
   ledgerSession?.bumpContextEpoch();
 }
 
@@ -179,6 +187,11 @@ function rerender(storage) {
 }
 
 function onSearchPick(match, storage) {
+  /* 搜尋進得來的路有兩條，兩條都繞過 #content 的 click 鎖（搜尋鈕在 topbar）與
+     鍵盤鎖（`/` 分支排在它前面），所以守衛得放在這裡。少了它，saving 期間跳到
+     別張卡，交易落地後 operation token 對不上，那筆評分只存在於 IDB，本機的
+     每日日誌與佇列都不知道（AE7）。 */
+  if (ledgerSession?.controller.isLocked()) return;
   // 跳到該卡：切到對應課程、cardIndex、並切回字卡模式
   state.currentLessonId = match.lessonId;
   state.cardIndex = match.index;
@@ -416,6 +429,7 @@ function clearEditModal(storage) {
 }
 
 function jumpToCard(cardKey, storage) {
+  if (ledgerSession?.controller.isLocked()) return;
   const found = findCardByKey(cardKey);
   if (!found) {
     alert('找不到這張卡片，請重新同步後再試一次。');
@@ -1323,6 +1337,12 @@ async function init() {
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea') return;
 
+    /* saving／失敗期間鍵盤一律不放行，一道蓋住整個 handler。方向鍵、`/` 開搜尋、
+       listen mode 的前後首都算 context mutation：換了卡片之後交易回來會因為
+       operation token 對不上而整筆丟掉，那筆評分在 IDB 裡但本機完全不知道（AE7）。
+       重試不受影響——它是 click（含鍵盤觸發的 click），走 #content 的 retry 分支。 */
+    if (ledgerSession?.controller.isLocked()) return;
+
     // / 開搜尋
     if (e.key === '/') {
       e.preventDefault();
@@ -1342,11 +1362,6 @@ async function init() {
 
     // 今日 / 練功 mode 沒有當前卡片，卡片快捷鍵（翻面 / 評分 / 換卡）不適用
     if (state.mode === 'today') return;
-
-    // saving／失敗期間鍵盤一律不放行。方向鍵也算 context mutation：換了卡片之後
-    // 交易回來會因為 operation token 對不上而整筆丟掉，那筆評分在 IDB 裡但本機
-    // 完全不知道（AE7）。所以這道鎖必須排在方向鍵之前。
-    if (ledgerSession?.controller.isLocked()) return;
 
     if (e.key === 'ArrowLeft') prevCard(storage);
     else if (e.key === 'ArrowRight') nextCard(storage);

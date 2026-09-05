@@ -156,6 +156,13 @@ export function createLedgerGradeSession({
       });
     },
     authoritativeCardCount: () => authoritativeByCardId.size,
+    /* 重置之後一定要呼叫。IDB 的權威列被清光了，這份記憶體快取要是還留著舊值，
+       逐卡閘門會拿它跟本機比而放行，然後 commitPracticeAttempt 讀 IDB 讀到空的、
+       拿空狀態當基準重算——interval 直接塌成 1，再鏡射回本機推上雲端。
+       清掉之後那張卡會退回 legacy（本機那筆才是對的），不會毀資料。 */
+    clearAuthoritative() {
+      authoritativeByCardId.clear();
+    },
     /* 佇列重建、或 cloud-sync 併入遠端進度時呼叫：卡片與課程沒變，但底下的到期
        狀態變了，進行中的那筆評分不該把結果套到已經換過內容的畫面上。 */
     bumpContextEpoch() {

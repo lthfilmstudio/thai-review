@@ -117,20 +117,37 @@ function openHigherVersion(version) {
   });
 }
 
-/* 模擬線上（codex/hybrid-mastery-design）真正建出來的 v2：13 個實體 store 全在。
-   新版跟它同名同版本，所以開起來不該觸發任何 onupgradeneeded。 */
+/* 模擬線上（codex/hybrid-mastery-release 的 0726965）真正建出來的 v2：13 個實體 store
+   全在。新版跟它同名同版本，所以開起來不該觸發任何 onupgradeneeded。index 也要照抄——
+   正因為不觸發 upgrade，fixture 少建的 index 之後補不回來，拿它當「回滾真的開得起來」
+   的證據就會失真。 */
 const PRODUCTION_V2_STORES = Object.freeze({
-  workspace_meta: ['workspaceId', 'key'],
-  practice_events: ['workspaceId', 'eventId'],
-  event_dispositions: ['workspaceId', 'eventId'],
-  formal_due_claims: ['workspaceId', 'cardId', 'dayKey'],
-  daily_lane_claims: ['workspaceId', 'cardId', 'dayKey', 'lane'],
-  attempt_phase_claims: ['workspaceId', 'attemptId', 'phase'],
-  outbox: ['workspaceId', 'eventId'],
-  sync_cursors: ['workspaceId', 'name'],
-  legacy_imports: ['workspaceId', 'snapshotId', 'recordId'],
-  quarantine: ['workspaceId', 'quarantineId'],
-  claim_journals: ['workspaceId', 'snapshotId'],
+  workspace_meta: [['workspaceId', 'key'], []],
+  practice_events: [['workspaceId', 'eventId'], [
+    ['by_day', ['workspaceId', 'dayKey', 'eventId']],
+    ['by_round', ['workspaceId', 'roundId', 'eventId']],
+    ['by_cycle', ['workspaceId', 'cycleId', 'eventId']],
+    ['by_card', ['workspaceId', 'cardId', 'eventId']],
+    ['by_server_seq', ['workspaceId', 'serverSeq']],
+    ['by_attempt_kind', ['workspaceId', 'attemptId', 'eventKind']],
+  ]],
+  event_dispositions: [['workspaceId', 'eventId'], []],
+  formal_due_claims: [['workspaceId', 'cardId', 'dayKey'], []],
+  daily_lane_claims: [['workspaceId', 'cardId', 'dayKey', 'lane'], []],
+  attempt_phase_claims: [['workspaceId', 'attemptId', 'phase'], []],
+  outbox: [['workspaceId', 'eventId'], [
+    ['by_status', ['workspaceId', 'status', 'nextAttemptAt', 'eventId']],
+  ]],
+  sync_cursors: [['workspaceId', 'name'], []],
+  legacy_imports: [['workspaceId', 'snapshotId', 'recordId'], [
+    ['by_snapshot', ['workspaceId', 'snapshotId', 'recordId']],
+    ['by_card', ['workspaceId', 'cardId', 'recordId']],
+  ]],
+  quarantine: [['workspaceId', 'quarantineId'], [
+    ['by_snapshot', ['workspaceId', 'snapshotId', 'quarantineId']],
+    ['by_reason', ['workspaceId', 'reason', 'quarantineId']],
+  ]],
+  claim_journals: [['workspaceId', 'snapshotId'], []],
 });
 
 function openVersionTwoFixture() {
@@ -138,9 +155,12 @@ function openVersionTwoFixture() {
     const request = indexedDB.open(DB_NAME, 2);
     request.onerror = () => reject(request.error);
     request.onupgradeneeded = () => {
-      for (const [name, keyPath] of Object.entries(PRODUCTION_V2_STORES)) {
-        request.result.createObjectStore(name, { keyPath })
-          .createIndex('by_workspace', 'workspaceId');
+      for (const [name, [keyPath, indexes]] of Object.entries(PRODUCTION_V2_STORES)) {
+        const created = request.result.createObjectStore(name, { keyPath });
+        created.createIndex('by_workspace', 'workspaceId');
+        for (const [indexName, indexKeyPath] of indexes) {
+          created.createIndex(indexName, indexKeyPath);
+        }
       }
       const store = request.result.createObjectStore('srs_v2', {
         keyPath: ['workspaceId', 'cardId'],

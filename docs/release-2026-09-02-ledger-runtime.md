@@ -45,10 +45,26 @@ U1–U7 的本機部分都完成了。**production 還沒動過**，線上跑的
 - 認領 **94 → 12324**（12968 個 alias 的 95.0%）
 - 剩下 644 筆全是真碰撞：618 筆是 Sheet 裡同一課有重複泰文（legacy 本來就共用一筆進度），
   26 筆歷史碰撞
-- 跨 79 個 production revision（20 份不同 catalog，2026-05-16 → 08-23）
-  **沒有任何一個 alias 指到過第二個 card_id**——放寬沒有繞過任何一筆真實反證
-- 走 runtime 真實路徑（`planRuntimeSrsBaseline`）驗過：seedable 94 → 12324，
-  quarantine 750（618 current collision + 26 historical + 106 是 Gate B 之後新加的卡）
+- 走 runtime 真實路徑（`planRuntimeSrsBaseline`）驗過，12324 筆 seed 裡 **0 筆**的
+  cardId 不等於「該 alias 在現行 catalog 唯一的 card_id」
+- seedable 94 → 12324，quarantine 750（618 current collision + 26 historical +
+  106 是 Gate B 之後新加的卡）
+
+**這條規則實際擔保什麼（兩輪獨立審查都指出原本的說法是空的，這裡更正）**：
+
+20 份歷史 catalog 的 246,718 筆卡片列裡，帶 `card_id` 的是 **0 筆**——`card_id` 是
+2026-08-24 Gate B backfill 之後才有的欄位。所以「證據矛盾」那三個 fail-closed 理由
+（`lineage_changed`／`duplicate_stable_card_id`／`invalid_lineage_identity`）在現有
+資料上一次都觸發不了。原本寫的「跨 79 個 revision 沒有任何 alias 指到過第二個
+card_id」是真的，但它為真只是因為歷史語料裡一個 card_id 觀測值都沒有，**證明不了
+身分穩定性**。
+
+真正擋住「把進度接到錯的卡」的是：alias 在現行 catalog 解析到恰好一張卡時，沒有
+第二張卡可以認錯。這套機制只能拒絕，不能改指向；644 筆未認領正好就是有第二個候選的
+那些。歷史 snapshot 剩下的作用是內容穩定性（這個 alias 至少在一份部署裡以相同內容
+出現過，中位數 26 份）。
+
+要不要在這個前提下把 12324 張卡交給帳本，是產品決定，不是技術結論。
 
 evidence schema、reason 詞彙、runtime validator 都沒動，所以 `src/storage-scope.js`
 一行都沒改；只換 `data/card-id-lineage.json` 與 `src/production-lineage-trust.js`。
@@ -141,17 +157,23 @@ per-deployment URL（`<hash>.thai-review.pages.dev`）不在 Cloudflare Access �
 
 **bundle 回滾是安全的，IndexedDB 不會擋。**
 
-`PRACTICE_DB_NAME` 與 `PRACTICE_DB_VERSION` 都跟線上（`codex/hybrid-mastery-design`）
-一模一樣：`thai-review-practice-v2`、version **2**。新版需要的 13 個實體 store，線上那份
-v2 早就全部建好了（機械比對過，集合完全一致），所以部署時不會觸發 `onupgradeneeded`，
-回滾時舊版 `indexedDB.open(name, 2)` 也照樣開得起來。
+`PRACTICE_DB_NAME` 與 `PRACTICE_DB_VERSION` 都跟線上一模一樣：`thai-review-practice-v2`、
+version **2**。新版需要的 13 個實體 store，線上那份早就全部建好了（機械比對過，集合
+完全一致），所以部署時不會觸發 `onupgradeneeded`，回滾時舊版 `indexedDB.open(name, 2)`
+也照樣開得起來。
+
+> 線上跑的是**哪一版**：2026-09-01 Codex 直接部署的 `codex/hybrid-mastery-release`
+> 的 `0726965`（Cloudflare deployment `023a3bb9`、`sw_cache=thai-review-v93`，見
+> `000_Agent/memory/codex_to_claude_handoff.md` 那則）。**不是** `codex/hybrid-mastery-design`，
+> 也不是 `data/production-deployments.json` 裡最後那筆——那份 manifest 是 08-24 產的，
+> 停在 08-23，已經過期。上面的比對是拿 `0726965` 做的。
 
 > 這件事一度是壞的。原本 `daily_card_claims` 是新開的 store，逼著把版本升到 3；一旦升上去，
 > 開過新版之後回滾，舊版會拿到 `VersionError` → `storage-unavailable`，**App 完全開不起來**，
 > 而且只能進 DevTools 砍掉 IndexedDB 才救得回來。真瀏覽器實測過：停在 v2 舊版開得起來，
 > 升到 v3 舊版就是 `VersionError`。現在 daily-card claim 借用 v2 就存在的
 > `formal_due_claims`（keyPath 三個欄位一模一樣，只是順序不同，而且那個 store 從來沒有
-> 任何 reader、線上也是空的——線上沒有人 import `practice-commit.js`）。
+> 任何 reader、線上也是空的——`0726965` 裡沒有任何檔案 import `practice-commit.js`）。
 
 鏡射把帳本的數字加進 `day` 的 top-level 欄位（`reviewed`／四檔／`practice`），
 `day.ledger` 只留「帳本貢獻了多少」給下次算差額用。所以回滾之後，只讀 top-level 的舊版
