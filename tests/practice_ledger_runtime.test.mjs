@@ -387,3 +387,57 @@ test('R11：採納不能把重置掉的卡救回來（IDB 沒有那一列就不�
   assert.equal(second.connection.srs.size, 0, '重置掉的進度不准被 legacy 救回來');
   assert.equal(second.result.adopted, null);
 });
+
+test('權威列讀失敗只讓帳本這輪不開放，不能連鏡射一起賠掉', async () => {
+  stored.clear();
+  const cards = [{ thai: 'one', card_id: CARD_A }];
+  const lineage = lineageFor({ 'L1:one': [CARD_A] });
+  /* 鏡射是冪等的（同一天寫過就不再算），所以兩輪要用不同的 dayKey，
+     不然第二輪的 mirror.days 本來就會是 0，斷言就變成空的。 */
+  const dayProjection = dayKey => ({
+    [`daily:${dayKey}`]: {
+      workspaceId: 'user:A', name: `daily:${dayKey}`, schemaVersion: 1,
+      projectorVersion: 'practice-daily-v1', dayKey,
+      reviewed: 2, again: 0, hard: 0, good: 2, easy: 0, practice: 1,
+    },
+  });
+  const projections = dayProjection('2026-08-24');
+
+  const first = await startWith({
+    workspaceId: 'user:A',
+    catalog: catalog(cards),
+    legacyProgress: { 'L1:one': stamped(30, 1000) },
+    loadLineageEvidence: lineage,
+    projections,
+  });
+  assert.equal(first.result.status, 'ready');
+  assert.equal(first.result.authoritativeSrs.length, 1, '控制組：讀得到的時候有一列');
+
+  /* 只讓 getAllSrs 壞掉（Safari 儲存吃緊、versionchange 競態都會這樣）。以前這行在
+     所有 inner try 之外，一丟就變成 status:'unavailable'，reconcileLedgerMirror 永遠
+     跑不到——畫面數字少一截，比「帳本這輪不開放」嚴重得多。 */
+  const inner = first.connection.__port;
+  const broken = {
+    ...first.connection,
+    __port: {
+      transaction: (names, mode, work) => inner.transaction(names, mode, ops => work({
+        ...ops,
+        getAllSrs: () => { throw new Error('idb read failed'); },
+      })),
+    },
+  };
+
+  const { result } = await startWith({
+    connection: broken,
+    workspaceId: 'user:A',
+    catalog: catalog(cards),
+    legacyProgress: { 'L1:one': stamped(78, 2000) },
+    loadLineageEvidence: lineage,
+    projections: dayProjection('2026-08-25'),
+  });
+
+  assert.equal(result.status, 'ready', '讀失敗不能把整個 boot 拖成 unavailable');
+  assert.equal(result.mirror.days, 1, '鏡射照跑，畫面數字不能少一截');
+  assert.deepEqual(result.authoritativeSrs, [], '讀不到就當沒有權威列，逐卡閘門自然退回 legacy');
+  assert.equal(result.adopted, null, '讀不到權威列就不能推論誰比較新，這輪不採納');
+});

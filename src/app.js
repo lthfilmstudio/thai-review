@@ -61,9 +61,31 @@ let practiceResetPort = null;
 /* ledger 評分 session。null 代表這次開機沒有帳本路徑可走。 */
 let ledgerSession = null;
 
+/* 每開始一次重置就 +1。用途是給「開始得比重置早、寫入卻比重置晚」的非同步工作
+   一條中止依據——目前只有 cloud-sync 的 v1 匯入 hook 是這種形狀（它中間 await 了
+   一次最長 10 秒的 lineage fetch）。一定要在 await 之前同步遞增：等清完再遞增的話，
+   hook 會讀到舊值、把重置前的排程寫回剛清空的 srs_v2。 */
+let ledgerAuthorityGeneration = 0;
+
+/* lineage evidence 是 1.46 MB 的靜態檔，內容綁在 bundle 上，一次 session 內不會變。
+   它帶 cache: 'no-store'（要的是「一定拿到這個 build 的那份」），所以瀏覽器不會幫忙；
+   cloud-sync 的匯入 hook 每一輪有遠端變動的同步都要用它，不記住的話就是每輪重抓
+   1.46 MB。只記成功的那份——失敗留著會把一次網路問題變成整個 session 都認領不了。 */
+let lineageEvidencePromise = null;
+function loadProductionLineageEvidence() {
+  if (!lineageEvidencePromise) {
+    lineageEvidencePromise = fetchProductionLineageEvidence().catch(error => {
+      lineageEvidencePromise = null;
+      throw error;
+    });
+  }
+  return lineageEvidencePromise;
+}
+
 /* 手動重置與遠端重置 epoch 共用這一條。清不掉就往上丟，讓呼叫端中止——半清的狀態
    比沒清更糟：本機沒了、IDB 還在，下次評分就把重置前的排程當基準算回去。 */
 async function resetLedgerAuthorityOrThrow() {
+  ledgerAuthorityGeneration += 1;
   /* 連線根本沒開＝這個 session 沒碰過 IDB，沒有權威列要清。這裡不能丟：遠端重置
      epoch 的呼叫端在 runSync 裡，例外會被外層 catch 成 warn 而且 watermark 不前進，
      整條雲端同步就永久停擺。注意這跟「runtime 沒起來但連線在」是兩件事——那種
@@ -939,7 +961,7 @@ async function init() {
     storage,
     legacyProgress: state.progress,
     loadLineageEvidence: async () => {
-      const lineageEvidence = await fetchProductionLineageEvidence();
+      const lineageEvidence = await loadProductionLineageEvidence();
       return { lineageEvidence, trustedRevisionManifest: TRUSTED_PRODUCTION_LINEAGE };
     },
     assertActive: id => {
@@ -973,7 +995,11 @@ async function init() {
      採納是後備。 */
   setLegacyImportHook(async winners => {
     if (!practiceResetPort || practiceLedger.status !== 'ready') return;
-    const evidence = await fetchProductionLineageEvidence();
+    /* 進來時的世代。下面那個 await 可能停 10 秒，這段期間使用者按重置的話，
+       winners 就變成「重置前的排程」——寫回去等於重置沒發生，而且新的 updatedAt
+       會通過 epoch 過濾推上雲端擴散到所有裝置。 */
+    const generation = ledgerAuthorityGeneration;
+    const evidence = await loadProductionLineageEvidence();
     const plan = planLegacyV1Import({
       winners,
       currentCatalog: bootResult.catalog,
@@ -982,6 +1008,12 @@ async function init() {
       trustedRevisionManifest: TRUSTED_PRODUCTION_LINEAGE,
     });
     if (!plan.imports.length) return;
+    /* 檢查點要貼著寫入。中間隔了 await 的話，重置可以插在檢查與寫入之間。 */
+    if (generation !== ledgerAuthorityGeneration) {
+      const error = new Error('匯入期間發生重置，這批不寫入');
+      error.code = 'LEDGER_RESET_DURING_IMPORT';
+      throw error;
+    }
     await commitLegacyV1Import({
       port: practiceResetPort,
       workspaceId: practiceLedgerWorkspaceId,
@@ -1030,10 +1062,11 @@ async function init() {
       /* 用 runtime 交出來的那份，不是開機前的 hydration 快照。baseline 與採納都是在
          hydration 之後才寫進 IDB 的——拿快照的話，卡片被 seed 的那一輪逐卡閘門會
          判定「沒有權威列但本機有進度」而退回 legacy，然後 localStorage 就比 IDB 新，
-         那張卡從此再也回不了帳本。 */
-      authoritativeSrsRows: practiceLedger.authoritativeSrs
-        ?? bootResult.hydration?.snapshot?.srs
-        ?? null,
+         那張卡從此再也回不了帳本。
+         （原本這裡還串了 `?? bootResult.hydration?.snapshot?.srs`，但 runtime 在
+         status !== 'unavailable' 時一定給陣列，而 session 只在 'ready' 才建——那條
+         fallback 永遠走不到，留著只會讓人以為還有後備。） */
+      authoritativeSrsRows: practiceLedger.authoritativeSrs,
     });
     // 遠端進度併進來 = 底下的到期狀態變了，讓還在路上的評分失效。
     setRemoteProgressHook(() => ledgerSession?.bumpContextEpoch());

@@ -102,8 +102,11 @@ test('service worker refreshes mutable Thai audio indexes before using cache', (
   }
 });
 
-test('service worker cache version invalidates the stale v97 bundle', () => {
-  assert.ok(sw.includes("const CACHE = 'thai-review-v98';"));
+test('service worker cache version invalidates the stale v98 bundle', () => {
+  /* SHELL 裡的檔案一律 cache-first，而 sw.js 本身 byte 沒變瀏覽器就不會 install，
+     precache 不會重跑——版號沒升＝已安裝的 PWA 永遠拿舊 bundle，部署對裝置是 no-op。
+     所以動到任何 src/*.js 都要連這裡一起升。 */
+  assert.ok(sw.includes("const CACHE = 'thai-review-v99';"));
   assert.ok(sw.includes("'./src/practice-grade-session.js'"),
     'ledger grade session must be available in the offline shell');
   assert.ok(sw.includes("'./src/practice-commit.js'"),

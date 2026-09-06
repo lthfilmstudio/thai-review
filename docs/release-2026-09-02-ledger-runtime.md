@@ -155,8 +155,9 @@ per-deployment URL（`<hash>.thai-review.pages.dev`）不在 Cloudflare Access �
 可以直接開。
 
 1. **fresh page**：DevTools → Application → Service Workers 確認 cache 是
-   `thai-review-v98`；Network 確認 `src/practice-grade-session.js` 拿到的是
-   `text/javascript` 不是 `text/html`。
+   `thai-review-v99`（**要跟線上前一版不同才有意義**——填成當時線上那個版號的話，
+   裝置停在舊 bundle 也會「通過」）；Network 確認 `src/practice-grade-session.js`
+   拿到的是 `text/javascript` 不是 `text/html`。
 2. **Today Due**：評一張，畫面正常前進；Application → IndexedDB →
    `thai-review-practice-v2` 應該多一筆 `practice_events`、一筆 `formal_due_claims`
    （daily-card claim 的實體 store 就是它）。
@@ -225,9 +226,24 @@ version **2**。新版需要的 13 個實體 store，線上那份早就全部建
   已經正確，匯入只是讓帳本跟上，失敗就這輪不收那些卡，開機採納是後備。
   （這點跟 `setRemoteResetHook` 相反，那條是 fail-closed。）
 
-**採納只處理「IDB 有那一列而且比本機舊」**。列不存在就不碰——重置會清光 `srs_v2` 但刻意
-保留 `seededAliases`，若採納在列不存在時也寫入，等於讓 legacy progress 把重置掉的進度
-救回來（R11）。有測試釘住這一條。
+**兩條路的不變式不一樣，別把它們寫成同一條**（第六輪審查抓到這份文件原本就寫錯）：
+
+- **開機採納**：只處理「IDB 有那一列而且比本機舊」。列不存在就不碰——重置會清光
+  `srs_v2` 但刻意保留 `seededAliases`，若採納在列不存在時也寫入，等於讓 legacy
+  progress 把重置掉的進度救回來（R11）。守衛在 `storage-scope.js` 的
+  `pendingLegacyAdoptions`（`!stampByCardId.has(cardId)` 就 continue），有測試釘住。
+- **cloud-sync 匯入**：**會**建立不存在的列，而且必須會——baseline 只對「有 legacy
+  progress 的 alias」種列（`planRuntimeSrsBaseline` 是從 `progress` 展開的），所以
+  「只在別台裝置評過、本機從沒評過」的卡在本機根本沒有那一列，不建就永遠收不進帳本。
+  它擋重置資料靠的是別的東西：`mergeRemoteRows` 的 `resetAt` epoch 過濾（winner 一定
+  是重置後的資料），加上下面那道圍籬。
+
+**重置圍籬**（`ledgerAuthorityGeneration`）：hook 中間 `await` 了一次最長 10 秒的 lineage
+fetch，使用者在那段期間按重置的話，winners 就變成「重置前的排程」。寫回剛清空的 `srs_v2`
+之後 `state.progress` 已經是空的，`ledgerCardEligible` 的 `!legacyProgress → true` 會放行，
+評分從重置前的 interval 續算，再以新的 `updatedAt` 通過 epoch 過濾推上雲端擴散——**重置
+靜默失效**。所以 `resetLedgerAuthorityOrThrow` 在第一個 `await` 之前就同步遞增世代，hook
+進來時抓一份、緊貼著寫入前比對一次，中間不准再有 `await`。三個要素各自反證過會紅。
 
 本機真瀏覽器實測修正後：種完當下那輪評就走帳本（`practice_events` 1、`formal_due_claims`
 1、`srs_v2` v1/interval 78）；再模擬單堂課評分讓 localStorage 前進到 interval 200，重載後
@@ -250,6 +266,61 @@ IDB 被採納到 v2/interval 200、`v1Import.stamp` 對得上。
 那些靠 controller 層的行為測試與各自針對性的位置測試。三輪下來漏掉的（搜尋、設定 modal、
 rerender 擦掉狀態列）全部都是「沒有人看過那個位置」——這條擋得住的正是那一類。
 
+## 第六輪獨立審查（2026-09-06）：U5c 補的六條
+
+兩個 fresh-context 審查員各自跑，兩邊都給「不能上 production」，各抓到一條 P0。
+
+**P0-1 SW cache 版號沒升，這批對已安裝的 PWA 是 no-op。** `sw.js` 從 `d4308a2` 到
+U5c 兩個 commit 一個 byte 都沒動，`CACHE` 還是 `thai-review-v98`＝線上正在跑的那個。
+改到的五支 `src/*.js` 全在 SHELL 裡走 cache-first；`sw.js` bytes 沒變瀏覽器就不會
+install，precache 不會重跑，裝置永遠拿舊 bundle。審查員在真瀏覽器做了對照：同一個
+origin 先裝舊版再切新版，`reg.update()` 之後 `src/app.js` 還是 59,110 bytes、
+`setLegacyImportHook` 不在；只把版號改成 v99，同樣的切換就變成 60,350 bytes、hook 在。
+**部署會成功、read-back 會全對、文件會說 bug 修好了，而 Nalin 的手機跑的是舊 code。**
+→ 升 v99，`tests/service_worker.test.mjs` 那條寫死的斷言一起改，並在部署後確認清單
+裡註明「版號要跟線上前一版不同才有意義」。
+
+**P0-2 匯入 hook 沒有重置圍籬。** 見上一節「重置圍籬」。審查員用真的
+`src/cloud-sync.js` 寫了 repro，讓 hook 停在可控 promise 上、中途重置，實測
+`FINAL: idb=1 gateCache=1 progressKeys=0`——重置後 IDB 又有列、閘門快取又被填滿。
+→ `ledgerAuthorityGeneration` 圍籬，三個要素各自反證過會紅。
+
+**P1-3 權威列讀失敗會連鏡射一起賠掉。** `readRuntimeAuthoritativeSrs` 原本在所有
+inner try 之外，一丟就變 `status:'unavailable'`，`reconcileLedgerMirror` 永遠跑不到。
+相對線上版是回歸（線上只是不開放 ledger 評分，數字照樣鏡射）。
+→ 包 try，讀不到就當沒有權威列（閘門自然退回 legacy，安全方向），有測試釘住。
+
+**P1-4 採納在主執行緒上是 O(alias × 卡片)。** `resolveLegacyAlias` 每次呼叫都把整個
+alias index 攤平重數一遍 `cardIdCounts`，而呼叫端是每個 alias 叫一次。真資料
+（13,738 張卡、13,074 個 alias）實測：
+
+| alias 數 | 修正前 | 修正後 |
+|---|---|---|
+| 20 | 20.6 ms | 4.4 ms |
+| 100 | 90.0 ms | 0.1 ms |
+| 500 | 422.3 ms | 0.4 ms |
+| 2000 | 1596.2 ms | 1.4 ms |
+
+resolved 筆數兩邊完全一樣。這條每天都會走到，而且**這批上線後的第一次開機**待採納
+的量最大（被 legacy 吃掉的卡越多集合越大，那正是這批要修的 bug）。
+→ 照 index 物件記住 `cardIdCounts`（`WeakMap`，連 `size` 一起記，index 變了就重算）。
+
+**P1-5 cloud-sync 每一輪有變動的同步都重抓 1.46 MB。** hook 每次都呼叫
+`fetchProductionLineageEvidence()`，而那支帶 `cache: 'no-store'`，瀏覽器不會幫忙。
+→ `loadProductionLineageEvidence()` 記憶化，**只記成功的那份**（記住失敗會把一次網路
+問題變成整個 session 都認領不了）。
+
+**P2-6 死掉的 fallback。** `authoritativeSrsRows` 原本串了
+`?? bootResult.hydration?.snapshot?.srs ?? null`，但 runtime 在 `status !== 'unavailable'`
+時一定給陣列、session 只在 `'ready'` 才建——那條永遠走不到，留著是假的保護。
+→ 拿掉，contract test 改成 `assert.doesNotMatch`。
+
+**沒有照審查員建議做的一條**：其中一位建議把「IDB 沒那一列就不寫」搬進
+`commitLegacyV1Import`。**沒有照做，因為那會弄壞 cloud-sync 那條路**——baseline 只對
+「有 legacy progress 的 alias」種列，所以「只在別台裝置評過、本機從沒評過」的卡在本機
+根本沒有那一列，不建就永遠收不進帳本。正確的處理是把兩條路的不變式分開寫清楚（已改，
+見上一節），不是把嚴格的那條套到兩邊。
+
 ## 已知的降級（不擋部署，但要知道）
 
 **別台裝置按重置之後，`stamp > resetAt` 而倖存的那些卡會永久留在 legacy。**
@@ -267,3 +338,20 @@ legacy（本機那份才是對的，**不會掉資料**），但 `runtime-srs-ba
   （quarantine 成 `missing_historical_evidence`）。要涵蓋就得重跑一次 Gate B。
 - v1 `thai_days` 沒有 `practice` 欄位，所以 practice-only 的出席只保證本機連續性，
   不宣稱跨裝置同步
+- **cloud-sync 那半的匯入 hook 沒有執行層級的測試**。`tests/cloud_sync.test.mjs` 驗的是
+  cloud-sync 這側何時呼叫 hook（用 stub），`tests/practice_ledger_app_contract.test.mjs`
+  驗的是 `app.js` 的**原始碼文字**。hook 裡面
+  `planLegacyV1Import → commitLegacyV1Import → adoptAuthoritative` 那串只在本機真瀏覽器
+  手動走過開機採納那半；cloud 那半沒有跑過。
+- **`RUNTIME_READBACK_ASSETS` 涵蓋不到 `src/app.js` 與 `src/cloud-sync.js`**，而 U5c 的
+  接線全在這兩支。守門測試的 regex（`^src/(practice-|ledger-|storage-scope|…)`）結構上
+  就挑不到它們。
+- **遠端 winner 只要 `device_id` 是 NULL 就永遠匯不進帳本**：`rowToProgress` 會給
+  `deviceId: null`，`isSrsStateSnapshot` 只收 `undefined` 或字串 → quarantine 成
+  `invalid_srs_snapshot`，而且那筆已經寫進 `state.progress`，下次開機的採納也一樣擋掉。
+  正常路徑的 `nextReview` 一定會填 deviceId，所以只有早期版本寫的列會踩到。
+  **待查**：`select count(*) from thai_cards where device_id is null and grade is not null;`
+  不是 0 的話，那些卡帳本永遠收不回來。
+- **採納失敗完全不可見**：開機採納失敗只寫進 `result.adopted`（沒人讀），cloud hook 失敗
+  只有 `console.warn`。手機上看不到 console，覆蓋率會靜默下滑——這次的 bug 就是這樣拖到
+  線上實測才發現的。

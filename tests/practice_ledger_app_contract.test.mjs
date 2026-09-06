@@ -41,7 +41,11 @@ test('lineage evidence 只從有 SHA-256 綁定的那支拿，不自己 fetch', 
   const end = appSource.indexOf('const deepLink = parseDeepLinkParam();', start);
   const block = appSource.slice(start, end);
 
-  assert.match(block, /fetchProductionLineageEvidence\(\)/);
+  /* loadProductionLineageEvidence 是同一支的記憶化包裝（module scope），底下就是
+     fetchProductionLineageEvidence()。重點是「不繞過 digest 驗證自己去 fetch」。 */
+  assert.match(block, /loadProductionLineageEvidence\(\)/);
+  assert.match(appCode, /lineageEvidencePromise = fetchProductionLineageEvidence\(\)/,
+    '包裝底下要真的是那支，不能換成別的來源');
   assert.match(block, /trustedRevisionManifest: TRUSTED_PRODUCTION_LINEAGE/);
   assert.doesNotMatch(block, /card-id-lineage\.json/,
     '自己 fetch 就繞過了 evidence 的 digest 驗證');
@@ -218,13 +222,11 @@ test('逐卡閘門要用 runtime 交出來的權威列，不是開機前的 hydr
   /* baseline 與採納都在 hydration 之後才寫 IDB。用快照的話，卡片被 seed 的那一輪
      閘門會判定「沒有權威列但本機有進度」而退回 legacy，接著 localStorage 就比 IDB
      新，那張卡從此再也回不了帳本（線上實測過）。 */
-  assert.match(appCode, /authoritativeSrsRows: practiceLedger\.authoritativeSrs/);
+  assert.match(appCode, /authoritativeSrsRows: practiceLedger\.authoritativeSrs,/);
+  /* 不准再串 hydration 快照當 fallback：runtime 在 status !== 'unavailable' 時一定
+     給陣列，而 session 只在 'ready' 才建，那條分支永遠走不到——留著是假的保護。 */
   const at = appCode.indexOf('authoritativeSrsRows:');
-  const block = appCode.slice(at, at + 220);
-  assert.ok(
-    block.indexOf('practiceLedger.authoritativeSrs') < block.indexOf('bootResult.hydration'),
-    'runtime 那份要排在 hydration 快照前面，快照只能當 fallback',
-  );
+  assert.doesNotMatch(appCode.slice(at, at + 220), /bootResult\.hydration/);
 });
 
 test('U5c：遠端 winner 的匯入 hook 有接上，而且會更新 session 的權威快取', () => {
@@ -240,6 +242,33 @@ test('U5c：遠端 winner 的匯入 hook 有接上，而且會更新 session 的
   assert.match(body, /adoptAuthoritative\(/);
   // 信任閘門不能繞過
   assert.match(body, /trustedRevisionManifest: TRUSTED_PRODUCTION_LINEAGE/);
+});
+
+test('U5c：匯入 hook 有重置圍籬，而且圍籬貼著寫入', () => {
+  /* hook 中間 await 了一次最長 10 秒的 lineage fetch。使用者在那段期間按重置的話，
+     winners 就是「重置前的排程」；寫回剛清空的 srs_v2 之後，逐卡閘門會因為
+     state.progress 已經空了而放行（ledgerCardEligible 的 !legacyProgress → true），
+     評分從重置前的 interval 續算，再以新的 updatedAt 通過 epoch 過濾推上雲端擴散。
+     重置靜默失效。 */
+  const reset = appCode.indexOf('async function resetLedgerAuthorityOrThrow() {');
+  assert.ok(reset > 0);
+  const beforeFirstAwait = appCode.slice(reset, appCode.indexOf('await ', reset));
+  assert.match(beforeFirstAwait, /ledgerAuthorityGeneration \+= 1;/,
+    '遞增要在第一個 await 之前——等清完才遞增的話 hook 讀到的還是舊值');
+
+  const hook = appCode.indexOf('setLegacyImportHook(');
+  const body = appCode.slice(hook, appCode.indexOf('\n  });', hook));
+  const capture = body.indexOf('const generation = ledgerAuthorityGeneration;');
+  const fetchAt = body.indexOf('await loadProductionLineageEvidence(');
+  const check = body.indexOf('generation !== ledgerAuthorityGeneration');
+  const commit = body.indexOf('await commitLegacyV1Import(');
+  assert.ok(capture >= 0 && fetchAt >= 0 && check >= 0 && commit >= 0,
+    '圍籬的四個要素都要在 hook 裡');
+  assert.ok(capture < fetchAt, '世代要在 fetch 之前就抓住');
+  assert.ok(check < commit, '比對要在寫入之前');
+  assert.ok(fetchAt < check, '比對要在 await 之後才有意義');
+  assert.doesNotMatch(body.slice(check, commit), /await /,
+    '比對與寫入之間不能再有 await，否則重置可以插進那個縫');
 });
 
 test('AE7：rerender 之後要把鎖住狀態重新套回去', () => {

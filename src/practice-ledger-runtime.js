@@ -131,11 +131,21 @@ export async function startPracticeLedgerRuntime({
 
        走的是 planLegacyV1Import／commitLegacyV1Import：同一套信任閘門（認不出
        alias 就 quarantine，不猜）、同一套單調保護（IDB 較新就不覆蓋）。 */
-    let authoritativeSrs = context.status === 'ready'
-      ? await readRuntimeAuthoritativeSrs({ port, workspaceId })
-      : [];
-    let adopted = null;
+    /* 讀失敗不能拖垮整個 boot。這一行如果直接往外丟，會被最外層 catch 成
+       status:'unavailable'，底下的 reconcileLedgerMirror 就永遠跑不到——畫面數字
+       少一截，比「帳本這輪不開放」嚴重得多。讀不到就當成沒有權威列，逐卡閘門
+       自然把所有卡踢回 legacy，那是安全方向。 */
+    let authoritativeSrs = [];
+    let authoritativeReadFailed = false;
     if (context.status === 'ready') {
+      try {
+        authoritativeSrs = await readRuntimeAuthoritativeSrs({ port, workspaceId });
+      } catch {
+        authoritativeReadFailed = true;
+      }
+    }
+    let adopted = null;
+    if (context.status === 'ready' && !authoritativeReadFailed) {
       const stale = pendingLegacyAdoptions(legacyProgress, authoritativeSrs, catalog);
       if (Object.keys(stale).length) {
         try {
