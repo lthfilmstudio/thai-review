@@ -209,6 +209,19 @@ test('AE7：會動 context 的位置清單沒有變動（新增一處就要來�
   assert.equal(found.length, CONTEXT_MUTATION_SITES.length, '重複出現的行數也要對得上');
 });
 
+test('逐卡閘門要用 runtime 交出來的權威列，不是開機前的 hydration 快照', () => {
+  /* baseline 與採納都在 hydration 之後才寫 IDB。用快照的話，卡片被 seed 的那一輪
+     閘門會判定「沒有權威列但本機有進度」而退回 legacy，接著 localStorage 就比 IDB
+     新，那張卡從此再也回不了帳本（線上實測過）。 */
+  assert.match(appCode, /authoritativeSrsRows: practiceLedger\.authoritativeSrs/);
+  const at = appCode.indexOf('authoritativeSrsRows:');
+  const block = appCode.slice(at, at + 220);
+  assert.ok(
+    block.indexOf('practiceLedger.authoritativeSrs') < block.indexOf('bootResult.hydration'),
+    'runtime 那份要排在 hydration 快照前面，快照只能當 fallback',
+  );
+});
+
 test('AE7：rerender 之後要把鎖住狀態重新套回去', () => {
   /* 狀態列與重試鈕是 card.js 每次 render 重新產生的、寫死 hidden，評分鈕的 disabled
      也會被沖掉。少了這一行，失敗期間任何一次 rerender 都會讓出路從畫面上消失，而

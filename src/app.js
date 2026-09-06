@@ -998,7 +998,13 @@ async function init() {
         afterGradeAdvance(storage, key, false);
       },
       onStateChange: ({ status }) => { renderLedgerSavingState(status); },
-      authoritativeSrsRows: bootResult.hydration?.snapshot?.srs || null,
+      /* 用 runtime 交出來的那份，不是開機前的 hydration 快照。baseline 與採納都是在
+         hydration 之後才寫進 IDB 的——拿快照的話，卡片被 seed 的那一輪逐卡閘門會
+         判定「沒有權威列但本機有進度」而退回 legacy，然後 localStorage 就比 IDB 新，
+         那張卡從此再也回不了帳本。 */
+      authoritativeSrsRows: practiceLedger.authoritativeSrs
+        ?? bootResult.hydration?.snapshot?.srs
+        ?? null,
     });
     // 遠端進度併進來 = 底下的到期狀態變了，讓還在路上的評分失效。
     setRemoteProgressHook(() => ledgerSession?.bumpContextEpoch());

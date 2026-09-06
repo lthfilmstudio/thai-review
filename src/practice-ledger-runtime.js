@@ -8,10 +8,14 @@
 import { cardIdOf, legacyAliasOf } from './card-identity.js';
 import { createPracticeTransactionPort } from './practice-db.js';
 import {
+  commitLegacyV1Import,
   commitRuntimeSrsBaseline,
   ensureRuntimeLedgerContext,
   pendingBaselineAliases,
+  pendingLegacyAdoptions,
+  planLegacyV1Import,
   planRuntimeSrsBaseline,
+  readRuntimeAuthoritativeSrs,
   readRuntimeBaselineState,
 } from './storage-scope.js';
 import { reconcileLedgerMirror } from './ledger-mirror.js';
@@ -119,6 +123,40 @@ export async function startPracticeLedgerRuntime({
       }
     }
 
+    /* 採納：本機比 IDB 新的卡要寫回權威列，否則帳本永遠收不回它。
+
+       這條路每天都會走到——單堂課評分一律走 legacy，評完 localStorage 的時間戳就
+       比 IDB 那份新，而逐卡閘門要求「IDB 不比本機舊」才放行。沒有這一步的話，
+       一張卡只要被 legacy 評過一次就永久離開帳本，覆蓋率會隨著使用一路掉。
+
+       走的是 planLegacyV1Import／commitLegacyV1Import：同一套信任閘門（認不出
+       alias 就 quarantine，不猜）、同一套單調保護（IDB 較新就不覆蓋）。 */
+    let authoritativeSrs = context.status === 'ready'
+      ? await readRuntimeAuthoritativeSrs({ port, workspaceId })
+      : [];
+    let adopted = null;
+    if (context.status === 'ready') {
+      const stale = pendingLegacyAdoptions(legacyProgress, authoritativeSrs, catalog);
+      if (Object.keys(stale).length) {
+        try {
+          const evidence = loadLineageEvidence ? await loadLineageEvidence() : null;
+          const plan = planLegacyV1Import({
+            winners: stale,
+            currentCatalog: catalog,
+            catalogDigest,
+            lineageEvidence: evidence?.lineageEvidence ?? null,
+            trustedRevisionManifest: evidence?.trustedRevisionManifest ?? null,
+          });
+          const result = await commitLegacyV1Import({ port, workspaceId, plan });
+          adopted = { summary: plan.summary, result };
+          authoritativeSrs = await readRuntimeAuthoritativeSrs({ port, workspaceId });
+        } catch (error) {
+          // 採納失敗不影響這次開機：那些卡這輪繼續走 legacy，下次再試。
+          adopted = { status: 'failed', reason: error?.code || 'LEGACY_ADOPTION_FAILED' };
+        }
+      }
+    }
+
     // 鏡射跟 fence 分開：就算 ledger 評分沒開放，已經在 IDB 裡的東西還是該讓
     // 使用者在畫面上看到，不然重開一次數字就少一截。
     const mirror = reconcileLedgerMirror({
@@ -134,6 +172,10 @@ export async function startPracticeLedgerRuntime({
       port,
       mirror,
       backfill,
+      adopted,
+      /* 評分 session 的逐卡閘門要用這份，不能用開機前的 hydration 快照——
+         baseline 與採納都是在那之後才寫的。 */
+      authoritativeSrs,
     };
   } catch (error) {
     return { status: 'unavailable', reason: error?.code || 'PRACTICE_LEDGER_START_FAILED', error };

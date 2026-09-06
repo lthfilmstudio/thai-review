@@ -60,6 +60,8 @@ function fakeConnection() {
           getWorkspaceMeta: (_w, key) => structuredClone(meta.get(key) || null),
           putWorkspaceMeta: (_w, key, row) => { meta.set(key, structuredClone(row)); },
           getSrs: (_w, cardId) => structuredClone(srs.get(cardId) || null),
+          getAllSrs: () => [...srs.values()].map(row => structuredClone(row)),
+          putSrs: (_w, cardId, row) => { srs.set(cardId, structuredClone(row)); },
           addSrsBaseline: (_w, cardId, row) => {
             if (srs.has(cardId)) return false;
             srs.set(cardId, structuredClone(row));
@@ -251,4 +253,105 @@ test('補跑 baseline 失敗不影響這次開機', async () => {
   assert.equal(second.result.status, 'ready', '已經認領過的照樣可用');
   assert.equal(second.result.backfill.status, 'failed');
   assert.equal(second.result.backfill.reason, 'LEGACY_LINEAGE_UNAVAILABLE');
+});
+
+/* ===== 開機採納（U5c 的本機那半）=====
+
+   線上實測抓到的：卡片被 baseline seed 進 IDB 的那一輪，`authoritativeSrsRows` 取自
+   開機前的 hydration 快照，還看不到剛寫進去的列 → 逐卡閘門判定「沒有權威列但本機有
+   進度」→ 退回 legacy。而 legacy 評完 localStorage 時間戳就比 IDB 新，閘門要求
+   IDB >= 本機，於是那張卡永久離開帳本——單堂課評分每一次都會造成這個結果。 */
+
+const stamped = (interval, updatedAt) => ({
+  grade: 'good', interval, reps: 5, easeFactor: 2.5,
+  reviewedAt: updatedAt, nextReviewAt: updatedAt, updatedAt,
+});
+
+function lineageFor(aliases) {
+  const snapshot = revision => ({ revision, complete: true, aliases });
+  return async () => ({
+    lineageEvidence: {
+      kind: 'production-lineage-evidence-v1', evidenceId: 'x:r1+r2',
+      completeness: 'complete', expectedRevisions: ['r1', 'r2'],
+      snapshots: [snapshot('r1'), snapshot('r2')],
+    },
+    trustedRevisionManifest: {
+      kind: 'trusted-lineage-revision-manifest-v1',
+      revisions: ['r1', 'r2'], allowHistoricalSnapshotEvidence: true,
+    },
+  });
+}
+
+test('handle 交出的權威列包含這一輪剛 seed 進去的，不是開機前的快照', async () => {
+  stored.clear();
+  const { result } = await startWith({
+    workspaceId: 'user:A',
+    catalog: catalog([{ thai: 'one', card_id: CARD_A }]),
+    legacyProgress: { 'L1:one': stamped(30, 1000) },
+    loadLineageEvidence: lineageFor({ 'L1:one': [CARD_A] }),
+  });
+
+  assert.equal(result.status, 'ready');
+  assert.equal(result.authoritativeSrs.length, 1,
+    '同一輪 seed 的列要看得見，否則第一次評分會退回 legacy');
+  assert.equal(result.authoritativeSrs[0].cardId, CARD_A);
+  assert.equal(result.authoritativeSrs[0].state.interval, 30);
+});
+
+test('本機比 IDB 新的卡會被採納回帳本（否則評過一次就永久走 legacy）', async () => {
+  stored.clear();
+  const cards = [{ thai: 'one', card_id: CARD_A }];
+  const lineage = lineageFor({ 'L1:one': [CARD_A] });
+
+  const first = await startWith({
+    workspaceId: 'user:A',
+    catalog: catalog(cards),
+    legacyProgress: { 'L1:one': stamped(30, 1000) },
+    loadLineageEvidence: lineage,
+  });
+  assert.equal(first.connection.srs.get(CARD_A).state.interval, 30);
+
+  // 這輪之間使用者在單堂課評過一次：localStorage 前進，IDB 沒動
+  const second = await startWith({
+    connection: first.connection,
+    workspaceId: 'user:A',
+    catalog: catalog(cards),
+    legacyProgress: { 'L1:one': stamped(78, 2000) },
+    loadLineageEvidence: lineage,
+  });
+
+  const row = second.connection.srs.get(CARD_A);
+  assert.equal(row.state.interval, 78, 'IDB 要追上本機，帳本才收得回這張卡');
+  assert.equal(row.state.updatedAt, 2000);
+  assert.ok(row.version > 0, '採納要留下版本痕跡');
+  assert.equal(second.result.adopted?.summary.importable, 1);
+  assert.equal(second.result.authoritativeSrs[0].state.interval, 78);
+});
+
+test('IDB 比本機新時不覆蓋（單調），也不白抓 lineage', async () => {
+  stored.clear();
+  const cards = [{ thai: 'one', card_id: CARD_A }];
+  let fetches = 0;
+  const lineage = aliases => async () => { fetches += 1; return lineageFor(aliases)(); };
+
+  const first = await startWith({
+    workspaceId: 'user:A',
+    catalog: catalog(cards),
+    legacyProgress: { 'L1:one': stamped(30, 5000) },
+    loadLineageEvidence: lineage({ 'L1:one': [CARD_A] }),
+  });
+  const afterSeed = fetches;
+
+  // 本機那份比較舊（例如剛被雲端重置擋掉的殘留），不該被拿去覆蓋 IDB
+  const second = await startWith({
+    connection: first.connection,
+    workspaceId: 'user:A',
+    catalog: catalog(cards),
+    legacyProgress: { 'L1:one': stamped(3, 1000) },
+    loadLineageEvidence: lineage({ 'L1:one': [CARD_A] }),
+  });
+
+  assert.equal(second.connection.srs.get(CARD_A).state.interval, 30, '不准回捲');
+  assert.equal(second.result.adopted, null, '沒有要採納的就不動');
+  assert.equal(fetches, afterSeed, '沒有待採納的 alias 就不白抓 lineage evidence');
 });

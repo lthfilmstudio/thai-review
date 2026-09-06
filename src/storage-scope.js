@@ -4,8 +4,10 @@
    learning read/write reaches a store. */
 
 import {
+  cardIdOf,
   indexLegacyAliases,
   isStableCardId,
+  legacyAliasOf,
   resolveLegacyAlias,
 } from './card-identity.js';
 import { isSrsStateSnapshot } from './srs.js';
@@ -1661,6 +1663,48 @@ function legacyV1ImportSignature(plan) {
 /* R10／KTD7：v1 雲端同步拉回來的 winner 要先過信任閘門轉成 stable card ID 再寫進
    IDB，之後才鏡射給 state。winners 就是 mergeRemoteRows() 的 progress——只包含
    「遠端比較新、需要覆蓋本機」的項目，合併判斷已經在那裡做完了。 */
+/* 讀這個 workspace 目前所有權威 SRS 列。開機時要用它做兩件事：交給評分 session
+   當逐卡閘門的判準（不能用開機前的 hydration 快照——baseline 就是在那之後才寫的），
+   以及找出「本機比 IDB 新」需要採納的卡。 */
+export async function readRuntimeAuthoritativeSrs({ port, workspaceId } = {}) {
+  const workspace = requiredIdentity(workspaceId);
+  if (!port || typeof port.transaction !== 'function') {
+    throw codedError('STORAGE_UNAVAILABLE', 'authoritative SRS read requires a transaction port');
+  }
+  return port.transaction(['srsV2'], 'readonly', async tx => {
+    requiredContextMethod(tx, 'getAllSrs');
+    const rows = await tx.getAllSrs(workspace);
+    return (Array.isArray(rows) ? rows : []).map(row => structuredClone(row));
+  });
+}
+
+/* 哪些 alias 的本機進度比 IDB 那份新？只回傳 alias→state，交給 planLegacyV1Import
+   過信任閘門——這裡用 catalog 做的 alias→cardId 只是為了不要每次開機都對一萬多張卡
+   跑一次交易，真正決定寫不寫得進去的仍然是 lineage。 */
+export function pendingLegacyAdoptions(progress, authoritativeRows, catalog) {
+  if (!plainRecord(progress)) return {};
+  const stampByCardId = new Map(
+    (authoritativeRows || [])
+      .filter(row => row && typeof row.cardId === 'string')
+      .map(row => [row.cardId, progressStamp(row.state)]),
+  );
+  const cardIdByAlias = new Map();
+  for (const lesson of catalog?.lessons || []) {
+    for (const card of lesson?.cards || []) {
+      const alias = legacyAliasOf(card, lesson?.id);
+      const cardId = cardIdOf(card);
+      if (alias && cardId) cardIdByAlias.set(alias, cardId);
+    }
+  }
+  const pending = {};
+  for (const [alias, state] of Object.entries(progress)) {
+    const cardId = cardIdByAlias.get(alias);
+    if (!cardId || !stampByCardId.has(cardId)) continue;
+    if (progressStamp(state) > stampByCardId.get(cardId)) pending[alias] = structuredClone(state);
+  }
+  return pending;
+}
+
 export function planLegacyV1Import({
   winners,
   currentCatalog,
