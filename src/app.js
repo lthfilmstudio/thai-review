@@ -1019,10 +1019,15 @@ async function init() {
       workspaceId: practiceLedgerWorkspaceId,
       plan,
     });
-    ledgerSession?.adoptAuthoritative(await readRuntimeAuthoritativeSrs({
+    const adopted = await readRuntimeAuthoritativeSrs({
       port: practiceResetPort,
       workspaceId: practiceLedgerWorkspaceId,
-    }));
+    });
+    /* 讀完到寫進記憶體快取之間也有縫：重置插在這裡的話 IDB 已經正確歸零，但這一行
+       會把閘門快取重新填回去，直接違反 clearAuthoritative() 那段宣告的不變式。
+       比對過就什麼都不做——重置自己已經清乾淨了。 */
+    if (generation !== ledgerAuthorityGeneration) return;
+    ledgerSession?.adoptAuthoritative(adopted);
   });
   if (practiceLedger.status === 'ready') {
     const cardKeyById = catalogCardKeyIndex(bootResult.catalog);

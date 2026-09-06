@@ -252,23 +252,36 @@ test('U5c：匯入 hook 有重置圍籬，而且圍籬貼著寫入', () => {
      重置靜默失效。 */
   const reset = appCode.indexOf('async function resetLedgerAuthorityOrThrow() {');
   assert.ok(reset > 0);
-  const beforeFirstAwait = appCode.slice(reset, appCode.indexOf('await ', reset));
-  assert.match(beforeFirstAwait, /ledgerAuthorityGeneration \+= 1;/,
-    '遞增要在第一個 await 之前——等清完才遞增的話 hook 讀到的還是舊值');
+  /* 「在第一個 await 之前」還不夠嚴：提早 return 那段本來就在 await 之前，遞增搬到
+     它後面照樣會過。要求它是函式的第一個敘述（排在提早 return 的條件之前）。 */
+  const body = appCode.slice(reset, appCode.indexOf('await ', reset));
+  const bump = body.indexOf('ledgerAuthorityGeneration += 1;');
+  assert.ok(bump >= 0, '重置要遞增世代，否則在飛的匯入會把重置前的排程寫回來');
+  assert.ok(bump < body.indexOf('practiceResetPort'),
+    '遞增要是函式的第一個敘述，排在提早 return 的條件之前');
 
   const hook = appCode.indexOf('setLegacyImportHook(');
-  const body = appCode.slice(hook, appCode.indexOf('\n  });', hook));
-  const capture = body.indexOf('const generation = ledgerAuthorityGeneration;');
-  const fetchAt = body.indexOf('await loadProductionLineageEvidence(');
-  const check = body.indexOf('generation !== ledgerAuthorityGeneration');
-  const commit = body.indexOf('await commitLegacyV1Import(');
+  const hookBody = appCode.slice(hook, appCode.indexOf('\n  });', hook));
+  const capture = hookBody.indexOf('const generation = ledgerAuthorityGeneration;');
+  const fetchAt = hookBody.indexOf('await loadProductionLineageEvidence(');
+  const check = hookBody.indexOf('generation !== ledgerAuthorityGeneration');
+  const commit = hookBody.indexOf('await commitLegacyV1Import(');
   assert.ok(capture >= 0 && fetchAt >= 0 && check >= 0 && commit >= 0,
     '圍籬的四個要素都要在 hook 裡');
   assert.ok(capture < fetchAt, '世代要在 fetch 之前就抓住');
   assert.ok(check < commit, '比對要在寫入之前');
   assert.ok(fetchAt < check, '比對要在 await 之後才有意義');
-  assert.doesNotMatch(body.slice(check, commit), /await /,
+  assert.doesNotMatch(hookBody.slice(check, commit), /await /,
     '比對與寫入之間不能再有 await，否則重置可以插進那個縫');
+
+  /* 寫完之後還要再比對一次才能更新記憶體的閘門快取：重置插在「權威列讀完」與
+     「寫進快取」之間的話，IDB 已經正確歸零，這一行卻會把快取填回去。 */
+  const adoptCheck = hookBody.lastIndexOf('generation !== ledgerAuthorityGeneration');
+  const adopt = hookBody.indexOf('adoptAuthoritative(');
+  assert.ok(adoptCheck > check, '更新閘門快取之前要有第二次比對');
+  assert.ok(adoptCheck < adopt, '第二次比對要排在 adoptAuthoritative 之前');
+  assert.doesNotMatch(hookBody.slice(adoptCheck, adopt), /await /,
+    '第二次比對與更新快取之間也不能有 await');
 });
 
 test('AE7：rerender 之後要把鎖住狀態重新套回去', () => {

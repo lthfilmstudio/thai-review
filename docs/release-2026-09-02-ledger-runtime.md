@@ -242,8 +242,18 @@ version **2**。新版需要的 13 個實體 store，線上那份早就全部建
 fetch，使用者在那段期間按重置的話，winners 就變成「重置前的排程」。寫回剛清空的 `srs_v2`
 之後 `state.progress` 已經是空的，`ledgerCardEligible` 的 `!legacyProgress → true` 會放行，
 評分從重置前的 interval 續算，再以新的 `updatedAt` 通過 epoch 過濾推上雲端擴散——**重置
-靜默失效**。所以 `resetLedgerAuthorityOrThrow` 在第一個 `await` 之前就同步遞增世代，hook
-進來時抓一份、緊貼著寫入前比對一次，中間不准再有 `await`。三個要素各自反證過會紅。
+靜默失效**。所以 `resetLedgerAuthorityOrThrow` **第一個敘述**就同步遞增世代（連提早
+return 的條件都排在它後面），hook 進來時抓一份，然後比對**兩次**：一次緊貼
+`commitLegacyV1Import`，一次緊貼 `adoptAuthoritative`——後者是第七輪審查補的，重置插在
+「權威列讀完」與「寫進記憶體閘門快取」之間的話，IDB 已經正確歸零，那一行卻會把快取
+填回去。兩處比對與其後的寫入之間都不准再有 `await`，測試連這一點一起釘。
+
+第七輪審查用真的 `src/cloud-sync.js` 重建了這個競態：
+```
+控制組（沒有圍籬）：idbInterval 40、idbRows 1、authoritativeCount 1   ← 重置被復活
+實驗組（有圍籬）  ：idbInterval null、idbRows 0、authoritativeCount 0
+                    ledger legacy import skipped: LEDGER_RESET_DURING_IMPORT
+```
 
 本機真瀏覽器實測修正後：種完當下那輪評就走帳本（`practice_events` 1、`formal_due_claims`
 1、`srs_v2` v1/interval 78）；再模擬單堂課評分讓 localStorage 前進到 interval 200，重載後
@@ -349,11 +359,17 @@ legacy（本機那份才是對的，**不會掉資料**），但 `runtime-srs-ba
   （quarantine 成 `missing_historical_evidence`）。要涵蓋就得重跑一次 Gate B。
 - v1 `thai_days` 沒有 `practice` 欄位，所以 practice-only 的出席只保證本機連續性，
   不宣稱跨裝置同步
+- **SW 版號的測試斷言是寫死字面量**（`assert.ok(sw.includes("const CACHE = 'thai-review-v99';"))`）。
+  它證明的是「這次改了」，不是「跟線上不同」。v99 上線之後這條就變成同義反覆，下一批
+  改 `src/*.js` 忘了升版一樣不會紅。真正的保證只在部署後那份人工清單裡。
 - **cloud-sync 那半的匯入 hook 沒有執行層級的測試**。`tests/cloud_sync.test.mjs` 驗的是
   cloud-sync 這側何時呼叫 hook（用 stub），`tests/practice_ledger_app_contract.test.mjs`
   驗的是 `app.js` 的**原始碼文字**。hook 裡面
   `planLegacyV1Import → commitLegacyV1Import → adoptAuthoritative` 那串只在本機真瀏覽器
-  手動走過開機採納那半；cloud 那半沒有跑過。
+  手動走過開機採納那半；cloud 那半沒有跑過。第七輪審查寫了一支約 60 行的 repro
+  （真 `cloud-sync.js` + 真 `storage-scope.js`，控制組會紅）證明這是做得到的，但它把
+  hook body 照抄了一份——要變成常駐測試得先把 hook body 從 `app.js` 抽成可匯入的模組，
+  否則測的是副本、會跟本體漂移。
 - **`RUNTIME_READBACK_ASSETS` 涵蓋不到 `src/app.js` 與 `src/cloud-sync.js`**，而 U5c 的
   接線全在這兩支。守門測試的 regex（`^src/(practice-|ledger-|storage-scope|…)`）結構上
   就挑不到它們。
