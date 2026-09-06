@@ -274,8 +274,10 @@ rerender 擦掉狀態列）全部都是「沒有人看過那個位置」——�
 U5c 兩個 commit 一個 byte 都沒動，`CACHE` 還是 `thai-review-v98`＝線上正在跑的那個。
 改到的五支 `src/*.js` 全在 SHELL 裡走 cache-first；`sw.js` bytes 沒變瀏覽器就不會
 install，precache 不會重跑，裝置永遠拿舊 bundle。審查員在真瀏覽器做了對照：同一個
-origin 先裝舊版再切新版，`reg.update()` 之後 `src/app.js` 還是 59,110 bytes、
-`setLegacyImportHook` 不在；只把版號改成 v99，同樣的切換就變成 60,350 bytes、hook 在。
+origin 先裝舊版再切新版，`reg.update()` 之後頁面拿到的 `src/app.js` 還是 59,110 個字元、
+`setLegacyImportHook` 不在；只把版號改成 v99，同樣的切換就變成 60,350 個字元、hook 在。
+（那兩個數字是 `(await res.text()).length`，UTF-16 code unit，不是 bytes——檔案實際的
+UTF-8 大小是 66,714 與 68,240。實驗是真的，第一次寫的時候單位標錯。）
 **部署會成功、read-back 會全對、文件會說 bug 修好了，而 Nalin 的手機跑的是舊 code。**
 → 升 v99，`tests/service_worker.test.mjs` 那條寫死的斷言一起改，並在部署後確認清單
 裡註明「版號要跟線上前一版不同才有意義」。
@@ -294,18 +296,27 @@ inner try 之外，一丟就變 `status:'unavailable'`，`reconcileLedgerMirror`
 alias index 攤平重數一遍 `cardIdCounts`，而呼叫端是每個 alias 叫一次。真資料
 （13,738 張卡、13,074 個 alias）實測：
 
-| alias 數 | 修正前 | 修正後 |
+| alias 數 | 每個 alias 各數一次 | 迴圈外算一次傳進去 |
 |---|---|---|
-| 20 | 20.6 ms | 4.4 ms |
-| 100 | 90.0 ms | 0.1 ms |
-| 500 | 422.3 ms | 0.4 ms |
-| 2000 | 1596.2 ms | 1.4 ms |
+| 100 | 79.3 ms | 0.8 ms |
+| 2000 | 1458.7 ms | 1.1 ms |
+| 13074（全部） | 9577.7 ms | 3.2 ms |
 
-resolved 筆數兩邊完全一樣。這條每天都會走到，而且**這批上線後的第一次開機**待採納
-的量最大（被 legacy 吃掉的卡越多集合越大，那正是這批要修的 bug）。
-→ 照 index 物件記住 `cardIdCounts`（`WeakMap`，連 `size` 一起記，index 變了就重算）。
+resolved 筆數兩邊完全一樣（2000 → 1839／1839，全部 → 11792／11792）。這條每天都會
+走到，而且**這批上線後的第一次開機**待採納的量最大（被 legacy 吃掉的卡越多集合越大，
+那正是這批要修的 bug）。
+→ `resolveLegacyAlias(alias, index, cardIdCounts)` 多收一個參數，唯一的 production
+呼叫端（`storage-scope.js` 的 `resolveLegacyProgressEntries`）在迴圈外算一次傳進去。
 
-**P1-5 cloud-sync 每一輪有變動的同步都重抓 1.46 MB。** hook 每次都呼叫
+**中間走過一次錯路，記在這裡**：第一版是用 `WeakMap` 照 index 物件快取，帶 `size`
+當防呆，註解寫「index 變了就重算」。第七輪審查實測打穿：`size` 一樣但內容變了的
+mutation 擋不住——把某個 alias 的 entries 換成指向另一張卡（alias 數不變），本該
+`duplicate_stable_card_id` quarantine 的會變成 `resolved`，等於讓某張卡的進度寫到
+另一張卡身上。而且把那個 `size` 守衛整條拿掉，全套測試還是 585 全綠。**與其留一個
+擋不住主要 mutation、卻在註解裡宣稱有守衛的快取，不如把統計是誰算的、什麼時候算的
+攤在呼叫端。** 現在有測試釘住「傳進來的 counts 會被採用」與「不是 Map 就當沒傳」。
+
+**P1-5 cloud-sync 每一輪有變動的同步都重抓 1.76 MiB。** hook 每次都呼叫
 `fetchProductionLineageEvidence()`，而那支帶 `cache: 'no-store'`，瀏覽器不會幫忙。
 → `loadProductionLineageEvidence()` 記憶化，**只記成功的那份**（記住失敗會把一次網路
 問題變成整個 session 都認領不了）。

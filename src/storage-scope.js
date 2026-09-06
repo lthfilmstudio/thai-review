@@ -5,6 +5,7 @@
 
 import {
   cardIdOf,
+  countCardIds,
   indexLegacyAliases,
   isStableCardId,
   legacyAliasOf,
@@ -1291,6 +1292,8 @@ function resolveLegacyProgressEntries({
     throw codedError(invalidCode, 'catalogDigest does not match the given catalog');
   }
   const catalogIndex = indexLegacyAliases(runtimeCatalogCards(currentCatalog));
+  /* 迴圈外算一次。傳進去之前不准再改 catalogIndex——底下只讀它。 */
+  const catalogCardIdCounts = countCardIds(catalogIndex);
   const lineage = normalizeLineageEvidence(lineageEvidence, trustedRevisionManifest);
   const resolved = [];
   const quarantined = [];
@@ -1302,7 +1305,7 @@ function resolveLegacyProgressEntries({
     if (!isSrsStateSnapshot(state)) {
       reason = 'invalid_srs_snapshot';
     } else {
-      const current = resolveLegacyAlias(legacyAlias, catalogIndex);
+      const current = resolveLegacyAlias(legacyAlias, catalogIndex, catalogCardIdCounts);
       if (current.status !== 'resolved') {
         reason = current.reason === 'ambiguous_legacy_alias'
           ? 'current_catalog_collision'

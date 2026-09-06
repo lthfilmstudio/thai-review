@@ -7,6 +7,7 @@ const {
   legacyAliasOf,
   indexLegacyAliases,
   resolveLegacyAlias,
+  countCardIds,
 } = await import('../src/card-identity.js');
 
 const ID_A = '550e8400-e29b-41d4-a716-446655440000';
@@ -87,4 +88,38 @@ test('missing or unidentified legacy aliases stay unresolved or quarantined', ()
   const result = resolveLegacyAlias('L1:沒有 ID', index);
   assert.equal(result.status, 'quarantine');
   assert.equal(result.reason, 'unidentified_legacy_alias');
+});
+
+test('countCardIds 數的是整份 index 裡每個 stable ID 出現幾次', () => {
+  const index = indexLegacyAliases([
+    { _lessonId: 'L1', thai: '甲', card_id: ID_A },
+    { _lessonId: 'L1', thai: '乙', card_id: ID_A },
+    { _lessonId: 'L1', thai: '丙', card_id: ID_B },
+    { _lessonId: 'L1', thai: '丁' },
+  ]);
+  const counts = countCardIds(index);
+  assert.equal(counts.get(ID_A), 2, '跨 alias 重複的要數到 2，那是 duplicate 閘門的依據');
+  assert.equal(counts.get(ID_B), 1);
+  assert.equal(counts.size, 2, '沒有 card_id 的卡不進統計');
+  assert.deepEqual(countCardIds(null), new Map(), 'index 不是 Map 就是空統計');
+});
+
+test('傳進來的 cardIdCounts 會被採用（迴圈式呼叫端在迴圈外算一次）', () => {
+  /* 這份統計是「整份 catalog 裡這個 ID 出現幾次」，跟 alias 無關，所以呼叫端每個
+     alias 叫一次的話會變成 O(alias × 卡片)。允許外面算好傳進來，但那也表示這個參數
+     必須真的被採用——不採用的話效能修正是假的，而且沒有任何行為差異看得出來。 */
+  const index = indexLegacyAliases([{ _lessonId: 'L1', thai: '甲', card_id: ID_A }]);
+  assert.deepEqual(resolveLegacyAlias('L1:甲', index), { status: 'resolved', cardId: ID_A, alias: 'L1:甲' });
+
+  const claimsDuplicate = new Map([[ID_A, 2]]);
+  assert.deepEqual(resolveLegacyAlias('L1:甲', index, claimsDuplicate), {
+    status: 'quarantine',
+    reason: 'duplicate_stable_card_id',
+    alias: 'L1:甲',
+    candidates: [ID_A],
+  });
+
+  // 不是 Map 的東西一律當沒傳，回去自己數；不能拿垃圾當統計用
+  assert.equal(resolveLegacyAlias('L1:甲', index, { [ID_A]: 2 }).status, 'resolved');
+  assert.equal(resolveLegacyAlias('L1:甲', index, null).status, 'resolved');
 });

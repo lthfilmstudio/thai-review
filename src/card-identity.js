@@ -36,36 +36,37 @@ export function indexLegacyAliases(cards = []) {
   return index;
 }
 
-/* cardIdCounts 是「整個 index」的統計，跟 alias 無關，但呼叫端是每個 alias 叫一次。
-   原本每次都重數一遍＝O(alias 數 × 卡片數)：13,738 張卡下量到約 1 ms／alias，
-   一次採納 2,000 張就是主執行緒卡住 2 秒（手機更久）。這裡照 index 物件記住結果。
-   size 一起記是防呆：index 被加過東西就重算，不要拿舊統計去判 duplicate。 */
-const cardIdCountsCache = new WeakMap();
-
-function countCardIds(aliasIndex) {
-  if (!(aliasIndex instanceof Map)) return new Map();
-  const cached = cardIdCountsCache.get(aliasIndex);
-  if (cached && cached.size === aliasIndex.size) return cached.counts;
+/* 「同一個 stable card ID 在整份 catalog 裡出現幾次」的統計，跟 alias 無關。
+   拿來判 duplicate_stable_card_id——那是防止把兩張不同的卡認成同一張的安全閘門。 */
+export function countCardIds(aliasIndex) {
   const counts = new Map();
+  if (!(aliasIndex instanceof Map)) return counts;
   for (const value of aliasIndex.values()) {
     for (const entry of Array.isArray(value) ? value : []) {
       if (entry?.cardId) counts.set(entry.cardId, (counts.get(entry.cardId) || 0) + 1);
     }
   }
-  cardIdCountsCache.set(aliasIndex, { size: aliasIndex.size, counts });
   return counts;
 }
 
-export function resolveLegacyAlias(alias, index) {
+/* cardIdCounts 是整個 index 的統計，但呼叫端是每個 alias 叫一次。不傳就每次重數一遍
+   ＝O(alias 數 × 卡片數)：13,738 張卡下約 1 ms／alias，一次採納 2,000 張就是主執行緒
+   卡住 1.6 秒（手機更久）。所以迴圈式的呼叫端要在迴圈外算一次傳進來。
+
+   曾經改成用 WeakMap 照 index 物件快取，帶 size 當防呆——但 size 一樣、內容變了的
+   mutation 擋不住（獨立審查實測：把某個 alias 的 entries 換成指向另一張卡，本該
+   quarantine 的會變成 resolved），而註解卻寫得像有守衛。與其留一個假的守衛，不如
+   讓「這份統計是誰算的、什麼時候算的」在呼叫端看得見。 */
+export function resolveLegacyAlias(alias, index, cardIdCounts = null) {
   const aliasIndex = Array.isArray(index) ? indexLegacyAliases(index) : index;
   const candidates = aliasIndex?.get(alias);
   const entries = Array.isArray(candidates) ? candidates : [];
   const resolvedIds = [...new Set(entries.map(entry => entry?.cardId).filter(Boolean))];
-  const cardIdCounts = countCardIds(aliasIndex);
+  const counts = cardIdCounts instanceof Map ? cardIdCounts : countCardIds(aliasIndex);
 
   if (entries.length === 1 && resolvedIds.length === 1 && entries.every(entry => entry?.cardId)) {
     const cardId = resolvedIds[0];
-    if ((cardIdCounts.get(cardId) || 0) > 1) {
+    if ((counts.get(cardId) || 0) > 1) {
       return {
         status: 'quarantine',
         reason: 'duplicate_stable_card_id',

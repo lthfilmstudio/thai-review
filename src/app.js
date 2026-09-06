@@ -67,10 +67,10 @@ let ledgerSession = null;
    hook 會讀到舊值、把重置前的排程寫回剛清空的 srs_v2。 */
 let ledgerAuthorityGeneration = 0;
 
-/* lineage evidence 是 1.46 MB 的靜態檔，內容綁在 bundle 上，一次 session 內不會變。
+/* lineage evidence 是 1.76 MiB 的靜態檔，內容綁在 bundle 上，一次 session 內不會變。
    它帶 cache: 'no-store'（要的是「一定拿到這個 build 的那份」），所以瀏覽器不會幫忙；
    cloud-sync 的匯入 hook 每一輪有遠端變動的同步都要用它，不記住的話就是每輪重抓
-   1.46 MB。只記成功的那份——失敗留著會把一次網路問題變成整個 session 都認領不了。 */
+   1.76 MiB。只記成功的那份——失敗留著會把一次網路問題變成整個 session 都認領不了。 */
 let lineageEvidencePromise = null;
 function loadProductionLineageEvidence() {
   if (!lineageEvidencePromise) {
