@@ -1,17 +1,44 @@
 # Runtime practice ledger — 上線前的狀態與步驟
 
-分支 `codex/hybrid-mastery-release`。這份記到 U7「不碰 production」的部分為止；
-真正的部署還沒做，最後一段是給執行的人照著走的。
+分支 `codex/hybrid-mastery-release`。
+
+## ⚠️ 2026-09-07 更正：「部署到這支腳本」＝正式站，沒有中間地帶
+
+這份文件從 09-02 到 09-06 的每一則都寫「已部署到 preview URL，production 沒動」，
+**這句話不成立，而且從第一次執行 `--deploy` 那一刻起就不成立**。
+
+`scripts/update-audio-deploy.sh` 呼叫的是
+`npx wrangler pages deploy out/pages-deploy --project-name thai-review --branch main`，
+`--branch main` **是寫死的**，跟目前 checkout 的 git branch 名稱（`codex/hybrid-mastery-release`
+還是 `main`）完全無關。`deploy-info.json` 裡的 `source_branch` 只是 `git rev-parse
+--abbrev-ref HEAD` 的紀錄字串，是給人看的中繼資料，**不是** wrangler 實際部署目標。
+
+而這個 Cloudflare Pages 專案是 Direct Upload（沒接 Git），沒有另外設定「production
+branch」，所以 `--branch main` 一律等於「這是新的正式部署」。用
+`GET /accounts/:id/pages/projects/thai-review` 查 `canonical_deployment`（正式網域
+真正在服務的那個）證實：`d4308a2`／deployment `83a0685d` 從 **2026-09-06 15:37 Asia/Taipei
+那一刻起就是正式站在跑的版本**，不是 preview。也就是說 U5c 修的「帳本用著用著流失覆蓋率」
+那個 bug，在 09-06 15:37 ～ 09-07 00:59（本次重新部署為止）這段時間**真的在 Nalin 的正式
+帳號上發生過**。
+
+**這支專案沒有「先部署到安全的地方試」這個選項**。以後每次跑 `--deploy` 都要當成正式
+發布來對待，不要因為目前 checkout 的 git branch 不是 `main` 就以為只是 preview。
 
 ## 目前狀態
 
-**已於 2026-09-06 15:37 部署**：`d4308a2`、deployment `83a0685d`、`sw_cache=thai-review-v98`，
-read-back 18 個資產 SHA 全部相符。之後又補了 U5c（見下），**那部分還沒部署**。
+**已於 2026-09-07 00:59 部署（正式站，已用 `canonical_deployment` API 確認）**：
+`5df9bc0`、deployment `dab0b6e6`、`sw_cache=thai-review-v99`，read-back 18 個資產 SHA
+全部相符。U5c、第六／七輪審查修正（含上面的重置圍籬）都在這個版本裡。
 
-部署後在 per-deployment URL 驗過：IndexedDB 是 `thai-review-practice-v2@2`（版本沒動，
-回滾安全）、所有 `.js` 的 content-type 正確、lineage evidence 有 12,324 個 resolved alias、
-帳本寫入鏈完整（`practice_events` + `formal_due_claims` + daily/history 投影 + outbox）、
-連點三次只產生一筆。
+部署後在 per-deployment URL 驗過：SW cache 確實是 `v99`（跟前一版 `v98` 不同，precache
+真的會重跑）、`src/practice-grade-session.js` content-type 是 `application/javascript`；
+`tests/browser/practice-db.html` fixture（清過 IndexedDB 後重跑）`status: passed`，含
+`rollbackSafe`／`dailyCardClaim`／`runtimeBaseline`／`abortObserved`／atomic rollback
+全部通過；一般字卡評分走 legacy 路徑存進 workspace-scoped localStorage 正常運作，沒有
+回歸。**沒有測到的**：Today Due 佇列的即時帳本寫入（`practice_events`／
+`formal_due_claims` 各一筆）——乾淨瀏覽器沒有到期卡可以觸發，需要有到期卡或真的
+legacy 進度的裝置才測得出來，之前的 09-06 U5c commit 已經在真瀏覽器測過這條，這次沒有
+重複造假資料重測。
 
 | 單元 | 內容 | 狀態 |
 |---|---|---|
@@ -21,7 +48,7 @@ read-back 18 個資產 SHA 全部相符。之後又補了 U5c（見下），**�
 | U4 | legacy + ledger 共用 materializer | 完成 |
 | U5 | 開機鏡射、catalog fence、重置、v1 匯入 | 邏輯完成，cloud-sync 接線見下 |
 | U6 | ledger-first 評分 controller、Today 接線、失敗 UI | 完成（`__ALL__` 未接） |
-| U7 | SW／release gate／read-back | 本機部分完成，部署未執行 |
+| U7 | SW／release gate／read-back | 完成，已部署（`dab0b6e6`，09-07） |
 | — | lineage 認領規則放寬（見下） | 完成 |
 | — | 獨立審查找到的 4 個 P0 | 已修，各自有反證 |
 
@@ -152,19 +179,22 @@ bash scripts/update-audio-deploy.sh --deploy
 ## 部署後要人工確認的（自動化擋不到）
 
 per-deployment URL（`<hash>.thai-review.pages.dev`）不在 Cloudflare Access 後面，
-可以直接開。
+可以直接開。**09-07 這次部署（`dab0b6e6`）用乾淨瀏覽器 profile 驗過第 1 項；2、3
+需要有到期卡或真實 legacy 進度才能測，乾淨瀏覽器測不出來，還沒有人在部署後對
+`dab0b6e6` 測過；4、5 也還沒做。**
 
-1. **fresh page**：DevTools → Application → Service Workers 確認 cache 是
+1. ✅ **fresh page**：DevTools → Application → Service Workers 確認 cache 是
    `thai-review-v99`（**要跟線上前一版不同才有意義**——填成當時線上那個版號的話，
    裝置停在舊 bundle 也會「通過」）；Network 確認 `src/practice-grade-session.js`
    拿到的是 `text/javascript` 不是 `text/html`。
-2. **Today Due**：評一張，畫面正常前進；Application → IndexedDB →
+2. ⬜ **Today Due**：評一張，畫面正常前進；Application → IndexedDB →
    `thai-review-practice-v2` 應該多一筆 `practice_events`、一筆 `formal_due_claims`
    （daily-card claim 的實體 store 就是它）。
-3. **連點**：同一顆按鈕連點三次，`practice_events` 只能多一筆。
-4. **離線**：關網路重開，App 要照常開得起來（SHELL 完整）。
-5. **既有進度**：用真的有 legacy progress 的裝置開一次，確認 `srs_v2` 有 seed 到、
-   或 quarantine 的原因合理（`current_catalog_collision` 之類是正常的）。
+3. ⬜ **連點**：同一顆按鈕連點三次，`practice_events` 只能多一筆。
+4. ⬜ **離線**：關網路重開，App 要照常開得起來（SHELL 完整）。
+5. ⬜ **既有進度**（**要 Nalin 本人在她的裝置上做**，不是本機模擬得出來的）：用真的
+   有 legacy progress 的裝置開一次，確認 `srs_v2` 有 seed 到、或 quarantine 的原因
+   合理（`current_catalog_collision` 之類是正常的）。
 
 ## 回滾
 
