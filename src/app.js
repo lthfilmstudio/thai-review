@@ -18,7 +18,7 @@ import { DAILY_KEY, initDailyLog, logReview, buildAchievementCtx, notifyAchievem
 import { advanceResweepCursor } from './resweep.js';
 import { syncProgressThrottled, syncProgressOnHide } from './progress-sync.js';
 import * as cloudAuth from './cloud-auth.js';
-import { syncNow, syncThrottled, syncSoon, flushOnHide, lastSyncedAt, resetProgressEverywhere, invalidateSync, clearSyncState, setRemoteProgressHook, setRemoteResetHook } from './cloud-sync.js';
+import { syncNow, syncThrottled, syncSoon, flushOnHide, lastSyncedAt, resetProgressEverywhere, invalidateSync, clearSyncState, setRemoteProgressHook, setRemoteResetHook, setLegacyImportHook } from './cloud-sync.js';
 import { recordGrade } from './grade-history.js';
 import { checkAndUnlock } from './achievements.js';
 import { getListenLog, speakCard, warmupVoices, preloadRealAudioAvailability } from './tts.js';
@@ -35,7 +35,12 @@ import {
 } from './practice-db.js';
 import { createLegacyClaimFlow, fetchProductionLineageEvidence } from './legacy-claim-flow.js';
 import { startPracticeLedgerRuntime, catalogCardKeyIndex } from './practice-ledger-runtime.js';
-import { resetRuntimeLedgerAuthority } from './storage-scope.js';
+import {
+  commitLegacyV1Import,
+  planLegacyV1Import,
+  readRuntimeAuthoritativeSrs,
+  resetRuntimeLedgerAuthority,
+} from './storage-scope.js';
 import { createLedgerGradeSession, ledgerGradeEligible } from './practice-grade-session.js';
 import { TRUSTED_PRODUCTION_LINEAGE } from './production-lineage-trust.js';
 import {
@@ -963,6 +968,30 @@ async function init() {
   /* 這一條要接在 status === 'ready' 的判斷外面。別台裝置按的重置會透過 epoch
      傳過來，而那時本機的 ledger runtime 可能根本沒起來——IDB 裡的權威列還是得清。 */
   setRemoteResetHook(resetLedgerAuthorityOrThrow);
+  /* U5c：遠端比較新的卡要即時寫進 IDB 的權威列，否則帳本這一整個 session 都會把
+     它們踢回 legacy。fail-open——丟出去會被 cloud-sync 接住寫 warn，下次開機的
+     採納是後備。 */
+  setLegacyImportHook(async winners => {
+    if (!practiceResetPort || practiceLedger.status !== 'ready') return;
+    const evidence = await fetchProductionLineageEvidence();
+    const plan = planLegacyV1Import({
+      winners,
+      currentCatalog: bootResult.catalog,
+      catalogDigest: practiceLedger.catalogDigest,
+      lineageEvidence: evidence,
+      trustedRevisionManifest: TRUSTED_PRODUCTION_LINEAGE,
+    });
+    if (!plan.imports.length) return;
+    await commitLegacyV1Import({
+      port: practiceResetPort,
+      workspaceId: practiceLedgerWorkspaceId,
+      plan,
+    });
+    ledgerSession?.adoptAuthoritative(await readRuntimeAuthoritativeSrs({
+      port: practiceResetPort,
+      workspaceId: practiceLedgerWorkspaceId,
+    }));
+  });
   if (practiceLedger.status === 'ready') {
     const cardKeyById = catalogCardKeyIndex(bootResult.catalog);
     ledgerSession = createLedgerGradeSession({

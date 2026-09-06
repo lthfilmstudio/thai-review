@@ -163,6 +163,17 @@ export function createLedgerGradeSession({
     clearAuthoritative() {
       authoritativeByCardId.clear();
     },
+    /* 帳本在 session 中途採納了新的權威列（cloud-sync 匯入）之後要叫這支，
+       否則逐卡閘門還拿著開機那份舊值，那些卡整個 session 都收不回來。 */
+    adoptAuthoritative(rows) {
+      let adopted = 0;
+      for (const row of rows || []) {
+        if (!row || typeof row.cardId !== 'string' || !row.state) continue;
+        authoritativeByCardId.set(row.cardId, structuredClone(row.state));
+        adopted += 1;
+      }
+      return adopted;
+    },
     /* 佇列重建、或 cloud-sync 併入遠端進度時呼叫：卡片與課程沒變，但底下的到期
        狀態變了，進行中的那筆評分不該把結果套到已經換過內容的畫面上。 */
     bumpContextEpoch() {

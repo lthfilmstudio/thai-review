@@ -55,6 +55,7 @@ let syncDeps = { ...defaultSyncDeps };
    還在路上的那筆評分不該把結果套到已經換過內容的畫面上（AE7）。 */
 let remoteProgressHook = null;
 let remoteResetHook = null;
+let legacyImportHook = null;
 export function setRemoteProgressHook(fn) { remoteProgressHook = fn; }
 
 /* 別台裝置按的重置會以 epoch 傳過來。本機除了刪掉 progress 鍵，還得清掉 IndexedDB
@@ -62,6 +63,14 @@ export function setRemoteProgressHook(fn) { remoteProgressHook = fn; }
    而且會以新的 updatedAt 通過 epoch 過濾推上雲端——別台的重置等於沒發生。
    跟 notifyRemoteProgress 不同，這條不吞例外：清不掉就讓整輪 sync 中止重來。 */
 export function setRemoteResetHook(fn) { remoteResetHook = fn; }
+
+/* 遠端比較新的那些卡（mergeRemoteRows 的 winners）要寫進 IDB 的權威列，否則帳本
+   手上那份就過期了——逐卡閘門會因為「IDB 比本機舊」把它們踢回 legacy，整個 session
+   都收不回來。
+
+   跟 remoteResetHook 相反，這條是 fail-open：本機合併本身已經正確，匯入只是讓帳本
+   跟上。失敗了就這輪不收那些卡，下次開機的採納會補。為了它中止整輪同步不划算。 */
+export function setLegacyImportHook(fn) { legacyImportHook = fn; }
 
 function notifyRemoteProgress(reason) {
   try {
@@ -463,6 +472,13 @@ async function runSync(op) {
       for (const k of editKeys) state.edits[k] = edits[k];
       saveState(op.storage);
       notifyRemoteProgress('remote-merge');
+      if (changedKeys.length) {
+        try {
+          await legacyImportHook?.(progress);
+        } catch (error) {
+          console.warn('ledger legacy import skipped:', error?.code || error?.message);
+        }
+      }
     }
     writeMergedHistory(mergedHistory, op.storage);
 

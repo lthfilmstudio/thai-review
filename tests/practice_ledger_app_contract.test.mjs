@@ -50,7 +50,12 @@ test('lineage evidence 只從有 SHA-256 綁定的那支拿，不自己 fetch', 
 test('ledger 起不來不擋開機：整段沒有 throw、沒有 boot 狀態轉移', () => {
   const start = appSource.indexOf('practiceLedger = await startPracticeLedgerRuntime({');
   const end = appSource.indexOf('const deepLink = parseDeepLinkParam();', start);
-  const block = appSource.slice(start, end);
+  /* 註冊 hook 的 callback body 要挖掉：那些 return 是 hook 自己的 early return，
+     不是開機路徑的中斷。留著的話下面那條「不得有 return;」會誤報。 */
+  const raw = appSource.slice(start, end);
+  const hookAt = raw.indexOf('setLegacyImportHook(');
+  const block = hookAt < 0 ? raw
+    : raw.slice(0, hookAt) + raw.slice(raw.indexOf('\n  });', hookAt));
 
   /* 這裡只准有 assertActive 的 workspace 守衛：一個給 ledger runtime 的 port，
      一個給重置專用的 port。兩個都在 callback 裡，開機路徑上不會被呼叫到。 */
@@ -220,6 +225,21 @@ test('逐卡閘門要用 runtime 交出來的權威列，不是開機前的 hydr
     block.indexOf('practiceLedger.authoritativeSrs') < block.indexOf('bootResult.hydration'),
     'runtime 那份要排在 hydration 快照前面，快照只能當 fallback',
   );
+});
+
+test('U5c：遠端 winner 的匯入 hook 有接上，而且會更新 session 的權威快取', () => {
+  assert.match(appCode, /setLegacyImportHook\(async winners => \{/);
+  const hook = appCode.indexOf('setLegacyImportHook(');
+  const readyBranch = appCode.indexOf("if (practiceLedger.status === 'ready')");
+  assert.ok(hook > 0 && readyBranch > 0 && hook < readyBranch,
+    'hook 要接在 ready 判斷之前（跟 reset hook 一樣，狀態是在 hook 裡面才判的）');
+  const body = appCode.slice(hook, appCode.indexOf('\n  });', hook));
+  assert.match(body, /planLegacyV1Import\(\{/);
+  assert.match(body, /commitLegacyV1Import\(\{/);
+  // 匯入完不更新快取的話，逐卡閘門整個 session 還拿著開機那份舊值
+  assert.match(body, /adoptAuthoritative\(/);
+  // 信任閘門不能繞過
+  assert.match(body, /trustedRevisionManifest: TRUSTED_PRODUCTION_LINEAGE/);
 });
 
 test('AE7：rerender 之後要把鎖住狀態重新套回去', () => {

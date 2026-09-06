@@ -287,3 +287,30 @@ test('清空之後全新的卡仍然收得下（控制組）', () => {
   rig.handle.clearAuthoritative();
   assert.equal(rig.handle.acceptsCard(CARD_A, null), true, '本機也沒進度的卡，空狀態本來就是對的起點');
 });
+
+test('U5c：session 中途採納新的權威列之後，逐卡閘門要用新值判斷', () => {
+  const rig = session({
+    session: { authoritativeSrsRows: [{ cardId: CARD_A, version: 1, state: srs(10, OLD_STAMP) }] },
+  });
+  const remoteNewer = srs(40, NEW_STAMP);
+
+  // cloud-sync 把遠端較新的那份併進本機之後，帳本手上還是開機那份舊值 → 會踢回 legacy
+  assert.equal(rig.handle.acceptsCard(CARD_A, remoteNewer), false);
+
+  rig.handle.adoptAuthoritative([{ cardId: CARD_A, version: 2, state: remoteNewer }]);
+
+  assert.equal(rig.handle.acceptsCard(CARD_A, remoteNewer), true, '採納之後就收得回來');
+  assert.equal(rig.handle.authoritativeCardCount(), 1);
+});
+
+test('U5c：adoptAuthoritative 忽略沒有 state 或 cardId 的列', () => {
+  const rig = session({ session: { authoritativeSrsRows: [] } });
+  const adopted = rig.handle.adoptAuthoritative([
+    { cardId: CARD_A, state: srs(10, OLD_STAMP) },
+    { cardId: CARD_A },
+    { state: srs(10, OLD_STAMP) },
+    null,
+  ]);
+  assert.equal(adopted, 1);
+  assert.equal(rig.handle.authoritativeCardCount(), 1);
+});

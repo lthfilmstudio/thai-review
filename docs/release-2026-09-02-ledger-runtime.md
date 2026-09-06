@@ -5,7 +5,13 @@
 
 ## 目前狀態
 
-U1–U7 的本機部分都完成了。**production 還沒動過**，線上跑的仍是舊版。
+**已於 2026-09-06 15:37 部署**：`d4308a2`、deployment `83a0685d`、`sw_cache=thai-review-v98`，
+read-back 18 個資產 SHA 全部相符。之後又補了 U5c（見下），**那部分還沒部署**。
+
+部署後在 per-deployment URL 驗過：IndexedDB 是 `thai-review-practice-v2@2`（版本沒動，
+回滾安全）、所有 `.js` 的 content-type 正確、lineage evidence 有 12,324 個 resolved alias、
+帳本寫入鏈完整（`practice_events` + `formal_due_claims` + daily/history 投影 + outbox）、
+連點三次只產生一筆。
 
 | 單元 | 內容 | 狀態 |
 |---|---|---|
@@ -94,9 +100,8 @@ node scripts/build-card-id-lineage.mjs \
 
 1. **R11 重置只清 `runtime-context`，保留 `seededAliases`。** 那份紀錄是「重置掉的
    進度不准被 legacy progress 救回來」的唯一依據，清掉等於重置無效。Nalin 已確認。
-2. **U5c 的 cloud-sync／app.js 接線移到 U6 之後。** `planLegacyV1Import`／
-   `commitLegacyV1Import` 都寫好也測過了，但還沒有 caller——在 ledger 真的開始寫入
-   之前，把 practice port 注進 production 同步流程是純風險。**這條還沒做。**
+2. ~~**U5c 的 cloud-sync／app.js 接線移到 U6 之後。**~~ **2026-09-06 已接**，見下面
+   「U5c：讓帳本收得回被 legacy 改過的卡」。
 3. **`__ALL__` 沒接 ledger，維持 legacy。** `classifyPracticeLane` 對 `__ALL__` 要求
    權威 SRS，那份資料在 IDB 要 async 讀，而 controller 的 `readContext()` 是同步的。
    接之前要先決定 context 讀取要不要非同步化。
@@ -109,9 +114,14 @@ node scripts/build-card-id-lineage.mjs \
   往前走。這是 R5 定的 lane 語意，不是 bug，但體感上跟以前不一樣。
 - 單堂課、收藏、搜尋完全沒變。
 
-## 部署步驟（還沒做）
+## 部署步驟
 
 前置：`docs/plans/2026-09-02-1157-...-plan.md` 的 Verification Contract 全過。
+
+> ⚠️ 這個 worktree 的 `out/` 是空的（build artifact 沒進 git），直接跑會看到「缺 10189
+> 個音檔、估 US$16.88」。那是假警報——把主 checkout 的 `out/site-preview/{audio,
+> audio-manifest.json,real-manifest.json,zh-manifest.json}` symlink 過來就會變成
+> `missing_audio_files: 0`。`rsync -aL` 會解引用成實體檔，不影響部署內容。
 
 ```bash
 cd /Users/lth/Downloads/thai-review-worktrees/ledger-runtime
@@ -186,6 +196,43 @@ version **2**。新版需要的 13 個實體 store，線上那份早就全部建
 `reviewed`／`games`／`bridged`，沒有任何欄位能表達「只掃過沒正式複習」。這種日子在
 回滾後會消耗一個安神保護。要完全避免的話得等 practice 有 v1 欄位。
 
+## U5c：讓帳本收得回被 legacy 改過的卡（2026-09-06）
+
+部署後在線上實測發現帳本會隨著使用一路空轉，原因有兩層：
+
+1. **卡片被 baseline seed 進 IDB 的那一輪，評分仍然走 legacy。** `authoritativeSrsRows`
+   取自 `bootResult.hydration`，而 hydration 在 `startPracticeLedgerRuntime` 跑 baseline
+   之前就讀完了，剛寫進去的列看不到 → 逐卡閘門判定「沒有權威列但本機有進度」。
+2. **legacy 評過一次，那張卡就永久離開帳本。** legacy 評完 localStorage 的時間戳比 IDB
+   新，而閘門要求「IDB 不比本機舊」；baseline 是 add-only 又會跳過 `seededAliases`，
+   沒有任何機制讓 IDB 追上。**單堂課評分一律走 legacy**，所以越用覆蓋率越低。
+
+線上對照（per-deployment URL，同一張卡）：
+
+| | IDB `srs_v2` | localStorage |
+|---|---|---|
+| 種完當下那輪評 | v0 / interval 30（沒動） | interval 78 |
+| 重載一次再評 | v1 / interval 100 | 同步 |
+
+修法兩處，都走既有的 `planLegacyV1Import`／`commitLegacyV1Import`（同一套信任閘門、
+同一套單調保護、同一套冪等）：
+
+- **開機採納**（`startPracticeLedgerRuntime`）：baseline 之後重讀權威列並交給評分 session
+  用（`app.js` 不再吃 hydration 快照），再把「本機比 IDB 新」的 alias 匯入。沒有待採納的
+  就完全不動，也不白抓一次 lineage evidence。
+- **cloud-sync 匯入**（U5c 原本的範圍）：`setLegacyImportHook`，遠端比較新的 winner 即時
+  寫進權威列，並更新 session 的快取（`adoptAuthoritative`）。**fail-open**——本機合併本身
+  已經正確，匯入只是讓帳本跟上，失敗就這輪不收那些卡，開機採納是後備。
+  （這點跟 `setRemoteResetHook` 相反，那條是 fail-closed。）
+
+**採納只處理「IDB 有那一列而且比本機舊」**。列不存在就不碰——重置會清光 `srs_v2` 但刻意
+保留 `seededAliases`，若採納在列不存在時也寫入，等於讓 legacy progress 把重置掉的進度
+救回來（R11）。有測試釘住這一條。
+
+本機真瀏覽器實測修正後：種完當下那輪評就走帳本（`practice_events` 1、`formal_due_claims`
+1、`srs_v2` v1/interval 78）；再模擬單堂課評分讓 localStorage 前進到 interval 200，重載後
+IDB 被採納到 v2/interval 200、`v1Import.stamp` 對得上。
+
 ## AE7 的守衛檢查能證明什麼、不能證明什麼
 
 `tests/practice_ledger_app_contract.test.mjs` 裡的 `CONTEXT_MUTATION_SITES` **不是**
@@ -214,7 +261,6 @@ legacy（本機那份才是對的，**不會掉資料**），但 `runtime-srs-ba
 
 ## 已知還沒做的
 
-- U5c 的 cloud-sync 接線（上面第 2 點）
 - `__ALL__` 的 ledger 路徑（上面第 3 點）
 - practice outbox 沒有上傳路徑——本輪範圍就不含新的 Supabase schema
 - Gate B manifest 停在 2026-08-24，之後 `data.json` 又多了 106 張卡，那些 alias 認領不到

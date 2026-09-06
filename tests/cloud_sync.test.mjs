@@ -10,8 +10,10 @@ globalThis.localStorage = {
 globalThis.location = { search: '' };
 
 const { state } = await import('../src/state.js');
-const { __setSyncTestDeps, syncNow, syncThrottled, syncSoon, invalidateSync, resetProgressEverywhere, flushOnHide } =
-  await import('../src/cloud-sync.js');
+const {
+  __setSyncTestDeps, syncNow, syncThrottled, syncSoon, invalidateSync,
+  resetProgressEverywhere, flushOnHide, setLegacyImportHook,
+} = await import('../src/cloud-sync.js');
 
 const ok = (body, status = 200) => ({
   ok: status >= 200 && status < 300,
@@ -896,5 +898,67 @@ test('flushOnHide uses complete UTF-8 byte size, one keepalive, and leaves overs
   } finally {
     restorePrefix();
     invalidateSync();
+  }
+});
+
+/* U5c：遠端比較新的卡要即時寫進帳本的權威列。沒接的話，逐卡閘門會因為「IDB 比本機舊」
+   把它們踢回 legacy，整個 session 都收不回來（開機的採納才會補）。 */
+
+const remoteWinner = {
+  card_key: 'L1:ก', grade: 'good', reviewed_at: 9000,
+  next_review_at: 9000, interval_days: 40, ease_factor: 2.5, reps: 6,
+  progress_updated_at: 9000,
+};
+
+test('U5c：遠端比較新的卡會交給帳本匯入', async () => {
+  resetLocal();
+  state.progress['L1:ก'] = {
+    grade: 'again', interval: 1, reps: 1, easeFactor: 2.5,
+    reviewedAt: 100, nextReviewAt: 100, updatedAt: 100,
+  };
+  const seen = [];
+  setLegacyImportHook(async winners => { seen.push(winners); });
+  const { restore } = installFetch({ cards: [remoteWinner] });
+  try {
+    await syncNow();
+    assert.equal(seen.length, 1, '有 winner 就要叫帳本匯入');
+    assert.deepEqual(Object.keys(seen[0]), ['L1:ก']);
+    assert.equal(seen[0]['L1:ก'].interval, 40, '交給帳本的是遠端那份（比較新）');
+  } finally {
+    setLegacyImportHook(null);
+    restore();
+  }
+});
+
+test('U5c：匯入失敗不擋同步（fail-open，開機採納是後備）', async () => {
+  resetLocal();
+  state.progress['L1:ก'] = {
+    grade: 'again', interval: 1, reps: 1, easeFactor: 2.5,
+    reviewedAt: 100, nextReviewAt: 100, updatedAt: 100,
+  };
+  setLegacyImportHook(async () => { throw new Error('IDB 掛了'); });
+  const { restore } = installFetch({ cards: [remoteWinner] });
+  try {
+    const result = await syncNow();
+    assert.ok(result, '整輪同步要照常完成');
+    assert.equal(result.pulled, 1, '本機合併本身不受影響');
+    assert.equal(state.progress['L1:ก'].interval, 40, '遠端那份仍然採納進本機');
+  } finally {
+    setLegacyImportHook(null);
+    restore();
+  }
+});
+
+test('U5c：沒有 winner 就不叫帳本', async () => {
+  resetLocal();
+  let calls = 0;
+  setLegacyImportHook(async () => { calls += 1; });
+  const { restore } = installFetch({ cards: [] });
+  try {
+    await syncNow();
+    assert.equal(calls, 0);
+  } finally {
+    setLegacyImportHook(null);
+    restore();
   }
 });

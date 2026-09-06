@@ -355,3 +355,35 @@ test('IDB 比本機新時不覆蓋（單調），也不白抓 lineage', async ()
   assert.equal(second.result.adopted, null, '沒有要採納的就不動');
   assert.equal(fetches, afterSeed, '沒有待採納的 alias 就不白抓 lineage evidence');
 });
+
+test('R11：採納不能把重置掉的卡救回來（IDB 沒有那一列就不碰）', async () => {
+  /* 重置會清光 srs_v2 但刻意保留 seededAliases，讓 legacy progress 不能把清掉的進度
+     救回來。採納若在「IDB 沒有那一列」時也寫入，就等於繞過那道保護——所以它只處理
+     「列存在而且比本機舊」的情況。 */
+  stored.clear();
+  const cards = [{ thai: 'one', card_id: CARD_A }];
+  const lineage = lineageFor({ 'L1:one': [CARD_A] });
+
+  const first = await startWith({
+    workspaceId: 'user:A',
+    catalog: catalog(cards),
+    legacyProgress: { 'L1:one': stamped(30, 1000) },
+    loadLineageEvidence: lineage,
+  });
+  assert.equal(first.connection.srs.size, 1);
+
+  // 模擬重置：清掉 srs 列與 runtime-context，但 baseline 帳（含 seededAliases）留著
+  first.connection.srs.clear();
+  first.connection.meta.delete('runtime-context');
+
+  const second = await startWith({
+    connection: first.connection,
+    workspaceId: 'user:A',
+    catalog: catalog(cards),
+    legacyProgress: { 'L1:one': stamped(78, 9000) },
+    loadLineageEvidence: lineage,
+  });
+
+  assert.equal(second.connection.srs.size, 0, '重置掉的進度不准被 legacy 救回來');
+  assert.equal(second.result.adopted, null);
+});
