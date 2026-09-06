@@ -5,6 +5,9 @@ import test from 'node:test';
 /* 跟 legacy_claim_app_contract.test.mjs 同一個路數：app.js 是 DOM 耦合的入口，
    沒辦法直接跑行為測試，就把「接在哪、順序對不對、有沒有接錯東西」釘住。 */
 const appSource = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
+/* 位置比對一律用這份。踩過三次：註解裡引用了要比對的字串，assert 就比到自己的註解，
+   結果是「程式碼明明對的，測試卻紅」或更糟的「程式碼錯了，測試卻綠」。 */
+const appCode = appSource.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
 const swSource = await readFile(new URL('../sw.js', import.meta.url), 'utf8');
 
 test('ledger runtime 接在 boot ready 之後、任何主畫面 render 之前', () => {
@@ -123,123 +126,136 @@ test('AE7：click 的鎖排在所有會動 context 的 handler 之前', () => {
   }
 });
 
-/* 這條取代「逐一列 selector 比對字串位置」的寫法。舊寫法只能證明「這幾個特定
-   selector 排在鎖後面」，證明不了「所有會動 context 的路徑都鎖住」——搜尋那個洞
-   就是這樣漏掉的（`/` 快捷鍵排在鍵盤鎖前面、搜尋鈕又不在 #content 裡）。
+/* AE7 的守衛檢查，第三版。前兩版都被獨立審查當場打穿：
+   - 第一版逐一列 selector 比對字串先後位置——只證明得了「這幾個 selector 排在鎖後面」。
+   - 第二版自己寫括號配對器切 listener body——被七種寫法規避（無大括號的箭頭 callback、
+     body 裡有 regex 字面值讓配對 desync、mutation 塞在豁免 function 的尾巴區間、
+     守衛換成含 isLocked() 的字串或沒有 return 的死表達式…），而且 46 個 listener 裡
+     有 18 個是認錯 body 的幻影區塊，防呆門檻是被灌水撐起來的。
 
-   第一版有兩個盲點，獨立審查抓到並實測證明過：
-   - 只掃 top-level `function`，而 init() 一支 750+ 行涵蓋全部 43 個 listener，
-     整支豁免等於把檢查關掉——在 init 的 handler 裡新增無守衛的 mutation 照樣全綠。
-   - 只比對 `isLocked()` 這個字串存不存在，把真守衛換成「只提到它的註解」照樣全綠。
-   所以現在：init 不再整支豁免，改成連同它裡面的 listener callback 一起切片；
-   比對前先剝掉註解；而且守衛必須排在第一個 mutation 之前。 */
-const CONTEXT_MUTATION_EXEMPT = Object.freeze(new Map([
-  // 評分成功後前進到下一張，本來就該動；鎖在它就永遠停在原卡
-  ['afterGradeAdvance', '評分成功後的前進路徑本身'],
-  ['nextCard', '所有人為呼叫端（方向鍵／滑動／cardPrev-Next）都已各自守門'],
-  ['prevCard', '同上'],
-  // 唯二傳 runtimeStorage 的呼叫端（設定存檔、重新同步）同時傳 force:true，
-  // force 會讓 cached 變 null，所以 loadLessonsSmart 的背景刷新分支走不到；
-  // 那兩個呼叫端本身都已經有 saving 鎖。
-  ['replaceRuntimeCatalog', '只由已守門的兩個設定 handler 同步呼叫；背景刷新分支因 force:true 不可達'],
-  // listener 已經各自切成獨立區塊，init 剩下的 body 就只有開機段（deep link、
-  // 初始課程／mode／cardIndex），那時 ledgerSession 還沒建立
-  ['init', '扣掉 listener 之後只剩開機段'],
-]));
+   兩次的共同錯誤是**想用靜態分析證明「所有路徑都守住了」**。做不到——每加一種寫法就多
+   一個漏洞，而測試全綠會給人假的信心，比沒有更危險。
 
-function stripComments(source) {
-  return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
-}
+   這一版不證明那件事。它只做一件騙不了的事：**盤點**所有會改 cardIndex／
+   currentLessonId／mode 的位置，跟凍結的清單逐字比對。新增、刪除、改寫任何一處都會紅，
+   逼人打開這條清單、看那個位置、決定它需不需要鎖。三輪下來漏掉的（搜尋、設定 modal、
+   rerender 擦掉狀態列）全部都是「沒有人看過那個位置」，這條擋得住的正是那件事。
 
-/* 從 openAt 這個 `{` 往後配對，跳過字串／樣板字面值裡的括號。 */
-function matchBrace(source, openAt) {
-  let depth = 0;
-  for (let i = openAt; i < source.length; i += 1) {
-    const char = source[i];
-    if (char === '"' || char === "'" || char === '`') {
-      const quote = char;
-      i += 1;
-      while (i < source.length) {
-        if (source[i] === '\\') { i += 2; continue; }
-        if (source[i] === quote) break;
-        i += 1;
-      }
-      continue;
+   它擋不住什麼，講清楚：不驗證守衛存在、不驗證守衛有效、不驗證守衛排在前面，也看不到
+   經過函式呼叫的間接 mutation。那些靠底下各自針對性的行為測試與 controller 測試。 */
+const CONTEXT_MUTATION_FILES = Object.freeze(['app.js', 'listen.js', 'state.js', 'ui.js']);
+const CONTEXT_MUTATION_SITES = Object.freeze([
+  "app.js | if (_initCards.length && state.cardIndex >= _initCards.length) state.cardIndex = 0;",
+  "app.js | if (idx >= 0) { state.cardIndex = idx; state.flipped = false; }",
+  "app.js | if (state.cardIndex >= cards.length) state.cardIndex = Math.max(0, cards.length - 1);",
+  "app.js | if (state.mode === 'listen' || state.mode === 'dialog' || state.mode === 'lists') state.mode = 'card';",
+  "app.js | state.cardIndex = (state.cardIndex + 1) % cards.length;",
+  "app.js | state.cardIndex = (state.cardIndex - 1 + cards.length) % cards.length;",
+  "app.js | state.cardIndex = 0;",
+  "app.js | state.cardIndex = 0;",
+  "app.js | state.cardIndex = 0;",
+  "app.js | state.cardIndex = 0;",
+  "app.js | state.cardIndex = 0;",
+  "app.js | state.cardIndex = 0;",
+  "app.js | state.cardIndex = 0;",
+  "app.js | state.cardIndex = 0;",
+  "app.js | state.cardIndex = found.index;",
+  "app.js | state.cardIndex = match.index;",
+  "app.js | state.currentLessonId = '__TODAY__';",
+  "app.js | state.currentLessonId = deepLink.lessonId;",
+  "app.js | state.currentLessonId = found.lessonId;",
+  "app.js | state.currentLessonId = id;",
+  "app.js | state.currentLessonId = lessons[0]?.id || null;",
+  "app.js | state.currentLessonId = match.lessonId;",
+  "app.js | state.currentLessonId = state.lessons[0]?.id || null;",
+  "app.js | state.currentLessonId = state.lessons[0]?.id || null;",
+  "app.js | state.currentLessonId = state.lessons[0]?.id || null;",
+  "app.js | state.mode = 'card';",
+  "app.js | state.mode = 'card';",
+  "app.js | state.mode = 'card';",
+  "app.js | state.mode = 'card';",
+  "app.js | state.mode = 'srs';",
+  "app.js | state.mode = 'srs';",
+  "app.js | state.mode = 'today';",
+  "app.js | state.mode = m;",
+  "listen.js | else state.cardIndex = 0;",
+  "listen.js | state.cardIndex = (state.cardIndex + 1) % cards.length;",
+  "listen.js | state.cardIndex = (state.cardIndex + 1) % cards.length;",
+  "listen.js | state.cardIndex = (state.cardIndex - 1 + cards.length) % cards.length;",
+  "listen.js | state.cardIndex = entry.cardIndex;",
+  "listen.js | state.cardIndex = session.nextIndex;",
+  "state.js | state.cardIndex = 0;",
+  "ui.js | if (state.cardIndex >= cards.length) state.cardIndex = 0;",
+]);
+
+test('AE7：會動 context 的位置清單沒有變動（新增一處就要來這裡登記）', async () => {
+  const pattern = /state\.(cardIndex|currentLessonId|mode)\s*=(?!=)/;
+  const found = [];
+  for (const name of CONTEXT_MUTATION_FILES) {
+    const source = await readFile(new URL(`../src/${name}`, import.meta.url), 'utf8');
+    for (const line of source.split('\n')) {
+      const trimmed = line.trim();
+      if (pattern.test(trimmed)) found.push(`${name} | ${trimmed}`);
     }
-    if (char === '{') depth += 1;
-    else if (char === '}') {
-      depth -= 1;
-      if (depth === 0) return i;
-    }
   }
-  return -1;
-}
+  found.sort();
 
-/* 把 app.js 切成「可以各自守門的區塊」：每個 addEventListener 的 callback body（配對
-   大括號抓真實範圍，不是抓到下一個 listener 為止），加上 top-level function——後者要把
-   已被 listener 認領的區段挖掉，否則 init 會把整個檔案後半吞進去，那正是第一版的盲點。 */
-function guardableBlocks(source) {
-  const blocks = [];
-  const claimed = [];
-  for (const match of source.matchAll(/addEventListener\(\s*'([a-z]+)'/g)) {
-    const open = source.indexOf('{', match.index);
-    if (open < 0) continue;
-    const close = matchBrace(source, open);
-    if (close < 0) continue;
-    blocks.push({ name: `listener:${match[1]}@${match.index}`, body: source.slice(open, close + 1) });
-    claimed.push([open, close]);
-  }
-  const fnStarts = [...source.matchAll(/^(?:async )?function ([A-Za-z0-9_]+)\(/gm)]
-    .map(match => ({ name: match[1], at: match.index }));
-  for (let i = 0; i < fnStarts.length; i += 1) {
-    const to = fnStarts[i + 1]?.at ?? source.length;
-    let body = '';
-    let cursor = fnStarts[i].at;
-    for (const [open, close] of claimed) {
-      if (close < cursor || open >= to) continue;
-      if (open > cursor) body += source.slice(cursor, open);
-      cursor = Math.max(cursor, close + 1);
-    }
-    if (cursor < to) body += source.slice(cursor, to);
-    blocks.push({ name: fnStarts[i].name, body });
-  }
-  return blocks;
-}
+  const added = found.filter(site => !CONTEXT_MUTATION_SITES.includes(site));
+  const removed = CONTEXT_MUTATION_SITES.filter(site => !found.includes(site));
+  assert.deepEqual(added, [],
+    '新增了會改 cardIndex／currentLessonId／mode 的位置。先確認它在 saving／save-failed '
+    + '期間會不會被觸發到（會的話要加 isLocked() 守衛），再把它登記進 CONTEXT_MUTATION_SITES。');
+  assert.deepEqual(removed, [], '有位置消失或被改寫，請更新 CONTEXT_MUTATION_SITES');
+  assert.equal(found.length, CONTEXT_MUTATION_SITES.length, '重複出現的行數也要對得上');
+});
 
-test('AE7：每一個會動 context 的區塊都要有 saving 鎖，而且鎖要排在 mutation 之前', () => {
-  const source = stripComments(appSource);
-  const blocks = guardableBlocks(source);
-  assert.ok(blocks.length > 60, `只切出 ${blocks.length} 個區塊，切法可能壞了`);
+test('AE7：rerender 之後要把鎖住狀態重新套回去', () => {
+  /* 狀態列與重試鈕是 card.js 每次 render 重新產生的、寫死 hidden，評分鈕的 disabled
+     也會被沖掉。少了這一行，失敗期間任何一次 rerender 都會讓出路從畫面上消失，而
+     controller 還鎖著——點擊被靜默吃掉，只能重新整理。 */
+  const start = appCode.indexOf('function rerender(storage) {');
+  assert.ok(start > 0);
+  const body = appCode.slice(start, appCode.indexOf('\n}', start));
+  assert.match(body, /renderLedgerSavingState\(ledgerSession\.controller\.getStatus\(\)\)/);
+  assert.ok(
+    body.indexOf('renderContent(') < body.indexOf('renderLedgerSavingState'),
+    '要排在 renderContent 之後，否則會被那次 render 沖掉',
+  );
+});
 
-  const mutation = /state\.(cardIndex|currentLessonId|mode)\s*=/;
-  const unguarded = [];
-  let checked = 0;
-  for (const block of blocks) {
-    const at = block.body.search(mutation);
-    if (at < 0) continue;
-    checked += 1;
-    if (CONTEXT_MUTATION_EXEMPT.has(block.name)) continue;
-    const lock = block.body.indexOf('isLocked()');
-    // 有鎖還不夠：鎖要排在第一個 mutation 前面才擋得住
-    if (lock < 0 || lock > at) unguarded.push(block.name);
-  }
-  assert.ok(checked >= 10, `只掃到 ${checked} 個會動 context 的區塊，掃描條件可能壞了`);
-  assert.deepEqual(unguarded, [],
-    `這些區塊會改 cardIndex／currentLessonId／mode，卻沒有排在前面的 saving 鎖：${unguarded.join(', ')}`);
+test('AE7：設定的守衛要排在任何寫入之前', () => {
+  /* 原本放在 if (inputChanged) 裡面：URL 沒改的常見情況整段跳過，直接落到
+     closeModal() + rerender()（而那個 rerender 會擦掉失敗狀態的出路）；而且
+     sheetInput 早就寫進去又存檔了，第二次點 inputChanged 變 false。 */
+  const start = appCode.indexOf("document.getElementById('btnSaveSettings')");
+  assert.ok(start > 0);
+  // 取固定視窗就好，這段的三個標記都在開頭 600 字內；找 handler 結尾容易抓錯縮排
+  const body = appCode.slice(start, start + 600);
+  const lock = body.indexOf('isLocked()');
+  assert.ok(lock > 0, '設定儲存要有 saving 鎖');
+  assert.ok(lock < body.indexOf('state.settings.sheetInput = newInput'), '鎖要排在寫入之前');
+  assert.ok(lock < body.indexOf('if (inputChanged)'), '不能藏在 inputChanged 分支裡');
+});
+
+test('評分的 promise 有接住 rejection，不留 unhandled', () => {
+  const start = appCode.indexOf('void ledgerSession.controller.submitGrade(g)');
+  assert.ok(start > 0);
+  const block = appCode.slice(start, start + 700);
+  assert.match(block, /\.catch\(error => \{/);
 });
 
 test('AE7：搜尋的兩條進入點都擋得住（鈕在 topbar、/ 走鍵盤）', () => {
   // 進入點一：`/` 快捷鍵。鎖要排在它之前，否則按下去就開了搜尋面板
-  const handler = appSource.indexOf("document.addEventListener('keydown'");
-  const lock = appSource.indexOf('if (ledgerSession?.controller.isLocked()) return;', handler);
-  const slash = appSource.indexOf("if (e.key === '/')", handler);
+  const handler = appCode.indexOf("document.addEventListener('keydown'");
+  const lock = appCode.indexOf('if (ledgerSession?.controller.isLocked()) return;', handler);
+  const slash = appCode.indexOf("if (e.key === '/')", handler);
   assert.ok(lock > handler && slash > lock, '鍵盤鎖要排在 / 開搜尋之前');
   // 而且要蓋住整個 handler，listen mode 的方向鍵也在鎖後面
-  const listen = appSource.indexOf("if (state.mode === 'listen') {", handler);
+  const listen = appCode.indexOf("if (state.mode === 'listen') {", handler);
   assert.ok(listen > lock, 'listen mode 的方向鍵也要在鎖後面');
   // 進入點二：搜尋結果點下去。btnSearch 在 topbar，#content 的 click 鎖蓋不到
-  const pick = appSource.indexOf('function onSearchPick(');
-  const pickBody = appSource.slice(pick, appSource.indexOf('\n}', pick));
+  const pick = appCode.indexOf('function onSearchPick(');
+  const pickBody = appCode.slice(pick, appCode.indexOf('\n}', pick));
   assert.match(pickBody, /if \(ledgerSession\?\.controller\.isLocked\(\)\) return;/);
 });
 

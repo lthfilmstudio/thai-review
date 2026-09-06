@@ -318,8 +318,9 @@ test('P1：projection-repair 重試又失敗，仍要再 emit 一次狀態', asy
 
 test('P1：交易落地之後 capture() 丟例外，不能把狀態卡在 saving', async () => {
   let captures = 0;
-  const rig = harness({});
-  // harness 的 captureOperation 是固定的，這裡另外組一個會在第二次呼叫時丟的
+  // harness 的 captureOperation 是固定的，這裡另外組一個會在第二次呼叫時丟的。
+  // advance 要自己記錄——拿 harness 的 rig.calls 來斷言是空的，那個 controller 沒被跑。
+  const advances = [];
   const controller = createPracticeGradeController({
     buildAttempt: () => ({ kind: 'attempt', phase: 'first', lane: 'due', attemptId: OPERATION.attemptId }),
     captureOperation: () => {
@@ -330,7 +331,7 @@ test('P1：交易落地之後 capture() 丟例外，不能把狀態卡在 saving
     },
     commit: async () => ({ status: 'committed', event: { eventId: 'e1' } }),
     mirror: async () => {},
-    advance: () => {},
+    advance: result => advances.push(result),
     onStateChange: () => {},
   });
 
@@ -340,5 +341,37 @@ test('P1：交易落地之後 capture() 丟例外，不能把狀態卡在 saving
   assert.equal(controller.getStatus(), 'idle');
   assert.equal(controller.isLocked(), false,
     'saving 沒有對應的動作按鈕，卡在那裡等於只能重新整理');
-  assert.equal(rig.calls.advances.length, 0);
+  assert.equal(advances.length, 0, 'context 對不上就不能拿這筆結果去前進');
+});
+
+test('P1：retry() 的 context-invalid 也要 emit，否則按鈕永遠灰掉', async () => {
+  /* 跟 projection-repair 那條完全對稱：呼叫端在 await 之前就把按鈕 disabled，
+     只有 onStateChange 會把它放回來。上一輪只修了雙胞胎的其中一個。 */
+  let captures = 0;
+  const states = [];
+  const controller = createPracticeGradeController({
+    buildAttempt: () => ({ kind: 'attempt', phase: 'first', lane: 'due', attemptId: OPERATION.attemptId }),
+    captureOperation: () => {
+      captures += 1;
+      // 送出那次正常（才進得了 save-failed），retry 時才丟
+      if (captures > 1) throw Object.assign(new Error('card is gone'), { code: 'PRACTICE_CONTEXT_INVALID' });
+      return { ...OPERATION };
+    },
+    commit: async () => {
+      throw Object.assign(new Error('quota'), { code: 'PRACTICE_DB_REQUEST_FAILED' });
+    },
+    mirror: async () => {},
+    advance: () => {},
+    onStateChange: state => states.push(state.status),
+  });
+
+  const failed = await controller.submitGrade('good');
+  assert.equal(failed.status, 'save-failed');
+  const before = states.length;
+
+  const retried = await controller.retry();
+
+  assert.equal(retried.status, 'context-invalid');
+  assert.ok(states.length > before,
+    '狀態沒變也要 emit，否則 UI 的重試鈕永遠回不來，只能重新整理');
 });

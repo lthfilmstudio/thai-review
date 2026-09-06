@@ -157,6 +157,10 @@ export function createPracticeGradeController({
       try {
         current = capture();
       } catch (error) {
+        /* 跟下面 repairProjection 的 catch 對稱，理由一模一樣：呼叫端在 await 之前
+           就把按鈕 disabled 了，只有 onStateChange 會把它放回來。狀態沒變也要 emit，
+           否則按鈕永遠灰掉、整個畫面鎖死，只能重新整理。 */
+        emit({ status, canRetry: !!pendingRetry, canRepair: !!pendingRepair });
         return { status: 'context-invalid', error };
       }
       /* 失敗期間 UI 有鎖，但手勢／深連結之類的漏網之魚仍可能換掉卡片。這裡拿

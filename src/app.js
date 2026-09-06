@@ -184,6 +184,11 @@ function rerender(storage) {
   renderTopbarTitle();
   renderContent(renderAgain, runtimeStorage);
   renderStats();
+  /* 狀態列與重試鈕是 card.js 每次 render 重新產生的、而且寫死 hidden，評分鈕的
+     disabled 也會被沖掉。所以任何一次 rerender 都會把失敗狀態的出路擦掉——畫面看
+     起來可以按，controller 卻還鎖著，點擊被靜默吃掉，只能重新整理。render 完一定
+     要把狀態重新套回去。 */
+  if (ledgerSession) renderLedgerSavingState(ledgerSession.controller.getStatus());
 }
 
 function onSearchPick(match, storage) {
@@ -1131,6 +1136,14 @@ async function init() {
 
   // 儲存設定
   document.getElementById('btnSaveSettings').addEventListener('click', async () => {
+    /* 守衛要排在任何寫入之前。放在 if (inputChanged) 裡面的話：URL 沒改的常見情況
+       整段跳過，直接落到 closeModal() + rerender()（那個 rerender 會擦掉失敗狀態的
+       出路）；而且 sheetInput 早就寫進去又存檔了，第二次點 inputChanged 變 false，
+       使用者會拿到「URL 換好了」的假象、資料其實還是舊的。 */
+    if (ledgerSession?.controller.isLocked()) {
+      alert('這筆評分還在存檔，等它完成再改設定。');
+      return;
+    }
     const newInput = document.getElementById('inpSheet').value.trim();
     const inputChanged = newInput !== state.settings.sheetInput;
     const oldInput = state.settings.sheetInput;
@@ -1138,11 +1151,6 @@ async function init() {
     saveState(storage);
     if (inputChanged) {
       const btn = document.getElementById('btnSaveSettings');
-      /* 這兩支重抓 Sheet 的按鈕都在設定 modal 裡，掛在 topbar 上，#content 的 click
-         鎖與鍵盤鎖都蓋不到，而它們會換掉 state.lessons 與 currentLessonId——`__TODAY__`
-         是虛擬課號、永遠不在 state.lessons 裡，所以那個 fallback if 必定成立。
-         saving 期間讓它跑，交易落地後 operation token 對不上，那筆評分只會留在 IDB。 */
-      if (ledgerSession?.controller.isLocked()) return;
       const originalText = btn.textContent;
       btn.disabled = true;
       btn.textContent = '同步中…';

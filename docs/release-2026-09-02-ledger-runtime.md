@@ -186,6 +186,23 @@ version **2**。新版需要的 13 個實體 store，線上那份早就全部建
 `reviewed`／`games`／`bridged`，沒有任何欄位能表達「只掃過沒正式複習」。這種日子在
 回滾後會消耗一個安神保護。要完全避免的話得等 practice 有 v1 欄位。
 
+## AE7 的守衛檢查能證明什麼、不能證明什麼
+
+`tests/practice_ledger_app_contract.test.mjs` 裡的 `CONTEXT_MUTATION_SITES` **不是**
+「所有路徑都守住了」的證明。它做的是**盤點**：把所有會改 `cardIndex`／`currentLessonId`／
+`mode` 的位置（`app.js`／`listen.js`／`state.js`／`ui.js`，目前 41 處）跟凍結清單逐字比對，
+任何新增、刪除、改寫都會紅，逼人打開清單看那個位置、決定它需不需要鎖。
+
+會這樣寫是因為前兩版都被獨立審查當場打穿：第一版逐一列 selector 比字串位置；第二版自己
+寫括號配對器切 listener body，被七種寫法規避（無大括號的箭頭 callback、body 裡的 regex
+字面值讓配對 desync、mutation 塞在豁免 function 的尾巴、守衛換成含 `isLocked()` 的字串或
+沒有 `return` 的死表達式…），而且 46 個 listener 裡有 18 個是認錯 body 的幻影區塊。
+**想用靜態分析證明「全部守住了」做不到，而全綠會給假的信心，比沒有更危險。**
+
+所以它擋不住：守衛不存在、守衛無效、守衛排錯位置、經過函式呼叫的間接 mutation。
+那些靠 controller 層的行為測試與各自針對性的位置測試。三輪下來漏掉的（搜尋、設定 modal、
+rerender 擦掉狀態列）全部都是「沒有人看過那個位置」——這條擋得住的正是那一類。
+
 ## 已知的降級（不擋部署，但要知道）
 
 **別台裝置按重置之後，`stamp > resetAt` 而倖存的那些卡會永久留在 legacy。**
