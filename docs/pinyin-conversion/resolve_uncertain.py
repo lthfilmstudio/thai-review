@@ -35,6 +35,8 @@ SYL_FIX['รส'] = 'r' + V('o', False) + 't' + T('low', 'dead', False)
 SYL_FIX['ต้น'] = 'd' + V('o', False) + 'n' + T('mid', 'live', mark='tho')
 # ผล pǒn 成果：ผ high + final ล->n(live) + 隱藏短o（單獨用不當กล複合聲母）
 SYL_FIX['ผล'] = 'p' + V('o', False) + 'n' + T('high', 'live')
+# วง wong 圈子/界（如 วงการ）：ว low + final ง(live) + 隱藏短o；來源 260904（中2-7）job
+SYL_FIX['วง'] = 'w' + V('o', False) + 'ng' + T('low', 'live')
 # ส่ง sòng 寄送：ส high + final ง(live) + mai ek
 SYL_FIX['ส่ง'] = 's' + V('o', False) + 'ng' + T('high', 'live', mark='ek')
 # ลม lom 風：ล low + final ม(live) + 隱藏短o
