@@ -14,12 +14,21 @@ concurrency:
   group: sync-sheet
   cancel-in-progress: false
 
+# 2026-09-07：這支 workflow 原本同步 main，但正式站現在是從
+# codex/hybrid-mastery-release 部署（main 已經停在純資料 bot commit，
+# 沒有人在上面開發），main 的自動同步已經跟 release 分岔過一次
+# （release 的 sync-sheet.py 多了 card_id 契約檢查，main 的舊版沒有）。
+# 改成直接同步 release，讓正式站永遠拿得到最新 Sheet 資料，不用每次
+# 上新課都要手動比對兩條分支。等 release 真的 merge 回 main 之後，
+# 這裡要記得改回 main（或刪掉這個分支限定）。
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: codex/hybrid-mastery-release
 
       - name: Setup Python
         uses: actions/setup-python@v5
