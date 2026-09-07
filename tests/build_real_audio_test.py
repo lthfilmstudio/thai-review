@@ -169,6 +169,24 @@ class MatchLessonCardsTest(unittest.TestCase):
         self.assertEqual(result["hits"][0]["part_index"], 0)
         self.assertEqual(result["misses"][0]["thai"], "ไม่มีจริง")
 
+    def test_rejects_degenerate_zero_duration_match_as_miss(self):
+        # Scribe 在搶話/回音處偶爾把整串音節的 start/end 疊在同一瞬間
+        # （forced-alignment 崩掉）。token 邊界比對仍會判定為命中，但切出來的
+        # 片段幾乎無聲——這種命中要當 miss 退回 YouGlish，不能出貨。
+        part0_words = [word("สั้นมาก", 1.0, 1.05)]
+        lesson = {"id": "gid-test", "cards": [{"thai": "สั้นมาก", "zh": "很短"}]}
+        result = bra.match_lesson_cards(lesson, [part0_words], start_pad_ms=0, end_pad_ms=0)
+        self.assertEqual(result["hits"], [])
+        self.assertEqual(len(result["misses"]), 1)
+        self.assertEqual(result["misses"][0]["thai"], "สั้นมาก")
+
+    def test_accepts_match_above_min_duration_threshold(self):
+        part0_words = [word("พอดี", 1.0, 1.0 + bra.MIN_MATCH_SEC + 0.01)]
+        lesson = {"id": "gid-test", "cards": [{"thai": "พอดี", "zh": "剛好"}]}
+        result = bra.match_lesson_cards(lesson, [part0_words], start_pad_ms=0, end_pad_ms=0)
+        self.assertEqual(len(result["hits"]), 1)
+        self.assertEqual(result["misses"], [])
+
     def test_prefers_earlier_part_on_tie(self):
         part0 = [word("หนึ่ง", 0.0, 0.3)]
         part1 = [word("หนึ่ง", 0.0, 0.3)]
