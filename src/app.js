@@ -33,7 +33,7 @@ import { createLegacyClaimFlow } from './legacy-claim-flow.js';
 import {
   renderSidebar, renderTopbarTitle, renderStats, renderContent,
   openDrawer, closeDrawer, openModal, closeModal, applyTheme,
-  openSearch, closeSearch, renderSearchResults,
+  openSearch, closeSearch, renderSearchResults, escapeHtml,
 } from './ui.js';
 
 let workspaceStorage = null;
@@ -1009,7 +1009,7 @@ async function init() {
       }
 
       const cur = state.lessons.find(l => l.id === state.currentLessonId);
-      if (cur) showLoading(`同步「${cur.title}」…`);
+      if (cur) showLoading(`同步「${escapeHtml(cur.title)}」…`);
       await ensureLessonLoaded(state.currentLessonId, { force: true, silentUI: true });
 
       setLastSync(url);
