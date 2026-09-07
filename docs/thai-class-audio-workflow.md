@@ -160,6 +160,14 @@ python3 scripts/transcribe-class.py \
 
 validator 會擋缺欄／多欄、表頭、編號、Karaoke hyphen、完全重複列、非法 UTF-8、控制字元與試算表公式前綴。若 `data.json` 在 handoff 後改變，也會停止並要求重新整理。只有通過後才原子取代正式 `<job-id>-Google-Sheets.tsv`，但仍不會寫入 Google Sheet；最後由 Nalin 審閱後人工貼入。
 
+### 5.1 新分頁一定要連 `card_id` 一起寫，不要先寫 5 欄再回頭補（2026-09-07 起）
+
+`codex/hybrid-mastery-release` 分支的 `scripts/sync-sheet.py` 現在要求**每一列都要有 F 欄 `card_id`**（canonical lowercase UUID，全 Sheet 跨分頁不重複），少一個就整批同步失敗——不是只有那堂課失敗，是全部 50 堂都同步不了，正式站也會拿不到新資料。這條規則是 U2 identity 工作加的，只鎖在 release 分支（正式站部署來源），main 分支跟這份文件原本描述的舊流程都還是 5 欄、不知道這件事。
+
+**`scripts/backfill-card-ids.py` / `plan-card-id-backfill.py` / `execute-card-id-backfill.py` 這三支不能拿來處理新分頁**——它們是既有 catalog 的一次性遷移工具，架構上強制要求「local `data.json` 的課數＝Sheet 上的分頁數」才能算 manifest，新分頁還沒進 `data.json` 就一定不滿足這個前提，會卡死在雞生蛋蛋生雞。不要花時間想拿它們套用在新課上。
+
+**實際做法**：貼新分頁的當下就把 6 欄（原本 5 欄 + `card_id`）一起寫進去，仿照 `scripts/write-260821-cards.py` 那種一次性寫入腳本的模式，card_id 用任何方式產生「有效、Sheet 全域唯一」的 UUID 都可以（不強制用 `backfill-card-ids.py` 裡 `proposed_card_id()` 那個確定性演算法，那是給既有 catalog 遷移用的，新卡片沒有這個需求，用 `uuid.uuid4()` 即可）。**貼完 Sheet 後、進 §6.5 課堂原音之前，先確認新分頁的 F 欄真的有值**，不要假設之前的慣例（只寫 5 欄）還適用。
+
 ## 6. 狀態速查
 
 | 狀態 | 意思 | 下一步 |
