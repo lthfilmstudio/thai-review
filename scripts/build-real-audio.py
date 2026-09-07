@@ -45,6 +45,7 @@ PART_MAX_SEC = 240
 AUDIO_PREFIX = "audio/real-tw"
 DEFAULT_START_PAD_MS = 120
 DEFAULT_END_PAD_MS = 150
+MIN_MATCH_SEC = 0.15
 TAIPEI = ZoneInfo("Asia/Taipei")
 
 LEAD_IN_SAMPLES = SAMPLE_RATE * LEAD_IN_MS // 1000
@@ -248,6 +249,12 @@ def match_lesson_cards(lesson: dict, parts_words: list[list[dict]],
                 m = find_match(part["entry"], variant_text)
                 if m:
                     start_sec, end_sec, occurrences = m
+                    if end_sec - start_sec < MIN_MATCH_SEC:
+                        # Scribe 偶爾在搶話/回音處把整串音節的 start/end 疊在同一個
+                        # 瞬間（forced-alignment 崩掉），token 邊界比對會誤判成
+                        # 命中，但切出來的音檔只有幾十毫秒、播了等於沒播。寧可當
+                        # miss 退回 YouGlish 備援，不要出貨一段幾乎無聲的片段。
+                        continue
                     p_start, p_end = padded_range(part["toks"], part["starts"], start_sec, end_sec,
                                                    start_pad_ms, end_pad_ms)
                     found = {
