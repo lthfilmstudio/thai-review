@@ -347,9 +347,26 @@ def main() -> int:
         )
         return 4
 
+    source_url = base + "/pubhtml"
+    generated_at = int(time.time())
+    if out_path.exists():
+        try:
+            previous = json.loads(out_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            previous = None
+        if (
+            previous is not None
+            and previous.get("source_url") == source_url
+            and previous.get("lessons") == lessons
+            and previous.get("dialogues") == dialogues
+        ):
+            # 內容完全沒變時沿用舊的 generated_at，寫出來的 bytes 才會跟舊檔一樣，
+            # 讓 git diff 看不到差異——不然每 30 分鐘都會因為時間戳造成一筆空 commit。
+            generated_at = previous.get("generated_at", generated_at)
+
     out = {
-        "generated_at": int(time.time()),
-        "source_url": base + "/pubhtml",
+        "generated_at": generated_at,
+        "source_url": source_url,
         "lessons": lessons,
         "dialogues": dialogues,
     }

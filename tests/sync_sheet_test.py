@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sys
 import tempfile
 import unittest
@@ -182,6 +183,83 @@ class SyncSheetDialogueTest(unittest.TestCase):
 
             self.assertEqual(result, 5)
             self.assertEqual(output.read_bytes(), original)
+
+    def test_main_keeps_generated_at_stable_when_content_is_unchanged(self):
+        # 每 30 分鐘跑一次的排程，Sheet 內容沒變時不該只因為 generated_at
+        # 換了新時間戳就製造一筆空 commit。
+        lesson_csv = (
+            "泰文,目的達拼音,中文,card_id\n"
+            "สวัสดี,sa wat di,你好,550e8400-e29b-41d4-a716-446655440000\n"
+        )
+        html = self.published_html(("初 1", "1"), (sync_sheet.DIALOGUE_SHEET_TITLE, "2"))
+
+        def fake_http_get(url, *args, **kwargs):
+            if url.endswith("/pubhtml"):
+                return html
+            if "gid=1" in url:
+                return lesson_csv
+            if "gid=2" in url:
+                return self.dialogue_csv(10)
+            raise AssertionError(f"unexpected URL: {url}")
+
+        with tempfile.TemporaryDirectory() as td:
+            output = Path(td) / "data.json"
+            with (
+                mock.patch.object(sys, "argv", ["sync-sheet.py", sync_sheet.DEFAULT_PUB_URL, str(output)]),
+                mock.patch.object(sync_sheet, "http_get", side_effect=fake_http_get),
+                mock.patch.object(sync_sheet.time, "time", return_value=1000.0),
+            ):
+                self.assertEqual(sync_sheet.main(), 0)
+            first_bytes = output.read_bytes()
+
+            with (
+                mock.patch.object(sys, "argv", ["sync-sheet.py", sync_sheet.DEFAULT_PUB_URL, str(output)]),
+                mock.patch.object(sync_sheet, "http_get", side_effect=fake_http_get),
+                mock.patch.object(sync_sheet.time, "time", return_value=2000.0),
+            ):
+                self.assertEqual(sync_sheet.main(), 0)
+            second_bytes = output.read_bytes()
+
+            self.assertEqual(first_bytes, second_bytes)
+            self.assertEqual(json.loads(second_bytes)["generated_at"], 1000)
+
+    def test_main_uses_fresh_generated_at_when_content_changes(self):
+        html = self.published_html(("初 1", "1"), (sync_sheet.DIALOGUE_SHEET_TITLE, "2"))
+
+        def fake_http_get(csv_text):
+            def _get(url, *args, **kwargs):
+                if url.endswith("/pubhtml"):
+                    return html
+                if "gid=1" in url:
+                    return csv_text
+                if "gid=2" in url:
+                    return self.dialogue_csv(10)
+                raise AssertionError(f"unexpected URL: {url}")
+            return _get
+
+        with tempfile.TemporaryDirectory() as td:
+            output = Path(td) / "data.json"
+            with (
+                mock.patch.object(sys, "argv", ["sync-sheet.py", sync_sheet.DEFAULT_PUB_URL, str(output)]),
+                mock.patch.object(sync_sheet, "http_get", side_effect=fake_http_get(
+                    "泰文,目的達拼音,中文,card_id\n"
+                    "สวัสดี,sa wat di,你好,550e8400-e29b-41d4-a716-446655440000\n"
+                )),
+                mock.patch.object(sync_sheet.time, "time", return_value=1000.0),
+            ):
+                self.assertEqual(sync_sheet.main(), 0)
+
+            with (
+                mock.patch.object(sys, "argv", ["sync-sheet.py", sync_sheet.DEFAULT_PUB_URL, str(output)]),
+                mock.patch.object(sync_sheet, "http_get", side_effect=fake_http_get(
+                    "泰文,目的達拼音,中文,card_id\n"
+                    "สวัสดีครับ,sa wat di krap,你好,550e8400-e29b-41d4-a716-446655440000\n"
+                )),
+                mock.patch.object(sync_sheet.time, "time", return_value=2000.0),
+            ):
+                self.assertEqual(sync_sheet.main(), 0)
+
+            self.assertEqual(json.loads(output.read_bytes())["generated_at"], 2000)
 
 
 if __name__ == "__main__":
