@@ -345,7 +345,7 @@
 }
 
 .sent-thai {
-  font-family: 'Noto Sans Thai', system-ui, sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 17px;
   font-weight: 500;
   color: var(--text);
