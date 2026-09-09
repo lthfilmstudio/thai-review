@@ -24,6 +24,29 @@ branch」，所以 `--branch main` 一律等於「這是新的正式部署」。
 **這支專案沒有「先部署到安全的地方試」這個選項**。以後每次跑 `--deploy` 都要當成正式
 發布來對待，不要因為目前 checkout 的 git branch 不是 `main` 就以為只是 preview。
 
+## 2026-09-09 更新：正式部署 0f551df2（sw v101），Codex 撞額度後由 Claude 接手覆核＋發布
+
+commit `567293e`（`codex/hybrid-mastery-release`）修「評分重試與開機鏡射競態」三個
+問題：(1) claim collision 重建 retry attempt 時會弄丟使用者原本按的評分；(2)
+projection repair 沒有互斥鎖，可能重疊觸發；(3) 開機時 `settleStreakOnOpen` 排在
+`startPracticeLedgerRuntime` 之前，runtime 這輪 `unavailable` 的話鏡射永遠補不到，
+streak 結算會把昨天誤判成缺席、真的扣掉安神保護——改成 boot ready 後立刻呼叫新的
+`reconcileLedgerMirror()`（只吃 hydration 投影，不依賴 runtime 起不起得來），確定
+鏡射完成才叫 runtime、才結算 streak；開機時間點也提前到任何 await 之前釘住，避免
+等待跨過台北午夜算錯日期。詳細改動與覆核過程見
+`000_Agent/memory/codex_to_claude_handoff.md` 09-09 那則。
+
+Claude 逐行對照過 `practice-grade-controller.js`／`ledger-mirror.js`／`today.js`／
+`app.js` 開機段落的邏輯，跑過 `node --test`（599/599）與部署腳本內建的 Python 測試
+（138/138），全過，沒發現新問題。部署用 `scripts/update-audio-deploy.sh --deploy`，
+`npx wrangler pages deployment list` 確認 `0f551df2`（`source_commit=567293e`）是
+Environment=`Production`、`branch=main`、時間最新的一筆，`sw_cache=thai-review-v101`。
+
+**跟這次修的三個 race condition 有關的情境，全部只有 node test 模擬過，沒有在瀏覽器
+裡人工重現**：claim collision 重試保留評分、projection repair 重疊、開機
+runtime-unavailable 誤扣保護。下面「部署後要人工確認」清單原本 2～5 項還沒做的
+狀態不變，且新增這三項一起欠著。
+
 ## 目前狀態
 
 **已於 2026-09-07 00:59 部署（正式站，已用 `canonical_deployment` API 確認）**：
@@ -181,10 +204,11 @@ bash scripts/update-audio-deploy.sh --deploy
 per-deployment URL（`<hash>.thai-review.pages.dev`）不在 Cloudflare Access 後面，
 可以直接開。**09-07 這次部署（`dab0b6e6`）用乾淨瀏覽器 profile 驗過第 1 項；2、3
 需要有到期卡或真實 legacy 進度才能測，乾淨瀏覽器測不出來，還沒有人在部署後對
-`dab0b6e6` 測過；4、5 也還沒做。**
+`dab0b6e6` 測過；4、5 也還沒做。09-09 這次部署（`0f551df2`，sw v101）第 1 項也還
+沒重新驗過，2～8 全部繼續欠著。**
 
-1. ✅ **fresh page**：DevTools → Application → Service Workers 確認 cache 是
-   `thai-review-v99`（**要跟線上前一版不同才有意義**——填成當時線上那個版號的話，
+1. ⬜ **fresh page**：DevTools → Application → Service Workers 確認 cache 是
+   `thai-review-v101`（**要跟線上前一版不同才有意義**——填成當時線上那個版號的話，
    裝置停在舊 bundle 也會「通過」）；Network 確認 `src/practice-grade-session.js`
    拿到的是 `text/javascript` 不是 `text/html`。
 2. ⬜ **Today Due**：評一張，畫面正常前進；Application → IndexedDB →
@@ -195,6 +219,15 @@ per-deployment URL（`<hash>.thai-review.pages.dev`）不在 Cloudflare Access �
 5. ⬜ **既有進度**（**要 Nalin 本人在她的裝置上做**，不是本機模擬得出來的）：用真的
    有 legacy progress 的裝置開一次，確認 `srs_v2` 有 seed 到、或 quarantine 的原因
    合理（`current_catalog_collision` 之類是正常的）。
+6. ⬜ **claim collision 保留評分**（09-09 新修）：兩個分頁開同一張到期卡，幾乎同時
+   評分，被搶輸的那個分頁補送 retry 後，畫面跟寫進帳本的評分要是你在那個分頁上
+   按的那個，不是被沖成別的值。
+7. ⬜ **projection repair 連按**（09-09 新修）：故意讓鏡射失敗一次進
+   `projection-repair`（例如短暫塞爆 IndexedDB quota），連續快按「重試」按鈕，
+   只能真的前進一次，不能重複記帳。
+8. ⬜ **開機 runtime 起不來仍鏡射昨日出席**（09-09 新修）：需要能模擬
+   `startPracticeLedgerRuntime` 回傳 `unavailable` 的情境（例如暫時擋掉 IDB 或
+   catalog fence），確認開機後「安神保護」沒有被誤扣、今日／連續天數畫面正確。
 
 ## 回滾
 
