@@ -29,6 +29,7 @@ test('只有 ledger ready 且身在 Today 才走 ledger（R1，__ALL__ 本輪未
 
 function session(overrides = {}) {
   const calls = { commits: [], advances: [] };
+  const { commit: customCommit, ...sessionOverrides } = overrides.session || {};
   let seq = 0;
   const ids = () => {
     seq += 1;
@@ -57,6 +58,7 @@ function session(overrides = {}) {
     advance: r => calls.advances.push(r),
     commit: async input => {
       calls.commits.push(input);
+      if (customCommit) return customCommit(input);
       return {
         status: 'committed',
         event: { eventId: input.attempt.eventId, dayKey: input.attempt.dayKey },
@@ -67,7 +69,7 @@ function session(overrides = {}) {
         },
       };
     },
-    ...overrides.session,
+    ...sessionOverrides,
   });
   return { calls, context, handle };
 }
@@ -99,6 +101,40 @@ test('Today Sweep 不帶 formalGrade（R5）', async () => {
   const attempt = rig.calls.commits[0].attempt;
   assert.equal(attempt.lane, 'sweep');
   assert.equal(Object.hasOwn(attempt, 'formalGrade'), false);
+});
+
+test('AE3：production readContext 沒有 grade，claim collision 仍沿用使用者原始評分', async () => {
+  stored.clear();
+  const rig = session({
+    context: { grade: undefined },
+    session: {
+      commit: async input => {
+        if (input.attempt.phase === 'first') {
+          return {
+            status: 'daily-card-already-claimed',
+            // readPracticeDayContext() 的 production 形狀：只有 claim context，沒有 grade。
+            context: {
+              phases: ['first'], lane: 'sweep',
+              roundId: '77777777-7777-4777-8777-777777777777',
+              cycleId: '88888888-8888-4888-8888-888888888888', cycleOrdinal: 1,
+              attemptId: '99999999-9999-4999-8999-999999999999',
+            },
+          };
+        }
+        return { status: 'committed', event: { eventId: input.attempt.eventId } };
+      },
+    },
+  });
+
+  const result = await rig.handle.controller.submitGrade('hard');
+
+  assert.equal(result.status, 'done');
+  assert.equal(rig.calls.commits.length, 2, 'first claim 被搶後要補送一筆 retry');
+  assert.equal(rig.calls.commits[1].attempt.phase, 'retry-1');
+  assert.equal(rig.calls.commits[1].attempt.lane, 'sweep');
+  assert.equal(rig.calls.commits[1].attempt.result, 'partial', 'retry 保留使用者按下的 hard');
+  assert.equal(Object.hasOwn(rig.calls.commits[1].attempt, 'formalGrade'), false,
+    'sweep retry 沒有 formalGrade，不能靠它反推原始評分');
 });
 
 test('All 的 lane 由權威 SRS 判：到期是 due，沒排程是 sweep（session 未接，直接驗分類器）', async () => {

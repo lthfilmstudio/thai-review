@@ -40,7 +40,7 @@ test('migration summary 在 daily/streak 前 await，且只靠本次 bootResult'
   const readyGate = appSource.indexOf("if (bootResult.status !== 'ready')");
   const summary = appSource.indexOf('await showLegacyMigrationSummary(', readyGate);
   const daily = appSource.indexOf('initDailyLog(state.progress, storage)', readyGate);
-  const streak = appSource.indexOf('settleStreakOnOpen(undefined, storage)', readyGate);
+  const streak = appSource.indexOf('settleStreakOnOpen(streakOpenedAt, storage)', readyGate);
   const summaryFunction = appSource.indexOf('function showLegacyMigrationSummary(');
   const source = appSource.slice(
     summaryFunction,

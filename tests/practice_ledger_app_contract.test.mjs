@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { reconcileLedgerMirror } from '../src/ledger-mirror.js';
+import { startPracticeLedgerRuntime } from '../src/practice-ledger-runtime.js';
+import { DAILY_KEY, loadDailyLog, settleStreakOnOpen } from '../src/today.js';
+
 /* 跟 legacy_claim_app_contract.test.mjs 同一個路數：app.js 是 DOM 耦合的入口，
    沒辦法直接跑行為測試，就把「接在哪、順序對不對、有沒有接錯東西」釘住。 */
 const appSource = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
@@ -10,15 +14,98 @@ const appSource = await readFile(new URL('../src/app.js', import.meta.url), 'utf
 const appCode = appSource.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
 const swSource = await readFile(new URL('../sw.js', import.meta.url), 'utf8');
 
-test('ledger runtime 接在 boot ready 之後、任何主畫面 render 之前', () => {
-  const readyGate = appSource.indexOf("if (bootResult.status !== 'ready')");
-  const start = appSource.indexOf('practiceLedger = await startPracticeLedgerRuntime({');
-  const settle = appSource.indexOf('settleStreakOnOpen(');
-  const deepLink = appSource.indexOf('const deepLink = parseDeepLinkParam();');
+test('R12：ledger runtime unavailable 時仍先鏡射昨日出席，再結算 streak', async () => {
+  const initialLog = {
+    v: 1,
+    backfilled: true,
+    days: { '2026-08-18': { reviewed: 1 } },
+    protection: 1,
+    protectionRefillCheckpoint: 0,
+  };
+  const makeStorage = () => {
+    const values = new Map([[DAILY_KEY, JSON.stringify(initialLog)]]);
+    return {
+      getItem: key => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+      removeItem: key => values.delete(key),
+    };
+  };
+  const yesterdayProjection = {
+    'daily:2026-08-19': {
+      workspaceId: 'user:A', name: 'daily:2026-08-19', schemaVersion: 1,
+      projectorVersion: 'practice-daily-v1', dayKey: '2026-08-19',
+      reviewed: 0, again: 0, hard: 0, good: 0, easy: 0, practice: 1,
+    },
+  };
+  const now = Date.parse('2026-08-20T04:00:00.000Z');
+
+  const staleMirror = makeStorage();
+  assert.equal(settleStreakOnOpen(now, staleMirror).type, 'protected',
+    '控制組：先結算會把昨天誤判成缺席');
+  assert.equal(loadDailyLog(staleMirror).protection, 0, '誤判會真的扣掉保護');
+
+  const reconciled = makeStorage();
+  reconcileLedgerMirror({ projections: yesterdayProjection, storage: reconciled });
+  const unavailable = await startPracticeLedgerRuntime({
+    connection: null,
+    projections: yesterdayProjection,
+    storage: reconciled,
+  });
+  assert.equal(unavailable.status, 'unavailable', '控制組：ledger runtime 這輪確實起不來');
+  assert.equal(settleStreakOnOpen(now, reconciled).type, 'none', '鏡射後昨天算有來');
+  assert.equal(loadDailyLog(reconciled).protection, 1, '安神保護不得被誤扣');
+
+  const readyGate = appCode.indexOf("if (bootResult.status !== 'ready')");
+  const mirror = appCode.indexOf('reconcileLedgerMirror({', readyGate);
+  const start = appCode.indexOf('practiceLedger = await startPracticeLedgerRuntime({', readyGate);
+  const settle = appCode.indexOf('settleStreakOnOpen(', start);
+  const deepLink = appCode.indexOf('const deepLink = parseDeepLinkParam();', settle);
 
   assert.ok(readyGate > 0 && start > readyGate, 'boot 沒 ready 就不該叫 ledger 起來');
-  assert.ok(start > settle, 'streak 結算要先跑完，鏡射才不會被結算蓋掉');
-  assert.ok(deepLink > start, '鏡射要在挑卡片、render 之前完成');
+  assert.ok(mirror > readyGate && mirror < start,
+    '鏡射必須在可能回 unavailable 的 ledger runtime 前完成');
+  assert.match(appCode.slice(mirror, start),
+    /projections: bootResult\.hydration\?\.snapshot\?\.projections/);
+  assert.match(appCode.slice(mirror, start),
+    /cardKeyById: catalogCardKeyIndex\(bootResult\.catalog\)/);
+  assert.ok(start < settle, 'ledger runtime 後才結算 streak');
+  assert.ok(deepLink > settle, '鏡射與 streak 結算都要在挑卡片、render 之前完成');
+});
+
+test('R12：ledger 啟動跨過台北午夜，streak 仍用開機當下的日期', () => {
+  const makeStorage = () => {
+    const values = new Map([[DAILY_KEY, JSON.stringify({
+      v: 1,
+      backfilled: true,
+      days: { '2026-08-18': { reviewed: 1 } },
+      protection: 1,
+      protectionRefillCheckpoint: 0,
+    })]]);
+    return {
+      getItem: key => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+      removeItem: key => values.delete(key),
+    };
+  };
+  const beforeTaipeiMidnight = Date.parse('2026-08-19T15:59:59.900Z');
+  const afterTaipeiMidnight = Date.parse('2026-08-19T16:00:00.100Z');
+
+  const openedBeforeMidnight = makeStorage();
+  assert.equal(settleStreakOnOpen(beforeTaipeiMidnight, openedBeforeMidnight).type, 'none');
+  assert.equal(loadDailyLog(openedBeforeMidnight).protection, 1,
+    '23:59 開機時，昨天 08-18 有來，不該扣保護');
+
+  const settledAfterMidnight = makeStorage();
+  assert.equal(settleStreakOnOpen(afterTaipeiMidnight, settledAfterMidnight).type, 'protected');
+  assert.equal(loadDailyLog(settledAfterMidnight).protection, 0,
+    '控制組：若 await 後才取時間，00:00 會把 08-19 當缺席並扣保護');
+
+  const readyGate = appCode.indexOf("if (bootResult.status !== 'ready')");
+  const capture = appCode.indexOf('const streakOpenedAt = Date.now();', readyGate);
+  const start = appCode.indexOf('practiceLedger = await startPracticeLedgerRuntime({', readyGate);
+  const settle = appCode.indexOf('settleStreakOnOpen(streakOpenedAt, storage)', start);
+  assert.ok(capture > readyGate && capture < start, '要在等待 ledger runtime 前固定開機時間');
+  assert.ok(settle > start, '結算時要明確使用固定的開機時間');
 });
 
 test('ledger runtime 拿到的是這次 boot 的 workspace、catalog 與 hydration 投影', () => {
@@ -310,6 +397,21 @@ test('AE7：設定的守衛要排在任何寫入之前', () => {
   assert.ok(lock > 0, '設定儲存要有 saving 鎖');
   assert.ok(lock < body.indexOf('state.settings.sheetInput = newInput'), '鎖要排在寫入之前');
   assert.ok(lock < body.indexOf('if (inputChanged)'), '不能藏在 inputChanged 分支裡');
+});
+
+test('R13：shuffle click 在 controller 鎖住時不改卡，按鈕也顯示 disabled', () => {
+  const start = appCode.indexOf("document.getElementById('btnShuffle').addEventListener('click'");
+  assert.ok(start > 0);
+  const body = appCode.slice(start, appCode.indexOf('\n  });', start));
+  const lock = body.indexOf('ledgerSession?.controller.isLocked()');
+  assert.ok(lock > 0, 'shuffle handler 要直接檢查 controller 鎖');
+  for (const mutation of ['stopListen()', 'shuffleCurrentLesson()', 'rerender(storage)', 'flashShuffle()']) {
+    assert.ok(body.indexOf(mutation) > lock, `${mutation} 必須排在鎖後面`);
+  }
+
+  const renderStart = appCode.indexOf('function renderLedgerSavingState(status)');
+  const renderBody = appCode.slice(renderStart, appCode.indexOf('\n}', renderStart));
+  assert.match(renderBody, /#btnShuffle/, 'saving／失敗期間 shuffle 按鈕要顯示 disabled');
 });
 
 test('評分的 promise 有接住 rejection，不留 unhandled', () => {

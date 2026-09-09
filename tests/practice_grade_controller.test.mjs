@@ -202,6 +202,114 @@ test('鏡射失敗進 projection-repair，重試只重跑鏡射不重送交易',
   assert.equal(rig.calls.advances.length, 1);
 });
 
+test('P1：重疊的 projection repair 只啟動一次鏡射、成功只前進一次', async () => {
+  let mirrors = 0;
+  let releaseRepair;
+  let repairStarted;
+  const repairGate = new Promise(resolve => { releaseRepair = resolve; });
+  const started = new Promise(resolve => { repairStarted = resolve; });
+  const rig = harness({
+    mirror: async () => {
+      mirrors += 1;
+      if (mirrors === 1) throw new Error('QuotaExceededError');
+      repairStarted();
+      await repairGate;
+    },
+  });
+  assert.equal((await rig.controller.submitGrade('good')).status, 'projection-repair');
+
+  const first = rig.controller.repairProjection();
+  await started;
+  const overlapPending = rig.controller.repairProjection();
+  await new Promise(resolve => setImmediate(resolve));
+  releaseRepair();
+  const [repaired, overlap] = await Promise.all([first, overlapPending]);
+
+  assert.deepEqual(overlap, { status: 'busy' }, '第二次呼叫要被同步 guard 擋下');
+  assert.equal(repaired.status, 'done');
+  assert.equal(mirrors, 2, '第一次失敗＋一次 repair，不能再多跑一次 mirror');
+  assert.equal(rig.calls.advances.length, 1, '只有拿到 guard 的 repair 可以前進');
+});
+
+test('R7/R13：projection repair 時卡片或 context epoch 已變仍鏡射，但不前進', async () => {
+  for (const [label, patch] of [
+    ['card', { cardId: '77777777-7777-4777-8777-777777777777' }],
+    ['context epoch', { contextEpoch: 1 }],
+  ]) {
+    let mirrors = 0;
+    const rig = harness({
+      mirror: async () => {
+        mirrors += 1;
+        if (mirrors === 1) throw new Error('QuotaExceededError');
+      },
+    });
+    assert.equal((await rig.controller.submitGrade('good')).status, 'projection-repair', label);
+    rig.setOperation(patch);
+
+    const repaired = await rig.controller.repairProjection();
+
+    assert.equal(repaired.status, 'stale-operation', label);
+    assert.equal(mirrors, 2, `${label}: 已提交的權威投影仍要完成鏡射`);
+    assert.equal(rig.calls.advances.length, 0, `${label}: stale result 不得前進`);
+    assert.equal(rig.controller.getStatus(), 'idle', `${label}: 鏡射完成後要解鎖`);
+  }
+});
+
+test('R12：projection repair 時 workspace 或 catalog 已變就不鏡射、不前進', async () => {
+  for (const [label, patch] of [
+    ['workspace id', { workspaceId: 'user:B' }],
+    ['workspace generation', { workspaceGeneration: 1 }],
+    ['catalog', { catalogDigest: 'sha256:b' }],
+  ]) {
+    let mirrors = 0;
+    const rig = harness({
+      mirror: async () => {
+        mirrors += 1;
+        if (mirrors === 1) throw new Error('QuotaExceededError');
+      },
+    });
+    assert.equal((await rig.controller.submitGrade('good')).status, 'projection-repair', label);
+    rig.setOperation(patch);
+
+    const repaired = await rig.controller.repairProjection();
+
+    assert.equal(repaired.status, 'stale-operation', label);
+    assert.equal(mirrors, 1, `${label}: stale result 不得再鏡射`);
+    assert.equal(rig.calls.advances.length, 0, `${label}: stale result 不得前進`);
+    assert.equal(rig.controller.getStatus(), 'idle', `${label}: 交給 boot reconcile 後要解鎖`);
+  }
+});
+
+test('R13：projection repair 鏡射期間 context drift 不得前進', async () => {
+  let mirrors = 0;
+  const rig = harness({
+    mirror: async () => {
+      mirrors += 1;
+      if (mirrors === 1) throw new Error('QuotaExceededError');
+      rig.setOperation({ contextEpoch: 1 });
+    },
+  });
+  assert.equal((await rig.controller.submitGrade('good')).status, 'projection-repair');
+
+  const repaired = await rig.controller.repairProjection();
+
+  assert.equal(repaired.status, 'stale-operation');
+  assert.equal(mirrors, 2, '權威投影已鏡射完成');
+  assert.equal(rig.calls.advances.length, 0, '鏡射期間失效的 operation 不得前進 UI');
+});
+
+test('R13：首次鏡射期間 context drift 也不得前進', async () => {
+  const rig = harness({
+    mirror: async () => { rig.setOperation({ cardId: '77777777-7777-4777-8777-777777777777' }); },
+  });
+
+  const result = await rig.controller.submitGrade('good');
+
+  assert.equal(result.status, 'stale-operation');
+  assert.equal(rig.calls.mirrors.length, 1, '交易的權威投影已鏡射');
+  assert.equal(rig.calls.advances.length, 0, '鏡射期間失效的 operation 不得前進 UI');
+});
+
 test('AE7：背景換掉 catalog，回來的結果不套用也不前進', async () => {
   let release;
   const gate = new Promise(resolve => { release = resolve; });
@@ -253,6 +361,65 @@ test('AE3：被另一個入口搶走 claim 時，拿它的 context 補送一次 
   assert.equal(rig.calls.advances.length, 1);
 });
 
+test('claim collision 重建 attempt 時沿用原始 grade', async () => {
+  const builds = [];
+  const rig = harness({
+    buildAttempt: ({ existingContext, grade }) => {
+      builds.push({ existingContext, grade });
+      return {
+        kind: 'attempt', phase: existingContext ? 'retry-1' : 'first',
+        lane: existingContext?.lane || 'due',
+        attemptId: existingContext?.attemptId || OPERATION.attemptId,
+      };
+    },
+    commit: async input => input.attempt.phase === 'first'
+      ? {
+        status: 'daily-card-already-claimed',
+        context: {
+          phases: ['first'], lane: 'sweep', roundId: 'r', cycleId: 'c',
+          cycleOrdinal: 1, attemptId: 'winner-attempt',
+        },
+      }
+      : { status: 'committed' },
+  });
+
+  assert.equal((await rig.controller.submitGrade('hard')).status, 'done');
+  assert.deepEqual(builds.map(call => call.grade), ['hard', 'hard']);
+});
+
+test('controller.retry 內遇到 claim collision 也沿用第一次送出的 grade', async () => {
+  const builds = [];
+  let commits = 0;
+  const rig = harness({
+    buildAttempt: ({ existingContext, grade }) => {
+      builds.push({ existingContext, grade });
+      return {
+        kind: 'attempt', phase: existingContext ? 'retry-1' : 'first',
+        lane: existingContext?.lane || 'due',
+        attemptId: existingContext?.attemptId || OPERATION.attemptId,
+      };
+    },
+    commit: async () => {
+      commits += 1;
+      if (commits === 1) throw new Error('quota');
+      if (commits === 2) {
+        return {
+          status: 'daily-card-already-claimed',
+          context: {
+            phases: ['first'], lane: 'weak', roundId: 'r', cycleId: 'c',
+            cycleOrdinal: 1, attemptId: 'winner-attempt',
+          },
+        };
+      }
+      return { status: 'committed' };
+    },
+  });
+
+  assert.equal((await rig.controller.submitGrade('easy')).status, 'save-failed');
+  assert.equal((await rig.controller.retry()).status, 'done');
+  assert.deepEqual(builds.map(call => call.grade), ['easy', 'easy']);
+});
+
 test('補送的那筆還是被擋：不再無限互搶，解鎖交還使用者', async () => {
   const rig = harness({
     commit: async () => ({
@@ -302,8 +469,14 @@ test('缺 adapter 直接拒絕建立 controller', () => {
 /* 兩個「只能重新整理」的死路，獨立審查各自實測抓到的。兩個都不掉資料（交易早就落地，
    開機的 reconcileLedgerMirror 會補鏡射），但使用者會以為 App 壞了。 */
 
-test('P1：projection-repair 重試又失敗，仍要再 emit 一次狀態', async () => {
-  const rig = harness({ mirror: async () => { throw new Error('QuotaExceededError'); } });
+test('P1：projection-repair 重試又失敗，仍要 emit 並可以再試', async () => {
+  let mirrors = 0;
+  const rig = harness({
+    mirror: async () => {
+      mirrors += 1;
+      if (mirrors < 3) throw new Error('QuotaExceededError');
+    },
+  });
   const first = await rig.controller.submitGrade('good');
   assert.equal(first.status, 'projection-repair');
   const before = rig.calls.states.length;
@@ -314,6 +487,11 @@ test('P1：projection-repair 重試又失敗，仍要再 emit 一次狀態', asy
   assert.ok(rig.calls.states.length > before,
     '狀態沒變也要 emit：呼叫端在 await 之前就把按鈕 disabled 了，只有 onStateChange 會把它放回來');
   assert.equal(rig.controller.isLocked(), true, '還是鎖著，但按鈕要能再按');
+
+  const recovered = await rig.controller.repairProjection();
+  assert.equal(recovered.status, 'done');
+  assert.equal(mirrors, 3);
+  assert.equal(rig.calls.advances.length, 1, '失敗後再試成功只前進一次');
 });
 
 test('P1：交易落地之後 capture() 丟例外，不能把狀態卡在 saving', async () => {

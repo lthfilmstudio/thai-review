@@ -51,6 +51,7 @@ export function createPracticeGradeController({
   // 已經在路上的那筆失效，而不是擋住使用者。
   let pendingRetry = null;
   let pendingRepair = null;
+  let repairInFlight = false;
 
   const setStatus = next => {
     if (status === next) return;
@@ -58,12 +59,33 @@ export function createPracticeGradeController({
     emit({ status, canRetry: !!pendingRetry, canRepair: !!pendingRepair });
   };
 
-  async function runCommit(attempt, operation) {
+  const captureCurrentOperation = () => {
+    try {
+      return capture();
+    } catch {
+      // 已落地的交易拍不到目前 context 時，交給開機 reconcile 補鏡射。
+      return null;
+    }
+  };
+
+  const committedOperationStillCurrent = operation => (
+    operationStillCurrent(operation, captureCurrentOperation())
+  );
+
+  const committedProjectionStillApplicable = operation => {
+    const current = captureCurrentOperation();
+    return !!operation && !!current
+      && operation.workspaceId === current.workspaceId
+      && operation.workspaceGeneration === current.workspaceGeneration
+      && operation.catalogDigest === current.catalogDigest;
+  };
+
+  async function runCommit(attempt, operation, grade) {
     let result = await commitAttempt({ attempt, operation });
     // AE3：同日同卡被另一個入口（Today／All 另一個 tab）先認領走了，拿它的
     // context 重建成 retry-N 再送一次。只補送一次，避免無限互搶。
     if (CLAIM_BLOCKED.has(result?.status) && result.context) {
-      const retryAttempt = build({ existingContext: result.context });
+      const retryAttempt = build({ existingContext: result.context, grade });
       if (!retryAttempt || retryAttempt.kind === 'retry-limit') {
         return { result, attempt, exhausted: true };
       }
@@ -73,14 +95,14 @@ export function createPracticeGradeController({
     return { result, attempt, exhausted: false };
   }
 
-  async function finish(attempt, operation) {
+  async function finish(attempt, operation, grade) {
     let committed;
     try {
-      committed = await runCommit(attempt, operation);
+      committed = await runCommit(attempt, operation, grade);
     } catch (error) {
       // 交易失敗：什麼都沒寫進去，留在原卡用同一個 attempt 重試。operation 要一起
       // 留著——重試時要拿它跟當下的 context 比，不能重新拍一張再跟自己比。
-      pendingRetry = { attempt, operation, error };
+      pendingRetry = { attempt, operation, grade, error };
       setStatus('save-failed');
       return { status: 'save-failed', error };
     }
@@ -98,13 +120,7 @@ export function createPracticeGradeController({
        capturePracticeOperation 就丟。讓它往上冒的話狀態永遠停在 saving，而
        saving 沒有對應的動作按鈕，使用者只能重新整理。拍不到 context 就當 stale——
        帳本已經有這筆，開機的 reconcileLedgerMirror 會補鏡射。 */
-    let current = null;
-    try {
-      current = capture();
-    } catch {
-      current = null;
-    }
-    if (!operationStillCurrent(operation, current)) {
+    if (!committedOperationStillCurrent(operation)) {
       pendingRetry = null;
       pendingRepair = null;
       setStatus('idle');
@@ -114,9 +130,15 @@ export function createPracticeGradeController({
     try {
       await mirrorResult(result);
     } catch (error) {
-      pendingRepair = { result, error };
+      pendingRepair = { result, operation, error };
       setStatus('projection-repair');
       return { status: 'projection-repair', result, error };
+    }
+    if (!committedOperationStillCurrent(operation)) {
+      pendingRetry = null;
+      pendingRepair = null;
+      setStatus('idle');
+      return { status: 'stale-operation', result };
     }
 
     pendingRetry = null;
@@ -145,14 +167,14 @@ export function createPracticeGradeController({
       if (!attempt) return { status: 'not-eligible' };
       if (attempt.kind === 'retry-limit') return { status: 'retry-limit', attempt };
       setStatus('saving');
-      return finish(attempt, operation);
+      return finish(attempt, operation, grade);
     },
 
     /* 失敗後重試：沿用同一個 attempt（同一組 attemptId／phase）。eventId 由呼叫端
        每次新產生，擋住重複的是 attemptPhaseClaims，不是 eventId。 */
     async retry() {
       if (status !== 'save-failed' || !pendingRetry) return { status: 'nothing-to-retry' };
-      const { attempt, operation } = pendingRetry;
+      const { attempt, operation, grade } = pendingRetry;
       let current;
       try {
         current = capture();
@@ -173,24 +195,40 @@ export function createPracticeGradeController({
         return { status: 'stale-operation' };
       }
       setStatus('saving');
-      return finish(attempt, operation);
+      return finish(attempt, operation, grade);
     },
 
     /* 鏡射修復：交易早就成功了，只重跑鏡射，絕不重送交易。 */
     async repairProjection() {
+      if (repairInFlight) return { status: 'busy' };
       if (status !== 'projection-repair' || !pendingRepair) return { status: 'nothing-to-repair' };
-      const { result } = pendingRepair;
+      repairInFlight = true;
+      const { result, operation } = pendingRepair;
+      if (!committedProjectionStillApplicable(operation)) {
+        pendingRepair = null;
+        repairInFlight = false;
+        setStatus('idle');
+        return { status: 'stale-operation', result };
+      }
       try {
         await mirrorResult(result);
       } catch (error) {
-        pendingRepair = { result, error };
+        pendingRepair = { result, operation, error };
+        repairInFlight = false;
         /* 狀態沒變，但一定要再 emit 一次：呼叫端在 await 之前就把按鈕 disabled 了，
            而按鈕只有 onStateChange 驅動的 render 會重新啟用。setStatus 對相同狀態
            是 no-op，所以這裡直接 emit，否則重試一次失敗按鈕就永遠灰掉。 */
         emit({ status, canRetry: !!pendingRetry, canRepair: !!pendingRepair });
         return { status: 'projection-repair', error };
       }
+      if (!committedOperationStillCurrent(operation)) {
+        pendingRepair = null;
+        repairInFlight = false;
+        setStatus('idle');
+        return { status: 'stale-operation', result };
+      }
       pendingRepair = null;
+      repairInFlight = false;
       setStatus('idle');
       advanceUi(result);
       return { status: 'done', result };

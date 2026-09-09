@@ -393,7 +393,7 @@ test('App 只以 workspace boot 開機，ready 前不做 daily/streak/save/rende
   const assignStorage = appSource.indexOf('workspaceStorage = bootResult.storage;', ready);
   const requireStorage = appSource.indexOf('const storage = requireWorkspaceStorage();', assignStorage);
   const firstDaily = appSource.indexOf('initDailyLog(state.progress, storage)', requireStorage);
-  const firstSettle = appSource.indexOf('settleStreakOnOpen(undefined, storage)', requireStorage);
+  const firstSettle = appSource.indexOf('settleStreakOnOpen(streakOpenedAt, storage)', requireStorage);
   const firstSave = appSource.indexOf('saveState(storage);', ready);
   const firstRender = appSource.indexOf('rerender(storage);', ready);
   assert.ok(initStart >= 0 && boot > initStart && ready > boot);

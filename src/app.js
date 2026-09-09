@@ -35,6 +35,7 @@ import {
 } from './practice-db.js';
 import { createLegacyClaimFlow, fetchProductionLineageEvidence } from './legacy-claim-flow.js';
 import { startPracticeLedgerRuntime, catalogCardKeyIndex } from './practice-ledger-runtime.js';
+import { reconcileLedgerMirror } from './ledger-mirror.js';
 import {
   commitLegacyV1Import,
   planLegacyV1Import,
@@ -308,7 +309,7 @@ const LEDGER_STATUS_TEXT = Object.freeze({
 function renderLedgerSavingState(status) {
   const busy = status !== 'idle';
   document.body.dataset.ledgerSaving = busy ? status : '';
-  for (const el of document.querySelectorAll('[data-grade], #cardPrev, #cardNext')) {
+  for (const el of document.querySelectorAll('[data-grade], #cardPrev, #cardNext, #btnShuffle')) {
     el.toggleAttribute('disabled', busy);
     el.setAttribute('aria-disabled', busy ? 'true' : 'false');
   }
@@ -944,14 +945,17 @@ async function init() {
   await showLegacyMigrationSummary(bootResult.migration?.summary);
   initDailyLog(state.progress, storage);
 
-  // streak 結算必須在 hydration 後、任何主畫面 render 前完成。
-  const settleEvent = settleStreakOnOpen(undefined, storage);
-  if (settleEvent.type === 'protected') {
-    showToast(`昨天沒開，用掉 ${settleEvent.spent} 個安神保護幫你保住連續天數`);
-  }
-  state.lessons = bootResult.catalog.lessons;
+  // 先固定這次開機的日期；ledger 啟動若跨過台北午夜，streak 仍以開機當下結算。
+  const streakOpenedAt = Date.now();
+  // hydration 已經帶回來的投影不依賴 ledger runtime。先鏡射，runtime 就算 unavailable，
+  // 昨日出席與歷史也不會漏掉。
+  reconcileLedgerMirror({
+    projections: bootResult.hydration?.snapshot?.projections || null,
+    cardKeyById: catalogCardKeyIndex(bootResult.catalog),
+    storage,
+  });
 
-  // ledger 這一側：確認 catalog fence、把 IDB 投影鏡射回本機。整段 fail-open——
+  // ledger 這一側：確認 catalog fence。整段 fail-open——
   // 失敗只代表這次開機不開放 ledger 評分，畫面與 legacy 評分完全不受影響（R14）。
   practiceLedger = await startPracticeLedgerRuntime({
     connection: practiceConnection,
@@ -973,6 +977,14 @@ async function init() {
       }
     },
   });
+
+  // streak 結算必須在 hydration 與 ledger daily 投影鏡射後、任何主畫面 render 前完成。
+  // commit 後、mirror 前若當掉，先結算會把昨天誤判成缺席並真的扣掉安神保護。
+  const settleEvent = settleStreakOnOpen(streakOpenedAt, storage);
+  if (settleEvent.type === 'protected') {
+    showToast(`昨天沒開，用掉 ${settleEvent.spent} 個安神保護幫你保住連續天數`);
+  }
+  state.lessons = bootResult.catalog.lessons;
 
   practiceLedgerWorkspaceId = bootResult.workspaceId;
   practiceResetPort = practiceLedger.port || (practiceConnection
@@ -1185,6 +1197,7 @@ async function init() {
     renderSearchResults(e.target.value, match => onSearchPick(match, storage));
   });
   document.getElementById('btnShuffle').addEventListener('click', () => {
+    if (ledgerSession?.controller.isLocked()) return;
     stopListen();
     shuffleCurrentLesson();
     rerender(storage);
