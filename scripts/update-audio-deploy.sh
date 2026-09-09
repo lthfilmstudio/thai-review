@@ -102,6 +102,7 @@ PY
 # 200 text/html，已登入又有 legacy 資料的使用者直接卡在 recoverable-failure。
 RUNTIME_READBACK_ASSETS=(
   "sw.js"
+  "src/app.js"
   "data.json"
   "zh-manifest.json"
   "audio-manifest.json"

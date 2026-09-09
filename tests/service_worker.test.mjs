@@ -295,6 +295,7 @@ test('ledger 相關的離線模組全部納入部署 read-back', async () => {
   for (const shellPath of shellPaths.filter(p => ledgerOwned.test(p))) {
     assert.ok(readback.has(shellPath), `${shellPath} 在 SHELL 裡但沒進部署 read-back`);
   }
+  assert.ok(readback.has('src/app.js'), 'ledger 開機接線入口也要 read-back');
   assert.ok(readback.has('data/card-id-lineage.json'), 'lineage 檔本身也要 read-back');
   assert.ok(readback.has('sw.js'));
 });

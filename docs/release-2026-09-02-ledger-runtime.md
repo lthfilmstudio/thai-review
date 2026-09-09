@@ -49,11 +49,12 @@ runtime-unavailable 誤扣保護。下面「部署後要人工確認」清單原
 
 ## 目前狀態
 
-**已於 2026-09-07 00:59 部署（正式站，已用 `canonical_deployment` API 確認）**：
-`5df9bc0`、deployment `dab0b6e6`、`sw_cache=thai-review-v99`，read-back 18 個資產 SHA
-全部相符。U5c、第六／七輪審查修正（含上面的重置圍籬）都在這個版本裡。
+**已於 2026-09-09 12:14 部署（正式站，已用 Wrangler deployment list 確認）**：
+`567293e`、deployment `0f551df2`、`sw_cache=thai-review-v101`。`deploy-info.json` 記錄的
+17 個資產 SHA 全部相符；Codex 另行比對當時尚未納入自動 read-back 的 `src/app.js`，線上與
+本機 SHA 皆為 `718e68421f3d13b94e627ab434b49ff7d47a06fb`。
 
-部署後在 per-deployment URL 驗過：SW cache 確實是 `v99`（跟前一版 `v98` 不同，precache
+前一版 `dab0b6e6` 在 per-deployment URL 驗過：SW cache 確實是 `v99`（跟前一版 `v98` 不同，precache
 真的會重跑）、`src/practice-grade-session.js` content-type 是 `application/javascript`；
 `tests/browser/practice-db.html` fixture（清過 IndexedDB 後重跑）`status: passed`，含
 `rollbackSafe`／`dailyCardClaim`／`runtimeBaseline`／`abortObserved`／atomic rollback
@@ -71,7 +72,7 @@ legacy 進度的裝置才測得出來，之前的 09-06 U5c commit 已經在真�
 | U4 | legacy + ledger 共用 materializer | 完成 |
 | U5 | 開機鏡射、catalog fence、重置、v1 匯入 | 邏輯完成，cloud-sync 接線見下 |
 | U6 | ledger-first 評分 controller、Today 接線、失敗 UI | 完成（`__ALL__` 未接） |
-| U7 | SW／release gate／read-back | 完成，已部署（`dab0b6e6`，09-07） |
+| U7 | SW／release gate／read-back | 完成，已部署（`0f551df2`，09-09） |
 | — | lineage 認領規則放寬（見下） | 完成 |
 | — | 獨立審查找到的 4 個 P0 | 已修，各自有反證 |
 
