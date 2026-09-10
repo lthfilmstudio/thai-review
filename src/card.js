@@ -136,7 +136,7 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
     </div>
     <div class="card-stage${state.flipped ? ' flipped' : ''}" id="cardStage">
       <div class="card-inner">
-        <div class="card front">
+        <div class="card front${reverse ? ' listen-first' : ''}">
           <div class="card-tag">${tag}</div>
           ${frontBody(card, reverse, zhRevealed)}
           <div class="flip-hint">TAP CARD TO FLIP</div>

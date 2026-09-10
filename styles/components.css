@@ -254,6 +254,14 @@
   to { opacity: 1; }
 }
 
+/* 正面上下間距比一般卡多 1/2（VOCAB／播放鈕／中文／TAP CARD TO FLIP） */
+.card.front.listen-first { gap: 30px; }
+.card.front.listen-first .thai-stack { gap: 21px; }
+
+@media (max-width: 640px) {
+  .card.front.listen-first { gap: 24px; }
+}
+
 .flip-hint {
   font-size: 9px;
   color: var(--text-mute);
