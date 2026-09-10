@@ -1,8 +1,8 @@
 /* 字卡模式 render。翻面走 .card-inner 整層旋轉
    （prefers-reduced-motion 時在 CSS 改 cross-fade）。
-   reverse=true：中文在正面、泰文在背面。 */
+   reverse=true：正面先只有播放鈕，按「顯示中文」才淡入中文；泰文在背面。 */
 
-import { state, isFavorite, toggleFavorite, srsEntryOf } from './state.js';
+import { state, isFavorite, toggleFavorite, srsEntryOf, cardKey } from './state.js';
 import { speakCard, zhLessonIdOf, hasRealAudio, getRealAudioUrl } from './tts.js';
 import { escapeHtml } from './ui.js';
 import { wireSentenceButton, SVG_SPARK_ICON } from './sentence.js';
@@ -41,12 +41,21 @@ function youglishUrl(thai) {
   return 'https://youglish.com/pronounce/' + encodeURIComponent(term) + '/thai';
 }
 
-function frontBody(card, reverse) {
+function zhFrontHtml(card) {
+  return `
+    <div class="zh" style="font-size:clamp(22px,4.2vw,30px)">${escapeHtml(card.zh)}</div>
+    ${card.note ? `<div class="zh-note">（${escapeHtml(card.note)}）</div>` : ''}
+  `;
+}
+
+function frontBody(card, reverse, zhRevealed) {
   if (reverse) {
     return `
       <div class="thai-stack">
-        <div class="zh" style="font-size:clamp(22px,4.2vw,30px)">${escapeHtml(card.zh)}</div>
-        ${card.note ? `<div class="zh-note">（${escapeHtml(card.note)}）</div>` : ''}
+        <button class="play-btn play-btn-lg" id="playFront" aria-label="播放泰文">${SVG_PLAY}</button>
+        <div class="zh-reveal-slot" id="zhRevealSlot">
+          ${zhRevealed ? zhFrontHtml(card) : '<button class="yg-btn zh-reveal-btn" id="zhRevealBtn">顯示中文</button>'}
+        </div>
       </div>
     `;
   }
@@ -91,6 +100,11 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
   const pct = Math.round(((i + 1) / cards.length) * 100);
   const tag = card.type === 'sentence' ? 'EXAMPLE' : 'VOCAB';
 
+  // 換到別張卡就把中文蓋回去；同一張卡重畫（同步、原音索引載完）維持打開
+  const zhRevealKey = card._cardKey || cardKey(card);
+  if (state.zhRevealedKey !== zhRevealKey) state.zhRevealedKey = null;
+  const zhRevealed = reverse && state.zhRevealedKey !== null;
+
   // 預覽 4 個評分按下去後的間隔（給每顆 pill 帶 meta 文字）
   const cur = srsEntryOf(card) || {};
   const previewAgain = formatNextReview(nextReview('again', cur).interval);
@@ -124,7 +138,7 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
       <div class="card-inner">
         <div class="card front">
           <div class="card-tag">${tag}</div>
-          ${frontBody(card, reverse)}
+          ${frontBody(card, reverse, zhRevealed)}
           <div class="flip-hint">TAP CARD TO FLIP</div>
         </div>
         <div class="card back">
@@ -198,6 +212,20 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
   document.getElementById('playBack')?.addEventListener('click', e => {
     e.stopPropagation();
     speakCard(card);
+  });
+
+  document.getElementById('playFront')?.addEventListener('click', e => {
+    e.stopPropagation();
+    speakCard(card);
+  });
+
+  // 顯示中文：只換 slot 內容並淡入，不整張重畫，重畫時已打開就直接顯示不再播動畫
+  document.getElementById('zhRevealBtn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    state.zhRevealedKey = zhRevealKey;
+    const slot = document.getElementById('zhRevealSlot');
+    slot.innerHTML = zhFrontHtml(card);
+    slot.classList.add('zh-fade-in');
   });
 
   // 課堂原音：獨立 <audio>，不共用 tts.js 的 sharedAudio（那個是自動播放鏈專用的

@@ -175,6 +175,7 @@ export const state = {
   srsToggle: false,          // card mode 下「只看待複習」開關（不存 localStorage）
   cardIndex: 0,
   flipped: false,
+  zhRevealedKey: null,       // 中文分頁正面：目前這張卡的中文已打開（存卡片 key，不存 localStorage）
   progress: {},              // { "lessonId:thai": { grade, nextReviewAt, interval, easeFactor, reps, ... } }
   favorites: {},             // { "thai": { v: 0|1, ts } }，v=0 是取消收藏的墓碑（跨裝置同步要）
   edits: {},                 // { "lessonId:thai": { thai, karaoke, zh, note } }，只存在本機
