@@ -220,8 +220,8 @@ class DurableStateTest(unittest.TestCase):
             self.assertEqual(len(snapshot["sha256"]), 64)
 
     def test_rate_freshness_has_a_fixed_thirty_day_boundary(self):
-        self.assertTrue(transcribe_class.rate_check_is_fresh(date(2026, 9, 15)))
-        self.assertFalse(transcribe_class.rate_check_is_fresh(date(2026, 9, 16)))
+        self.assertTrue(transcribe_class.rate_check_is_fresh(date(2026, 10, 12)))
+        self.assertFalse(transcribe_class.rate_check_is_fresh(date(2026, 10, 13)))
 
 
 @unittest.skipUnless(transcribe_class.tool_available("ffmpeg") and transcribe_class.tool_available("ffprobe"), "FFmpeg required")
@@ -338,8 +338,10 @@ class KeytermsAndSpeakerCountTest(unittest.TestCase):
         with_kw = transcribe_class.estimate_paid_usage([3600.0], has_keyterms=True)
         self.assertEqual(without["keyterms_surcharge_applied"], False)
         self.assertEqual(with_kw["keyterms_surcharge_applied"], True)
-        # 20% 加成套在 raw_usd（buffer 前），buffered_usd 應該正好是 raw_usd * 1.10
-        self.assertEqual(float(with_kw["raw_usd"]), round(float(without["raw_usd"]) * 1.2, 4))
+        # 加成套在 raw_usd（buffer 前），取「20%」與「每小時 $0.05」較高者：
+        # 1 小時 base $0.22，20% 是 $0.044，$0.05 較高 → raw $0.27
+        self.assertEqual(without["raw_usd"], "0.2200")
+        self.assertEqual(with_kw["raw_usd"], "0.2700")
         self.assertAlmostEqual(
             float(with_kw["buffered_usd"]), float(with_kw["raw_usd"]) * 1.10, places=3
         )

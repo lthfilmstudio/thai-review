@@ -26,12 +26,15 @@ MAX_TOTAL_SECONDS = Decimal("7200")
 MAX_BUFFERED_USD = Decimal("0.50")
 SCRIBE_USD_PER_HOUR = Decimal("0.22")
 ESTIMATE_BUFFER = Decimal("1.10")
-# ElevenLabs keyterms 加成：官方文件「an additional 20% surcharge on the base
-# transcription cost」，非零 keyterms 一律套用，不隨詞數縮放。
+# ElevenLabs keyterms 加成，兩個官方來源說法不同（2026-09-12 查核）：
+# - API 文件：「an additional 20% surcharge on the base transcription cost」
+# - pricing/api 價格表：Keyterm prompting add-on「$0.050」／小時
+# 估價取兩者較高者（目前是每小時 $0.05），非零 keyterms 一律套用，不隨詞數縮放。
 KEYTERMS_SURCHARGE = Decimal("1.20")
+KEYTERMS_ADDON_USD_PER_HOUR = Decimal("0.05")
 MAX_KEYTERMS = 1000
 MAX_KEYTERM_CHARS = 50
-RATE_CHECKED_ON = "2026-08-16"
+RATE_CHECKED_ON = "2026-09-12"
 RATE_MAX_AGE_DAYS = 30
 DEFAULT_OUTPUT_ROOT = Path("out/class-transcriptions")
 DEFAULT_STT_SECRETS_PATH = Path.home() / ".secrets" / "elevenlabs-stt.env"
@@ -265,7 +268,10 @@ def estimate_paid_usage(durations_seconds: Iterable[float], *, has_keyterms: boo
     billed_minutes = sum(math.ceil(float(value / Decimal(60))) for value in durations)
     raw = Decimal(billed_minutes) * SCRIBE_USD_PER_HOUR / Decimal(60)
     if has_keyterms:
-        raw *= KEYTERMS_SURCHARGE
+        raw += max(
+            raw * (KEYTERMS_SURCHARGE - 1),
+            Decimal(billed_minutes) * KEYTERMS_ADDON_USD_PER_HOUR / Decimal(60),
+        )
     buffered = raw * ESTIMATE_BUFFER
     quant = Decimal("0.0001")
     return {
