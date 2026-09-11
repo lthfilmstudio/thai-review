@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+import { indexLegacyAliases } from '../src/card-identity.js';
 import { TRUSTED_PRODUCTION_LINEAGE } from '../src/production-lineage-trust.js';
 
 const ROOT = new URL('../', import.meta.url);
@@ -14,6 +15,37 @@ function load(path) {
 
 function jsonBytes(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+/* 產品允許在 Sheet 刪卡（R15「刪除卡移出分母」），所以 lineage 的 canonical card ID
+   不一定還在 catalog。分兩種情況：
+   - deleted：這個 ID 在 lineage 裡的每個 alias，現行 catalog 都已經找不到——卡被刪了。
+     runtime 的 planRuntimeSrsBaseline 會先要求 alias 在現行 catalog 解析得到，
+     找不到就隔離，不會拿 lineage 的 ID 去認領，所以放行。
+   - drift：alias 還在 catalog，卻已經不是這個 ID——card_id 被換掉或重新 backfill，
+     舊進度會整批被隔離，必須擋下來。
+   2026-09-12 以前這條測試要求 canonical ID 全部都在 catalog，Sheet 刪一張 Gate B
+   之前的卡就會擋住所有部署（Nalin 同意放寬）。 */
+function lineageCatalogDrift(lineage, catalog) {
+  const cards = catalog.lessons.flatMap(lesson => (
+    lesson.cards.map(card => ({ ...card, _lessonId: lesson.id }))
+  ));
+  const catalogIds = new Set(cards.map(card => card.card_id));
+  const aliasIndex = indexLegacyAliases(cards);
+  const aliasesById = new Map();
+  for (const [alias, cardId] of Object.entries(lineage.resolvedAliases)) {
+    if (!aliasesById.has(cardId)) aliasesById.set(cardId, []);
+    aliasesById.get(cardId).push(alias);
+  }
+  const drift = [];
+  const deleted = [];
+  for (const cardId of lineage.canonicalCardIds) {
+    if (catalogIds.has(cardId)) continue;
+    const stillPresent = (aliasesById.get(cardId) || []).filter(alias => aliasIndex.has(alias));
+    if (stillPresent.length) drift.push({ cardId, aliases: stillPresent });
+    else deleted.push(cardId);
+  }
+  return { drift, deleted };
 }
 
 test('production deployment manifest 完整守恆且 self-hash 可重建', () => {
@@ -65,10 +97,41 @@ test('compact lineage 與 trusted revisions 精確一致且 aliases 守恆', () 
   );
 });
 
-test('lineage 的 current card IDs 全都存在於 mandatory catalog', () => {
+test('lineage 的 current card IDs 只會因為刪卡而不在 catalog，不能漂移', () => {
   const lineage = load('data/card-id-lineage.json');
   const catalog = load('data.json');
-  const catalogIds = new Set(catalog.lessons.flatMap(lesson => lesson.cards.map(card => card.card_id)));
-  assert.ok(lineage.canonicalCardIds.every(cardId => catalogIds.has(cardId)));
-  assert.equal(catalogIds.size, catalog.lessons.flatMap(lesson => lesson.cards).length);
+  assert.deepEqual(lineageCatalogDrift(lineage, catalog).drift, []);
+  const cards = catalog.lessons.flatMap(lesson => lesson.cards);
+  assert.equal(new Set(cards.map(card => card.card_id)).size, cards.length);
+});
+
+test('lineageCatalogDrift：刪卡放行，同一個 alias 換了 card_id 要擋', () => {
+  const idA = '11111111-1111-5111-8111-111111111111';
+  const idB = '22222222-2222-5222-8222-222222222222';
+  const idC = '33333333-3333-5333-8333-333333333333';
+  const lineage = {
+    canonicalCardIds: [idA, idB],
+    resolvedAliases: { 'gid-1:甲': idA, 'gid-1:乙': idB },
+  };
+  const lesson = cards => ({ lessons: [{ id: 'gid-1', cards }] });
+
+  const intact = lesson([{ thai: '甲', card_id: idA }, { thai: '乙', card_id: idB }]);
+  assert.deepEqual(lineageCatalogDrift(lineage, intact), { drift: [], deleted: [] });
+
+  const deleted = lesson([{ thai: '甲', card_id: idA }]);
+  assert.deepEqual(lineageCatalogDrift(lineage, deleted), { drift: [], deleted: [idB] });
+
+  const reassigned = lesson([{ thai: '甲', card_id: idA }, { thai: '乙', card_id: idC }]);
+  assert.deepEqual(lineageCatalogDrift(lineage, reassigned), {
+    drift: [{ cardId: idB, aliases: ['gid-1:乙'] }],
+    deleted: [],
+  });
+
+  const movedToOtherLesson = {
+    lessons: [
+      { id: 'gid-1', cards: [{ thai: '甲', card_id: idA }] },
+      { id: 'gid-2', cards: [{ thai: '乙', card_id: idC }] },
+    ],
+  };
+  assert.deepEqual(lineageCatalogDrift(lineage, movedToOtherLesson), { drift: [], deleted: [idB] });
 });
