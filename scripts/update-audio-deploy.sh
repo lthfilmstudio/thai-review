@@ -15,6 +15,8 @@ Options:
   --max-chars N          Paid character cap for this run. Defaults to dry-run missing chars.
   --manifest PATH        Manifest path. Default: out/site-preview/audio-manifest.json.
   --out-dir PATH         Site/audio output root. Default: out/site-preview.
+  --zh-cache-dir PATH    GCP zh segment cache. Default: out/zh-cache of the checkout
+                         that physically holds <out-dir>/audio (follows symlinks).
   --keychain-service S   macOS Keychain service for ELEVENLABS_API_KEY.
                          Default: elevenlabs-thai-review-sample.
   --skip-tests           Skip test suites before deploy.
@@ -34,6 +36,7 @@ skip_tests=0
 max_chars=""
 manifest="out/site-preview/audio-manifest.json"
 out_dir="out/site-preview"
+zh_cache_dir=""
 keychain_service="elevenlabs-thai-review-sample"
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -43,6 +46,7 @@ while [[ $# -gt 0 ]]; do
     --max-chars) max_chars="${2:-}"; shift 2 ;;
     --manifest) manifest="${2:-}"; shift 2 ;;
     --out-dir) out_dir="${2:-}"; shift 2 ;;
+    --zh-cache-dir) zh_cache_dir="${2:-}"; shift 2 ;;
     --keychain-service) keychain_service="${2:-}"; shift 2 ;;
     --skip-tests) skip_tests=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -207,6 +211,18 @@ PY
 
 ensure_preview_shell
 
+# zh 段落快取要跟 sprite 放在同一個 checkout。release worktree 的 <out-dir>/audio 是
+# symlink 回主 checkout，這時快取也要用主 checkout 那份；用 worktree 自己的 out/zh-cache
+# 會找不到已經合成過的段落，重烤時整堂課重新付費合成（2026-09-11 中 2-8 踩過）。
+if [[ -z "$zh_cache_dir" ]]; then
+  if [[ -d "$out_dir/audio" ]]; then
+    zh_cache_dir="$(cd -P "$out_dir/audio" && cd ../.. && pwd -P)/zh-cache"
+  else
+    zh_cache_dir="out/zh-cache"
+  fi
+fi
+echo "zh cache dir: $zh_cache_dir"
+
 echo "== Dry-run: ElevenLabs baked Thai audio =="
 read_dry_run
 echo "Data generated: $data_generated"
@@ -258,7 +274,7 @@ fi
 echo
 echo "== Dry-run: GCP zh sprite audio =="
 read_zh_dry_run() {
-  zh_json="$(python3 scripts/gen-zh-audio.py --dry-run --json --out-dir "$out_dir")"
+  zh_json="$(python3 scripts/gen-zh-audio.py --dry-run --json --out-dir "$out_dir" --cache-dir "$zh_cache_dir")"
   zh_stale="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["lessons_stale"])' <<<"$zh_json")"
   zh_chars="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["api_chars"])' <<<"$zh_json")"
   zh_usd="$(python3 -c 'import json,sys; print(format(json.load(sys.stdin)["estimated_usd"], ".2f"))' <<<"$zh_json")"
@@ -275,7 +291,8 @@ if [[ "$zh_stale" != "0" && "$generate" -eq 1 ]]; then
     --generate \
     --confirm-paid-api \
     --max-chars "$zh_chars" \
-    --out-dir "$out_dir"
+    --out-dir "$out_dir" \
+    --cache-dir "$zh_cache_dir"
   read_zh_dry_run
 fi
 
