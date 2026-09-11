@@ -1,7 +1,7 @@
 /* Service Worker：app shell cache + runtime CSV cache。
    改檔後升 CACHE 版本號強制更新。 */
 
-const CACHE = 'thai-review-v103';
+const CACHE = 'thai-review-v104';
 
 const SHELL = [
   './',
@@ -121,6 +121,7 @@ self.addEventListener('fetch', e => {
        url.pathname.endsWith('/src/tts-prompts.js') ||
        url.pathname.endsWith('/audio-manifest.json') ||
        url.pathname.endsWith('/zh-manifest.json') ||
+       url.pathname.endsWith('/real-manifest.json') ||
        url.pathname.endsWith('/deploy-info.json'))) {
     e.respondWith(networkFirst(e.request));
     return;
