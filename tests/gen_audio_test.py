@@ -222,6 +222,79 @@ class GenAudioTest(unittest.TestCase):
         self.assertEqual(dry_run["missing"][0]["item"].thai, "ขอบใจ นะ")
         self.assertEqual(dry_run["missing"][0]["item"].tts_text, "[warm, sincere] ขอบใจนะ")
 
+    def test_stale_prompt_is_dropped_when_thai_changed_but_zh_did_not(self):
+        """泰文修了錯字、中文沒動 → 舊 prompt 必須被丟掉。
+
+        2026-09-12 踩到：條件原本是「thai 不符『且』zh 不符」才跳過，改錯字時
+        zh 一樣就讓過期 prompt 過關，tts_text 還是舊字串，覆蓋率報 missing=0，
+        那張卡卻一直播改之前的發音，而且零警告。
+        """
+        data = {
+            "lessons": [{
+                "id": "gid-202574020",
+                "title": "初 5-7",
+                "cards": [
+                    {"thai": "ทำเค้กเป็นมั้ย", "zh": "會做蛋糕嗎"},
+                ],
+            }],
+        }
+        prompts = {
+            "lessons": {
+                "gid-202574020": {
+                    "items": [{
+                        "row": 1,
+                        "thai": "ทำเค้กเป็นมย",
+                        "zh": "會做蛋糕嗎",
+                        "tts_prompt": "[curious, conversational] ทำเค้กเป็นมย",
+                    }],
+                },
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            prompt_path = Path(tmp) / "tts-prompts.json"
+            prompt_path.write_text(json.dumps(prompts, ensure_ascii=False), encoding="utf-8")
+            prompted = gen_audio.apply_tts_prompts(data, gen_audio.load_tts_prompts(prompt_path))
+
+        card = prompted["lessons"][0]["cards"][0]
+        self.assertNotIn("tts_prompt", card)
+
+        items, _, _, _ = gen_audio.collect_unique_thai(prompted)
+        self.assertEqual([i.tts_text for i in items], ["ทำเค้กเป็นมั้ย"])
+
+    def test_prompt_still_applies_when_thai_matches(self):
+        """泰文相符時照舊套用，不能因為上面那條防呆把正常路徑一起擋掉。"""
+        data = {
+            "lessons": [{
+                "id": "gid-202574020",
+                "title": "初 5-7",
+                "cards": [
+                    {"thai": "ทำเค้กเป็นมั้ย", "zh": "會做蛋糕嗎"},
+                ],
+            }],
+        }
+        prompts = {
+            "lessons": {
+                "gid-202574020": {
+                    "items": [{
+                        "row": 1,
+                        "thai": "ทำเค้กเป็นมั้ย",
+                        "zh": "會做蛋糕嗎",
+                        "tts_prompt": "[curious, conversational] ทำเค้กเป็นมั้ย",
+                    }],
+                },
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            prompt_path = Path(tmp) / "tts-prompts.json"
+            prompt_path.write_text(json.dumps(prompts, ensure_ascii=False), encoding="utf-8")
+            prompted = gen_audio.apply_tts_prompts(data, gen_audio.load_tts_prompts(prompt_path))
+
+        items, _, _, _ = gen_audio.collect_unique_thai(prompted)
+        self.assertEqual([i.tts_text for i in items],
+                         ["[curious, conversational] ทำเค้กเป็นมั้ย"])
+
 
 if __name__ == "__main__":
     unittest.main()

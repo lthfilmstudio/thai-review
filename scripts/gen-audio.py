@@ -160,9 +160,13 @@ def apply_tts_prompts(data: dict, prompt_data: dict | None) -> dict:
             prompt_thai = str(item.get("thai") or "").strip()
             card_zh = str(card.get("zh") or "").strip()
             prompt_zh = str(item.get("zh") or "").strip()
+            # prompt 帶的是「當初拿去烤 MP3 的那串字」。卡片泰文一改，prompt 就過期了，
+            # 再套上去會讓 tts_text 還是舊字串 → audio_key 命中舊音檔 → 覆蓋率報 missing=0，
+            # 但那張卡實際播的是改之前的發音，而且完全沒有警告。所以泰文必須相符才套用；
+            # zh 只是「確認是同一列」的第二道關卡，不能單獨讓過期 prompt 過關。
             thai_matches = normalize_audio_text(card_thai) == normalize_audio_text(prompt_thai)
             zh_matches = not prompt_zh or card_zh == prompt_zh
-            if not thai_matches and not zh_matches:
+            if not (thai_matches and zh_matches):
                 cards_out.append(card)
                 continue
 

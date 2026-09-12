@@ -281,10 +281,10 @@ class BackfillCardIdsTest(unittest.TestCase):
         report = backfill_card_ids.build_dry_run(
             backfill_card_ids.load_data(ROOT / "data.json")
         )
-        self.assertEqual(report["summary"]["card_count"], 14145)
+        self.assertEqual(report["summary"]["card_count"], 14144)
         self.assertEqual(report["summary"]["collision_group_count"], 617)
         self.assertEqual(report["summary"]["collision_card_count"], 1280)
-        self.assertEqual(report["summary"]["unique_card_id_count"], 14145)
+        self.assertEqual(report["summary"]["unique_card_id_count"], 14144)
 
     def test_learning_snapshot_reports_collision_intersections(self):
         snapshot = json.loads(
