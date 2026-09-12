@@ -140,7 +140,7 @@ async function loadLessonsSmart({ force = false, runtimeStorage = null } = {}) {
 function rerender(storage) {
   const runtimeStorage = requireWorkspaceStorage(storage);
   const renderAgain = () => rerender(runtimeStorage);
-  preloadRealAudioAvailability(state.currentLessonId, renderAgain);
+  preloadRealAudioAvailability(renderAgain);
   renderSidebar(id => selectLesson(id, runtimeStorage), runtimeStorage);
   renderTopbarTitle();
   renderContent(renderAgain, runtimeStorage);

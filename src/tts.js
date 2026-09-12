@@ -346,15 +346,27 @@ function loadRealShard(url) {
   return promise;
 }
 
-/* 課次的真人語音索引還沒抓過就先抓一次（不 await），抓到之後叫 onReady()
-   讓呼叫端（app.js 的 rerender）重畫，UI 才會補上原本因為還沒查到而沒顯示
-   的按鈕。已經抓過的課次直接跳過，重複呼叫零成本。 */
-export function preloadRealAudioAvailability(lessonId, onReady) {
-  if (!lessonId || realKnownThaiCache.has(lessonId)) return;
-  loadRealTiming(lessonId).then(timing => {
-    realKnownThaiCache.set(lessonId, new Set(Object.keys(timing?.items || {})));
-    onReady?.();
-  });
+/* manifest 上「所有」有真人音檔的課次索引一次抓完（不 await），抓到之後叫
+   onReady() 讓呼叫端（app.js 的 rerender）重畫，UI 才會補上原本因為還沒查到
+   而沒顯示的按鈕。
+
+   不能只抓目前選中的課：虛擬課次（__ALL__ / __TODAY__ / __FAV__ / __SEARCH__）
+   的卡片帶的是自己原本那堂課的 _lessonId（state.js 的 currentLesson()），而
+   card.js 是拿 zhLessonIdOf(card) 去查，只預載 state.currentLessonId 會讓混合
+   模式下每一張卡都查不到、按鈕整批消失。timing JSON 全部加起來才幾十 KB，音檔
+   要點下去才抓，所以全抓的代價很小。
+
+   已經抓過就直接跳過，重複呼叫零成本。 */
+let realPreloadPromise = null;
+export function preloadRealAudioAvailability(onReady) {
+  if (realPreloadPromise) return;
+  realPreloadPromise = loadRealManifest().then(index => {
+    const lessonIds = [...index.keys()].filter(id => !realKnownThaiCache.has(id));
+    if (!lessonIds.length) return;
+    return Promise.all(lessonIds.map(lessonId => loadRealTiming(lessonId).then(timing => {
+      realKnownThaiCache.set(lessonId, new Set(Object.keys(timing?.items || {})));
+    }))).then(() => { onReady?.(); });
+  }).catch(() => {});
 }
 
 /* 同步查詢，給 card.js render 用；還沒 preload 過的課次一律當作沒有（false），
