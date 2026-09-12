@@ -189,8 +189,8 @@
         {
           "row": 44,
           "zh": "可以嗎",
-          "thai": "ได้มั้คะ",
-          "tts_prompt": "[curious, conversational] ได้มั้คะ"
+          "thai": "ได้มั้ยคะ",
+          "tts_prompt": "[curious, conversational] ได้มั้ยคะ"
         },
         {
           "row": 47,
@@ -243,8 +243,8 @@
         {
           "row": 67,
           "zh": "會做蛋糕嗎",
-          "thai": "ทำเค้กเป็นมย",
-          "tts_prompt": "[curious, conversational] ทำเค้กเป็นมย"
+          "thai": "ทำเค้กเป็นมั้ย",
+          "tts_prompt": "[curious, conversational] ทำเค้กเป็นมั้ย"
         },
         {
           "row": 68,
@@ -3749,8 +3749,8 @@
         {
           "row": 54,
           "zh": "不用擔心",
-          "thai": "不ต้องเป็นห่วง",
-          "tts_prompt": "[firm, clear] 不ต้องเป็นห่วง"
+          "thai": "ไม่ต้องเป็นห่วง",
+          "tts_prompt": "[firm, clear] ไม่ต้องเป็นห่วง"
         },
         {
           "row": 59,
