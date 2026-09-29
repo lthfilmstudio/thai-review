@@ -415,15 +415,29 @@ function pickBrowserVoice(lang) {
     || null;
 }
 
+function clearPlaybackHandlers(audio) {
+  audio.onended = null;
+  audio.onerror = null;
+  audio.onpause = null;
+  audio.onloadedmetadata = null;
+}
+
+// 非同步原音 lookup 用同一代號，鍵盤、按鈕與停止操作都能使舊請求失效。
+export function isCurrentPlaybackGeneration(generation) {
+  return generation === playbackGeneration;
+}
+
 export function cancelSpeech() {
   playbackGeneration++;
   const playback = currentPlayback;
   currentPlayback = null;
   if (playback?.audio) {
+    clearPlaybackHandlers(playback.audio);
     try { playback.audio.pause(); } catch {}
   }
   try { window.speechSynthesis?.cancel(); } catch {}
   playback?.resolve?.(0);
+  return playbackGeneration;
 }
 
 export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked = true, presetUrl = null }) {
@@ -432,18 +446,23 @@ export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked 
 
   return new Promise(resolve => {
     let settled = false;
+    let watchdog;
+    const isActive = () => !settled && generation === playbackGeneration;
     const finish = durationMs => {
       if (settled) return;
       settled = true;
+      clearTimeout(watchdog);
       if (currentPlayback?.generation === generation) currentPlayback = null;
       resolve(durationMs);
     };
+    // 下載尚未完成時也必須能取消、結束等待中的 Promise。
+    currentPlayback = { generation, resolve: finish };
 
     const trimmed = (text || '').trim();
     if (!trimmed) { finish(0); return; }
 
     const fallback = () => {
-      if (generation !== playbackGeneration) { finish(0); return; }
+      if (!isActive()) { finish(0); return; }
       // 背景中 speechSynthesis 不會出聲、也常不回 onend，直接跳過避免聲音鏈卡死。
       if (typeof document !== 'undefined' && document.hidden) { finish(0); return; }
       if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) {
@@ -458,7 +477,11 @@ export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked 
       if (browserVoice) utterance.voice = browserVoice;
 
       // speechSynthesis 偶爾一個事件都不回，保險絲逾時直接放行。
-      const watchdog = setTimeout(() => finish(0), Math.max(4000, trimmed.length * 300));
+      watchdog = setTimeout(() => {
+        if (!isActive()) return;
+        window.speechSynthesis.cancel();
+        finish(0);
+      }, Math.max(4000, trimmed.length * 300));
       let startedAt = Date.now();
       utterance.onstart = () => { startedAt = Date.now(); };
       utterance.onend = () => { clearTimeout(watchdog); finish(Date.now() - startedAt); };
@@ -468,28 +491,41 @@ export function speakTextWithPromise({ text, voice, lang, rate = 1, preferBaked 
     };
 
     const playAudio = (url, onError) => {
-      if (generation !== playbackGeneration) { finish(0); return; }
+      if (!isActive()) { finish(0); return; }
       if (!url) { onError(); return; }
 
       const audio = getSharedAudio();
+      clearPlaybackHandlers(audio);
       audio.src = url;
       // 換 src 會把 playbackRate 重設成 defaultPlaybackRate，兩個都要設。
       audio.defaultPlaybackRate = rate;
       audio.playbackRate = rate;
       let startedAt = Date.now();
+      let failed = false;
+      const fail = tag => {
+        // 一次播放可能同時回 error 事件及 play() rejection，只切換一次。
+        if (failed || !isActive()) return;
+        failed = true;
+        clearPlaybackHandlers(audio);
+        try { audio.pause(); } catch {}
+        logListenEvent(tag);
+        onError();
+      };
       currentPlayback = { generation, audio, resolve: finish };
       audio.onended = () => {
+        if (failed || !isActive()) return;
         const durationMs = Number.isFinite(audio.duration) && audio.duration > 0
           ? audio.duration * 1000 / rate
           : Date.now() - startedAt;
         finish(durationMs);
       };
-      audio.onerror = () => { logListenEvent('media-error'); onError(); };
+      audio.onerror = () => fail('media-error');
       startedAt = Date.now();
-      audio.play().catch(err => { logListenEvent(`play-fail ${err?.name || err}`); onError(); });
+      audio.play().catch(err => fail(`play-fail ${err?.name || err}`));
     };
 
     const playWorkerAudio = () => {
+      if (!isActive()) { finish(0); return; }
       fetchWorkerTtsBlob(trimmed, voice).then(url => {
         playAudio(url, fallback);
       });
@@ -521,6 +557,7 @@ export function playSilenceWithPromise(ms) {
     if (!(ms > 0)) { finish(0); return; }
 
     const audio = getSharedAudio();
+    clearPlaybackHandlers(audio);
     try {
       audio.src = getSilenceUrl(ms);
     } catch {
@@ -753,6 +790,7 @@ export function playUrlWithPromise(url, { startAtSec = 0, onStall } = {}) {
     };
 
     const audio = getSharedAudio();
+    clearPlaybackHandlers(audio);
     audio.src = url;
     audio.defaultPlaybackRate = 1;
     audio.playbackRate = 1;
@@ -777,6 +815,7 @@ export function playUrlWithPromise(url, { startAtSec = 0, onStall } = {}) {
         .catch(err => logListenEvent(`cycle-resume-fail ${err?.name || err}`));
     };
     const begin = () => {
+      if (settled || generation !== playbackGeneration) return;
       audio.onloadedmetadata = null; // 共用 audio，不留 handler 給下一次播放
       startedAt = Date.now();
       audio.play().catch(err => { logListenEvent(`cycle-play-fail ${err?.name || err}`); finish(0); });
@@ -784,6 +823,7 @@ export function playUrlWithPromise(url, { startAtSec = 0, onStall } = {}) {
     if (startAtSec > 0) {
       // blob WAV metadata 載入極快；等 loadedmetadata 設起點才不會被 load 重設回 0
       audio.onloadedmetadata = () => {
+        if (settled || generation !== playbackGeneration) return;
         try { audio.currentTime = startAtSec; } catch {}
         begin();
       };

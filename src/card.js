@@ -3,7 +3,7 @@
    reverse=true：正面先只有播放鈕，按「顯示中文」才淡入中文；泰文在背面。 */
 
 import { state, isFavorite, toggleFavorite, srsEntryOf, cardKey } from './state.js';
-import { speakCard, zhLessonIdOf, hasRealAudio, getRealAudioUrl } from './tts.js';
+import { speakCard, cancelSpeech, isCurrentPlaybackGeneration, playUrlWithPromise, zhLessonIdOf, hasRealAudio, getRealAudioUrl } from './tts.js';
 import { escapeHtml } from './ui.js';
 import { wireSentenceButton, SVG_SPARK_ICON } from './sentence.js';
 import { nextReview, formatNextReview } from './srs.js';
@@ -94,7 +94,7 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
   const reverse = !!opts.reverse;
   const realAudioAvailable = opts.hasRealAudio || hasRealAudio;
   const realAudioUrlLoader = opts.getRealAudioUrl || getRealAudioUrl;
-  const AudioCtor = opts.AudioCtor || Audio;
+  const playAudioUrl = opts.playAudioUrl || playUrlWithPromise;
   const i = state.cardIndex;
   const card = cards[i];
   const pct = Math.round(((i + 1) / cards.length) * 100);
@@ -228,17 +228,18 @@ export function renderCardMode(el, cards, _onGrade, opts = {}) {
     slot.classList.add('zh-fade-in');
   });
 
-  // 課堂原音：獨立 <audio>，不共用 tts.js 的 sharedAudio（那個是自動播放鏈專用的
-  // 狀態機，這裡只是手動點一次播放，混用會互搶播放狀態）。
+  // 與 AI 語音共用互斥播放；lookup 期間的新點擊也會作廢舊請求。
+  // 直接播原音 URL，失敗不切換 TTS，保留原音的速度與切點。
   document.getElementById('realAudioBtn')?.addEventListener('click', async e => {
     e.stopPropagation();
+    const playbackGeneration = cancelSpeech();
     const url = await realAudioUrlLoader(card.thai, realAudioLessonId);
-    if (!isCurrentCardAudioRender(audioRenderGeneration)) return;
+    if (!isCurrentCardAudioRender(audioRenderGeneration) || !isCurrentPlaybackGeneration(playbackGeneration)) return;
     if (!url) {
       console.warn('課堂原音載入失敗：', card.thai);
       return;
     }
-    new AudioCtor(url).play().catch(() => {});
+    void playAudioUrl(url);
   });
 
   // AI 造句：傳卡片的泰文當 word；按下去 fetch、render；不影響翻面

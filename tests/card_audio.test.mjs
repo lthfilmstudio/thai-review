@@ -14,6 +14,7 @@ const {
 } = await import('../src/card.js');
 const { state } = await import('../src/state.js');
 const { renderContent } = await import('../src/ui.js');
+const { cancelSpeech, speakCard } = await import('../src/tts.js');
 
 function makeElementStore() {
   const elements = new Map();
@@ -63,7 +64,7 @@ test('delayed Card A lookup after Card B renders creates no stale Audio, while B
   const render = card => renderCardMode(root, [card], () => {}, {
     hasRealAudio: () => true,
     getRealAudioUrl: (thai) => new Promise(resolve => audioRequests.push({ thai, resolve })),
-    AudioCtor: FakeAudio,
+    playAudioUrl: url => new FakeAudio(url).play(),
   });
 
   render(cards[0]);
@@ -91,7 +92,7 @@ test('leaving card mode invalidates a pending card audio completion', async () =
   renderCardMode(root, [cards[0]], () => {}, {
     hasRealAudio: () => true,
     getRealAudioUrl: () => request,
-    AudioCtor: FakeAudio,
+    playAudioUrl: url => new FakeAudio(url).play(),
   });
   const click = elements.get('realAudioBtn').listeners.get('click');
   const clickPromise = click({ stopPropagation() {} });
@@ -113,7 +114,7 @@ test('renderContent SRS empty state invalidates a pending card audio completion'
   renderCardMode(root, [cards[0]], () => {}, {
     hasRealAudio: () => true,
     getRealAudioUrl: () => request,
-    AudioCtor: FakeAudio,
+    playAudioUrl: url => new FakeAudio(url).play(),
   });
   const click = elements.get('realAudioBtn').listeners.get('click');
   const clickPromise = click({ stopPropagation() {} });
@@ -133,3 +134,75 @@ test('renderContent SRS empty state invalidates a pending card audio completion'
   state.lessons = [];
   state.progress = {};
 });
+
+test('teacher audio repeat clicks and AI playback share one active media source in both directions', async t => {
+  const { elements, root } = makeElementStore();
+  const media = [];
+  globalThis.document = { getElementById(id) { return elements.get(id) || null; }, hidden: false };
+  globalThis.window = { speechSynthesis: { cancel() {} } };
+  globalThis.Audio = class {
+    constructor(url) { this.src = url; this.paused = true; media.push(this); }
+    play() { this.paused = false; return Promise.resolve(); }
+    pause() { this.paused = true; this.onpause?.(); }
+  };
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ items: [{ text: '卡 A', path: 'ai.mp3' }] }) });
+  t.after(() => cancelSpeech());
+  renderCardMode(root, [cards[0]], () => {}, { hasRealAudio: () => true, getRealAudioUrl: async () => 'teacher.mp3' });
+  const click = id => elements.get(id).listeners.get('click')({ stopPropagation() {} });
+  await click('realAudioBtn');
+  await click('realAudioBtn');
+  assert.equal(media.filter(audio => !audio.paused).length, 1, 'repeated original-audio clicks overlap');
+  click('playBack');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(media.filter(audio => !audio.paused).length, 1, 'AI overlaps original audio');
+  assert.equal(media.find(audio => !audio.paused).src, 'ai.mp3');
+  await click('realAudioBtn');
+  assert.equal(media.filter(audio => !audio.paused).length, 1, 'original audio overlaps AI');
+  assert.equal(media.find(audio => !audio.paused).src, 'teacher.mp3');
+});
+
+test('AI click invalidates a pending teacher lookup on the same card', async () => {
+  const { elements, root } = makeElementStore();
+  globalThis.document = { getElementById(id) { return elements.get(id) || null; }, hidden: false };
+  let resolveLookup;
+  const played = [];
+  globalThis.Audio = class {
+    constructor(url) { played.push(url); }
+    play() { return Promise.resolve(); }
+  };
+  renderCardMode(root, [cards[0]], () => {}, {
+    hasRealAudio: () => true,
+    getRealAudioUrl: () => new Promise(resolve => { resolveLookup = resolve; }),
+    playAudioUrl: url => played.push(url),
+  });
+  const pending = elements.get('realAudioBtn').listeners.get('click')({ stopPropagation() {} });
+  elements.get('playBack').listeners.get('click')({ stopPropagation() {} });
+  resolveLookup('stale-teacher.mp3');
+  await pending;
+  assert.deepEqual(played, []);
+  await new Promise(resolve => setImmediate(resolve));
+  cancelSpeech();
+});
+
+for (const action of ['keyboard P', 'cancelSpeech']) {
+  test(`${action} invalidates a pending teacher lookup outside card click handlers`, async () => {
+    const { elements, root } = makeElementStore();
+    globalThis.document = { getElementById(id) { return elements.get(id) || null; }, hidden: false };
+    let resolveLookup;
+    const played = [];
+    renderCardMode(root, [cards[0]], () => {}, {
+      hasRealAudio: () => true,
+      getRealAudioUrl: () => new Promise(resolve => { resolveLookup = resolve; }),
+      playAudioUrl: url => played.push(url),
+    });
+    const pending = elements.get('realAudioBtn').listeners.get('click')({ stopPropagation() {} });
+    // app.js keyboard P directly invokes speakCard, bypassing playBack's handler.
+    if (action === 'keyboard P') speakCard(cards[0]);
+    else cancelSpeech();
+    resolveLookup('stale-teacher.mp3');
+    await pending;
+    assert.deepEqual(played, []);
+    await new Promise(resolve => setImmediate(resolve));
+    cancelSpeech();
+  });
+}
