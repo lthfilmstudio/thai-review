@@ -8,6 +8,7 @@ import unittest
 from contextlib import redirect_stdout
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -220,8 +221,9 @@ class DurableStateTest(unittest.TestCase):
             self.assertEqual(len(snapshot["sha256"]), 64)
 
     def test_rate_freshness_has_a_fixed_thirty_day_boundary(self):
-        self.assertTrue(transcribe_class.rate_check_is_fresh(date(2026, 9, 15)))
-        self.assertFalse(transcribe_class.rate_check_is_fresh(date(2026, 9, 16)))
+        with patch.object(transcribe_class._common, "RATE_CHECKED_ON", "2026-08-16"):
+            self.assertTrue(transcribe_class.rate_check_is_fresh(date(2026, 9, 15)))
+            self.assertFalse(transcribe_class.rate_check_is_fresh(date(2026, 9, 16)))
 
 
 @unittest.skipUnless(transcribe_class.tool_available("ffmpeg") and transcribe_class.tool_available("ffprobe"), "FFmpeg required")

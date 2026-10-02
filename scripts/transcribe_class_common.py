@@ -31,7 +31,8 @@ ESTIMATE_BUFFER = Decimal("1.10")
 KEYTERMS_SURCHARGE = Decimal("1.20")
 MAX_KEYTERMS = 1000
 MAX_KEYTERM_CHARS = 50
-RATE_CHECKED_ON = "2026-08-16"
+# https://elevenlabs.io/pricing/api — Scribe v2 USD 0.22/hour, checked 2026-09-28.
+RATE_CHECKED_ON = "2026-09-28"
 RATE_MAX_AGE_DAYS = 30
 DEFAULT_OUTPUT_ROOT = Path("out/class-transcriptions")
 DEFAULT_STT_SECRETS_PATH = Path.home() / ".secrets" / "elevenlabs-stt.env"
