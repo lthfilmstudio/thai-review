@@ -282,8 +282,9 @@ class BackfillCardIdsTest(unittest.TestCase):
             backfill_card_ids.load_data(ROOT / "data.json")
         )
         self.assertEqual(report["summary"]["card_count"], 14144)
-        self.assertEqual(report["summary"]["collision_group_count"], 617)
-        self.assertEqual(report["summary"]["collision_card_count"], 1280)
+        # 2026-09-29 字卡審查寫回 Sheet 後多一組同內容卡（617→618、1280→1282）
+        self.assertEqual(report["summary"]["collision_group_count"], 618)
+        self.assertEqual(report["summary"]["collision_card_count"], 1282)
         self.assertEqual(report["summary"]["unique_card_id_count"], 14144)
 
     def test_learning_snapshot_reports_collision_intersections(self):

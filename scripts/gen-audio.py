@@ -22,12 +22,13 @@ from urllib import error, parse, request
 from zoneinfo import ZoneInfo
 
 
-DEFAULT_VOICE_NAME = "Jessica - Playful, Bright, Warm"
-DEFAULT_VOICE_ID = "r1KmysJdVYZjJCm4mL3b"
-DEFAULT_MODEL_ID = "eleven_v3"
+# 2026-10-02 全部改用 Aom（Eleven v4）；舊 Jessica 音檔 audio/jessica-v1 已移出部署目錄
+DEFAULT_VOICE_NAME = "Aom - Gentle, Confident, Smooth"
+DEFAULT_VOICE_ID = "nealpwJT5tCyJFKDzEq8"
+DEFAULT_MODEL_ID = "eleven_v4"
 DEFAULT_LANGUAGE_CODE = "th"
 DEFAULT_OUTPUT_FORMAT = "mp3_44100_128"
-DEFAULT_AUDIO_PREFIX = "audio/jessica-v1"
+DEFAULT_AUDIO_PREFIX = "audio/aom-v4"
 DEFAULT_OUT_DIR = Path("out")
 DEFAULT_TTS_PROMPTS_PATH = Path("tts-prompts.json")
 DEFAULT_USD_PER_1K_CHARS = 0.10

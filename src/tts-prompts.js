@@ -192,8 +192,8 @@ export const TTS_PROMPT_MANIFEST = {
         {
           "row": 44,
           "zh": "可以嗎",
-          "thai": "ได้มั้คะ",
-          "tts_prompt": "[curious, conversational] ได้มั้คะ"
+          "thai": "ได้มั้ยคะ",
+          "tts_prompt": "[curious, conversational] ได้มั้ยคะ"
         },
         {
           "row": 47,
@@ -246,8 +246,8 @@ export const TTS_PROMPT_MANIFEST = {
         {
           "row": 67,
           "zh": "會做蛋糕嗎",
-          "thai": "ทำเค้กเป็นมย",
-          "tts_prompt": "[curious, conversational] ทำเค้กเป็นมย"
+          "thai": "ทำเค้กเป็นมั้ย",
+          "tts_prompt": "[curious, conversational] ทำเค้กเป็นมั้ย"
         },
         {
           "row": 68,
@@ -3752,8 +3752,8 @@ export const TTS_PROMPT_MANIFEST = {
         {
           "row": 54,
           "zh": "不用擔心",
-          "thai": "不ต้องเป็นห่วง",
-          "tts_prompt": "[firm, clear] 不ต้องเป็นห่วง"
+          "thai": "ไม่ต้องเป็นห่วง",
+          "tts_prompt": "[firm, clear] ไม่ต้องเป็นห่วง"
         },
         {
           "row": 59,
@@ -6868,8 +6868,8 @@ export const TTS_PROMPT_MANIFEST = {
         {
           "row": 143,
           "zh": "有醫院、飯店、學校、電影院",
-          "thai": "มีทั้งโรงพยาบาลโรงแรมโรงเรียนโรงหนังโรงหนัง",
-          "tts_prompt": "[informative, listing] มีทั้งโรงพยาบาลโรงแรมโรงเรียนโรงหนังโรงหนัง"
+          "thai": "มีทั้งโรงพยาบาลโรงแรมโรงเรียนโรงหนัง",
+          "tts_prompt": "[informative, listing] มีทั้งโรงพยาบาลโรงแรมโรงเรียนโรงหนัง"
         },
         {
           "row": 144,
@@ -8851,9 +8851,11 @@ export function applyTtsPromptsToLesson(lesson) {
     const item = promptsByRow.get(index + 1);
     if (!item?.tts_prompt) return card;
 
+    // 跟 gen-audio.py apply_tts_prompts 同一條規則：泰文必須相符才套用，zh 只是第二道關卡。
+    // 泰文改過卻套舊 prompt，會拿舊字串去查 audio-manifest → 查不到就退回 Worker TTS。
     const thaiMatches = normalizeThaiPromptText(card?.thai) === normalizeThaiPromptText(item.thai);
     const zhMatches = !item.zh || String(card?.zh || '').trim() === String(item.zh || '').trim();
-    if (!thaiMatches && !zhMatches) return card;
+    if (!(thaiMatches && zhMatches)) return card;
 
     return { ...card, tts_prompt: item.tts_prompt };
   });
